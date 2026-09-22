@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -40,9 +40,17 @@ jobs:
             url=$(python3 -c "import os,sys,urllib.parse; print(sys.argv[1].replace('PASS', urllib.parse.quote(os.environ['DB_PASSWORD'], safe='')))" "$c")
             out=$(PGCONNECT_TIMEOUT=8 psql "$url" -c 'select 1' 2>&1); rc=$?
             if [ $rc -eq 0 ]; then echo "connected via ${c#*@}"; echo "url=$url" >> "$GITHUB_OUTPUT"; exit 0; fi
-            echo "${c#*@}: $(echo "$out" | head -1 | cut -c1-160)"
+            echo "${c#*@}: $(echo "$out" | head -1 | cut -c1-160)" | tee -a "$RUNNER_TEMP/diag.txt"
           done
           echo "could not connect to database"; exit 1
+      - name: Publish diagnostics
+        if: failure()
+        run: |
+          git config user.name deploy-bot; git config user.email bot@users.noreply.github.com
+          git fetch origin logs 2>/dev/null && git checkout logs || git checkout --orphan logs
+          git rm -rfq --cached . 2>/dev/null || true; mkdir -p logs
+          { echo "run ${{ github.run_id }} $(date -u)"; cat "$RUNNER_TEMP/diag.txt" 2>/dev/null; } > logs/last-run.txt
+          git add -f logs/last-run.txt; git commit -qm "diag ${{ github.run_id }}" || true; git push -q origin HEAD:logs
       - name: Run migrations
         run: |
           for f in $(ls supabase/migrations/*.sql | sort); do echo "== $f"; psql "${{ steps.db.outputs.url }}" -v ON_ERROR_STOP=1 -f "$f"; done
