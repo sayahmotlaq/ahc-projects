@@ -1,0 +1,69 @@
+name: deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  database:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      DB_URL: ${{ secrets.DB_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: Resolve database connection
+        id: db
+        run: |
+          set +e
+          REF=$(echo "$SUPABASE_URL" | sed -E 's#https://([a-z0-9]+)\.supabase\.co.*#\1#')
+          if [ -n "$DB_URL" ]; then CANDS="$DB_URL"; else
+            CANDS=""
+            for host in aws-0-eu-central-1 aws-1-eu-central-1 aws-0-ap-south-1 aws-1-ap-south-1 aws-0-ap-southeast-1 aws-1-ap-southeast-1 aws-0-eu-west-1 aws-1-eu-west-1 aws-0-us-east-1 aws-1-us-east-1 aws-0-eu-west-2 aws-1-eu-west-2 aws-0-eu-north-1 aws-1-eu-north-1 aws-0-ap-northeast-1 aws-1-ap-northeast-1 aws-0-ca-central-1 aws-1-ca-central-1 aws-0-sa-east-1 aws-1-sa-east-1 aws-0-us-west-1 aws-1-us-west-1 aws-0-ap-southeast-2 aws-1-ap-southeast-2 aws-0-ap-northeast-2 aws-1-ap-northeast-2 aws-0-us-east-2 aws-1-us-east-2 aws-0-eu-west-3 aws-1-eu-west-3; do
+              CANDS="$CANDS postgresql://postgres.$REF:PASS@$host.pooler.supabase.com:5432/postgres"
+            done
+          fi
+          for c in $CANDS; do
+            url=$(python3 -c "import os,sys,urllib.parse; print(sys.argv[1].replace('PASS', urllib.parse.quote(os.environ['DB_PASSWORD'], safe='')))" "$c")
+            if psql "$url" -c 'select 1' >/dev/null 2>&1; then echo "connected via ${c%%:PASS@*}@${c#*@}"; echo "url=$url" >> "$GITHUB_OUTPUT"; exit 0; fi
+          done
+          echo "could not connect to database"; exit 1
+      - name: Run migrations
+        run: |
+          for f in $(ls supabase/migrations/*.sql | sort); do echo "== $f"; psql "${{ steps.db.outputs.url }}" -v ON_ERROR_STOP=1 -f "$f"; done
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Seed reference data
+        run: node scripts/seed.mjs
+
+  pages:
+    needs: database
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inject public config
+        run: |
+          cat > site/config.js <<EOF
+          window.AHC_CONFIG = { url: "${{ secrets.SUPABASE_URL }}", anon: "${{ secrets.SUPABASE_ANON_KEY }}", version: "${{ github.sha }}" };
+          EOF
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: site }
+      - id: deployment
+        uses: actions/deploy-pages@v4
