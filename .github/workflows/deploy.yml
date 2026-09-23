@@ -61,6 +61,9 @@ jobs:
       - name: Seed reference data
         id: seed
         run: node scripts/seed.mjs 2>&1 | tee "$RUNNER_TEMP/seed.txt"; test ${PIPESTATUS[0]} -eq 0
+      - name: Import projects (one-time per file)
+        if: steps.db.outputs.url != ''
+        run: node scripts/import_projects.mjs 2>&1 | tee -a "$RUNNER_TEMP/seed.txt"; test ${PIPESTATUS[0]} -eq 0
       - name: Publish seed log
         if: always()
         continue-on-error: true

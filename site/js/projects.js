@@ -3,29 +3,34 @@ import { sb, REF, STAGES, stageOf, PROJECT_TYPES, UPDATE_KINDS, canEdit, isAdmin
 import { $, $$, esc, fmt, fmt0, money, dateAr, toast, err, modal, confirm, field, inp, sel, formData } from './ui.js';
 import { mountBoq, calc, BOQ_STATUS } from './boq.js';
 
+const CATEGORIES = ['حكومي', 'شراء مباشر', 'شراكة مجتمعية'];
 let profiles = [];
 async function loadProfiles() { profiles = await q(sb.from('profiles').select('id,full_name,email,role').order('full_name')); return profiles; }
-const pname = id => profiles.find(p => p.id === id)?.full_name || '—';
+const pname = (id, fallback) => profiles.find(p => p.id === id)?.full_name || fallback || '—';
 const stageBadge = k => { const s = stageOf(k); return `<span class="stage" style="background:${s.color}">${esc(s.ar)}</span>`; };
 
 // ---------- لوحة المؤشرات
 export async function mountDashboard(root) {
   root.innerHTML = '<p class="muted">جارٍ التحميل…</p>';
-  const [projects] = await Promise.all([q(sb.from('projects').select('id,name,ref,facility,stage,priority,budget,contract_value,progress_actual,progress_planned,end_date,updated_at,engineer_id').eq('archived', false)), loadProfiles()]);
+  const [projects] = await Promise.all([q(sb.from('projects').select('id,name,ref,facility,stage,priority,budget,contract_value,paid_amount,progress_actual,progress_planned,end_date,updated_at,engineer_id,engineer_name,status_note,category').eq('archived', false)), loadProfiles()]);
   const byStage = {}; STAGES.forEach(s => byStage[s.key] = { n: 0, v: 0 });
   projects.forEach(p => { const b = byStage[p.stage] || (byStage[p.stage] = { n: 0, v: 0 }); b.n++; b.v += Number(p.contract_value || p.budget || 0); });
   const active = projects.filter(p => !['closed', 'cancelled'].includes(p.stage));
-  const late = active.filter(p => p.end_date && p.end_date < today() && p.stage === 'execution');
+  const late = active.filter(p => p.status_note || (p.end_date && p.end_date < today() && p.stage === 'execution'));
+  const chs = await q(sb.from('challenges').select('id,project_id,title,severity,status,owner,projects(name)').neq('status', 'مغلق').order('severity'));
   const totalV = active.reduce((a, p) => a + Number(p.contract_value || p.budget || 0), 0);
   const exec = projects.filter(p => p.stage === 'execution');
   root.innerHTML = `<div class="dash">
-    <div class="kpis"><div class="kpi"><b>${projects.length}</b><span>إجمالي المشاريع</span></div><div class="kpi"><b>${active.length}</b><span>مشاريع قائمة</span></div><div class="kpi"><b>${exec.length}</b><span>تحت التنفيذ</span></div><div class="kpi ${late.length ? 'bad' : ''}"><b>${late.length}</b><span>متأخرة عن موعدها</span></div><div class="kpi"><b>${totalV >= 1e6 ? (totalV / 1e6).toFixed(1) + '<small> مليون</small>' : fmt0(totalV)}</b><span>القيمة الإجمالية (ر.س)</span></div></div>
+    <div class="kpis"><div class="kpi"><b>${projects.length}</b><span>إجمالي المشاريع</span></div><div class="kpi"><b>${active.length}</b><span>مشاريع قائمة</span></div><div class="kpi"><b>${exec.length}</b><span>تحت التنفيذ</span></div><div class="kpi ${late.length ? 'bad' : ''}"><b>${late.length}</b><span>متأخرة / متعثرة</span></div><div class="kpi ${chs.length ? 'bad' : ''}"><b>${chs.length}</b><span>تحديات مفتوحة</span></div><div class="kpi"><b>${totalV >= 1e6 ? (totalV / 1e6).toFixed(1) + '<small> مليون</small>' : fmt0(totalV)}</b><span>القيمة الإجمالية (ر.س)</span></div></div>
     <div class="pcard"><h2><span class="ic"></span>المشاريع حسب المرحلة</h2><div class="stagebar">${STAGES.map(s => `<a class="stagecell" href="#/projects?stage=${s.key}" style="border-top-color:${s.color}"><b>${byStage[s.key].n}</b><span>${esc(s.ar)}</span><small>${money(Math.round(byStage[s.key].v))}</small></a>`).join('')}</div></div>
     <div class="two">
-      <div class="pcard"><h2><span class="ic"></span>تحت التنفيذ</h2>${exec.length ? `<table class="lst"><thead><tr><th>المشروع</th><th>المهندس</th><th class="c">مخطط</th><th class="c">فعلي</th><th>الانتهاء</th></tr></thead><tbody>${exec.map(p => `<tr data-open="${p.id}"><td><b>${esc(p.name)}</b><br><span class="muted">${esc(p.facility || '')}</span></td><td>${esc(pname(p.engineer_id))}</td><td class="c">${p.progress_planned || 0}%</td><td class="c"><div class="bar"><i style="width:${p.progress_actual || 0}%"></i></div>${p.progress_actual || 0}%</td><td class="${p.end_date && p.end_date < today() ? 'bad' : ''}">${dateAr(p.end_date)}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">لا توجد مشاريع تحت التنفيذ حالياً.</p>'}</div>
-      <div class="pcard"><h2><span class="ic"></span>آخر التحديثات</h2><div id="recent"><p class="muted">…</p></div></div>
-    </div></div>`;
+      <div class="pcard"><h2><span class="ic"></span>تحت التنفيذ</h2>${exec.length ? `<table class="lst"><thead><tr><th>المشروع</th><th>المهندس</th><th class="c">مخطط</th><th class="c">فعلي</th><th>الانتهاء</th></tr></thead><tbody>${exec.map(p => `<tr data-open="${p.id}"><td><b>${esc(p.name)}</b><br><span class="muted">${esc(p.facility || '')}</span></td><td>${esc(pname(p.engineer_id, p.engineer_name))}</td><td class="c">${p.progress_planned || 0}%</td><td class="c"><div class="bar"><i style="width:${p.progress_actual || 0}%"></i></div>${p.progress_actual || 0}%</td><td class="${late.includes(p) ? 'bad' : ''}">${dateAr(p.end_date)}${p.status_note ? ' · ' + esc(p.status_note) : ''}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">لا توجد مشاريع تحت التنفيذ حالياً.</p>'}</div>
+      <div class="pcard"><h2><span class="ic"></span>التحديات المفتوحة</h2>${chs.length ? chs.map(c => `<div class="upd"><div class="uh">${sevBadge(c.severity)} <a href="#/project/${c.project_id}/challenges">${esc(c.projects?.name || '')}</a> <span class="muted">· ${esc(c.owner || '')}</span></div><div class="ub">${esc(c.title)}</div></div>`).join('') : '<p class="muted">لا توجد تحديات مفتوحة.</p>'}</div>
+    </div>
+    <div class="pcard"><h2><span class="ic"></span>المحفظة حسب الفئة</h2><table class="lst"><thead><tr><th>الفئة</th><th class="c">عدد</th><th class="c">قيمة العقود (ر.س)</th><th class="c">المصروف (ر.س)</th><th class="c">متوسط الإنجاز</th><th class="c">متأخرة / متعثرة</th></tr></thead><tbody>${['حكومي', 'شراء مباشر', 'شراكة مجتمعية'].map(cat => { const ps = projects.filter(p => p.category === cat); const ex = ps.filter(p => p.stage === 'execution'); return `<tr data-cat="${cat}"><td><b>${cat}</b></td><td class="c">${ps.length}</td><td class="c n">${money(ps.reduce((a, p) => a + Number(p.contract_value || 0), 0))}</td><td class="c n">${money(ps.reduce((a, p) => a + Number(p.paid_amount || 0), 0))}</td><td class="c">${ex.length ? Math.round(ex.reduce((a, p) => a + Number(p.progress_actual || 0), 0) / ex.length) + '%' : '—'}</td><td class="c ${ps.filter(p => late.includes(p)).length ? 'bad' : ''}">${ps.filter(p => late.includes(p)).length}</td></tr>`; }).join('')}</tbody></table></div>
+    <div class="pcard"><h2><span class="ic"></span>آخر التحديثات</h2><div id="recent"><p class="muted">…</p></div></div></div>`;
   $$('[data-open]', root).forEach(tr => tr.onclick = () => location.hash = '#/project/' + tr.getAttribute('data-open'));
+  $$('[data-cat]', root).forEach(tr => { tr.style.cursor = 'pointer'; tr.onclick = () => location.hash = '#/projects?cat=' + encodeURIComponent(tr.getAttribute('data-cat')); });
   const ups = await q(sb.from('project_updates').select('id,project_id,kind,body,happened_on,created_by,projects(name)').order('created_at', { ascending: false }).limit(8));
   $('#recent').innerHTML = ups.length ? ups.map(u => `<div class="upd"><div class="uh"><span class="badge skel">${UPDATE_KINDS[u.kind] || u.kind}</span> <a href="#/project/${u.project_id}">${esc(u.projects?.name || '')}</a> <span class="muted">· ${esc(pname(u.created_by))} · ${dateAr(u.happened_on)}</span></div><div class="ub">${esc(u.body)}</div></div>`).join('') : '<p class="muted">لا توجد تحديثات بعد.</p>';
 }
@@ -34,19 +39,19 @@ export async function mountDashboard(root) {
 export async function mountProjects(root, params) {
   const edit = canEdit();
   root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">المشاريع</h1><span style="flex:1"></span>${edit ? '<button class="btn primary" id="pNew">＋ مشروع جديد</button>' : ''}</div>
-    <div class="filters"><input id="fq" placeholder="بحث بالاسم أو الرقم أو المنشأة…"><select id="fStage"><option value="">كل المراحل</option>${STAGES.map(s => `<option value="${s.key}" ${params.get('stage') === s.key ? 'selected' : ''}>${esc(s.ar)}</option>`).join('')}</select><select id="fEng"><option value="">كل المهندسين</option></select><label class="chk"><input type="checkbox" id="fArch"> عرض المؤرشفة</label></div>
+    <div class="filters"><input id="fq" placeholder="بحث بالاسم أو الرقم أو المنشأة…"><select id="fCat"><option value="">كل الفئات</option>${CATEGORIES.map(c => `<option ${params.get('cat') === c ? 'selected' : ''}>${c}</option>`).join('')}</select><select id="fStage"><option value="">كل المراحل</option>${STAGES.map(s => `<option value="${s.key}" ${params.get('stage') === s.key ? 'selected' : ''}>${esc(s.ar)}</option>`).join('')}</select><select id="fEng"><option value="">كل المهندسين</option></select><label class="chk"><input type="checkbox" id="fArch"> عرض المؤرشفة</label></div>
     <div id="plist"><p class="muted">جارٍ التحميل…</p></div>`;
   await loadProfiles();
   $('#fEng').innerHTML += profiles.filter(p => ['admin', 'engineer'].includes(p.role)).map(p => `<option value="${p.id}">${esc(p.full_name)}</option>`).join('');
   let all = [];
-  async function load() { all = await q(sb.from('projects').select('*').order('updated_at', { ascending: false })); render(); }
+  async function load() { all = await q(sb.from('projects').select('*').order('category').order('stage').order('name')); render(); }
   function render() {
-    const qs = ($('#fq').value || '').toLowerCase(), st = $('#fStage').value, en = $('#fEng').value, arch = $('#fArch').checked;
-    const rows = all.filter(p => (arch || !p.archived) && (!st || p.stage === st) && (!en || p.engineer_id === en) && (!qs || [p.name, p.ref, p.facility, p.contractor].join(' ').toLowerCase().includes(qs)));
-    $('#plist').innerHTML = rows.length ? `<table class="lst"><thead><tr><th>الرقم</th><th>المشروع</th><th>المنشأة</th><th>النوع</th><th>المرحلة</th><th>المهندس</th><th class="c">القيمة (ر.س)</th><th class="c">الإنجاز</th><th>آخر تحديث</th></tr></thead><tbody>${rows.map(p => `<tr data-open="${p.id}" class="${p.archived ? 'off' : ''}"><td class="cd">${esc(p.ref || '—')}</td><td><b>${esc(p.name)}</b>${p.priority === 'urgent' ? ' <span class="badge bad">عاجل</span>' : p.priority === 'high' ? ' <span class="badge ovr">مهم</span>' : ''}</td><td>${esc(p.facility || '—')}</td><td>${esc(p.type || '—')}</td><td>${stageBadge(p.stage)}</td><td>${esc(pname(p.engineer_id))}</td><td class="c n">${money(p.contract_value || p.budget)}</td><td class="c">${p.stage === 'execution' ? `<div class="bar"><i style="width:${p.progress_actual || 0}%"></i></div>${p.progress_actual || 0}%` : '—'}</td><td>${dateAr(p.updated_at)}</td></tr>`).join('')}</tbody></table>` : '<div class="empty-boq">لا توجد مشاريع مطابقة</div>';
+    const qs = ($('#fq').value || '').toLowerCase(), st = $('#fStage').value, en = $('#fEng').value, arch = $('#fArch').checked, cat = $('#fCat').value;
+    const rows = all.filter(p => (arch || !p.archived) && (!st || p.stage === st) && (!cat || p.category === cat) && (!en || p.engineer_id === en) && (!qs || [p.name, p.ref, p.facility, p.contractor].join(' ').toLowerCase().includes(qs)));
+    $('#plist').innerHTML = rows.length ? `<table class="lst"><thead><tr><th>م</th><th>المشروع</th><th>الفئة</th><th>الجهة المستفيدة</th><th>المرحلة</th><th>المهندس</th><th class="c">القيمة (ر.س)</th><th class="c">الإنجاز</th><th>آخر تحديث</th></tr></thead><tbody>${rows.map((p, i) => `<tr data-open="${p.id}" class="${p.archived ? 'off' : ''}"><td class="c">${i + 1}</td><td><b>${esc(p.name)}</b>${p.priority === 'urgent' ? ' <span class="badge bad">عاجل</span>' : p.priority === 'high' ? ' <span class="badge ovr">مهم</span>' : ''}<br><span class="muted">${esc(p.ref || '')} ${esc(p.facility || '')}</span></td><td>${esc(p.category || '—')}</td><td>${esc(p.beneficiary || '—')}</td><td>${stageBadge(p.stage)}${p.status_note ? ` <span class="badge bad">${esc(p.status_note)}</span>` : ''}</td><td>${esc(pname(p.engineer_id, p.engineer_name))}</td><td class="c n">${money(p.contract_value || p.budget)}</td><td class="c">${p.stage === 'execution' ? `<div class="bar"><i style="width:${p.progress_actual || 0}%"></i></div>${p.progress_actual || 0}%` : '—'}</td><td>${dateAr(p.updated_at)}</td></tr>`).join('')}</tbody></table>` : '<div class="empty-boq">لا توجد مشاريع مطابقة</div>';
     $$('[data-open]', root).forEach(tr => tr.onclick = () => location.hash = '#/project/' + tr.getAttribute('data-open'));
   }
-  ['fq', 'fStage', 'fEng', 'fArch'].forEach(id => $('#' + id).oninput = render);
+  ['fq', 'fCat', 'fStage', 'fEng', 'fArch'].forEach(id => $('#' + id).oninput = render);
   if (edit) $('#pNew').onclick = () => editProject(null, id => location.hash = '#/project/' + id);
   await load();
 }
@@ -57,17 +62,29 @@ async function editProject(p, done) {
   const html = `<form id="f" class="pgrid">
     ${field('اسم المشروع *', inp('name', p?.name || '', 'required'), 'wide')}
     ${field('رقم المشروع / المرجع', inp('ref', p?.ref || '', 'placeholder="AHC-PRJ-2026-001"'))}
+    ${field('فئة المشروع', sel('category', CATEGORIES, p?.category || 'حكومي'))}
     ${field('نوع المشروع', sel('type', PROJECT_TYPES, p?.type || PROJECT_TYPES[0]))}
     ${field('المنشأة / الموقع', inp('facility', p?.facility || ''))}
+    ${field('الجهة المستفيدة', inp('beneficiary', p?.beneficiary || ''))}
     ${field('الجهة الطالبة', inp('dept', p?.dept || ''))}
-    ${field('المهندس المسؤول', sel('engineer_id', engs, p?.engineer_id || session.user.id))}
+    ${field('المهندس المسؤول (حساب)', sel('engineer_id', engs, p?.engineer_id || ''))}
+    ${field('اسم مدير المشروع', inp('engineer_name', p?.engineer_name || '', 'placeholder="يُستخدم إن لم يكن له حساب بعد"'))}
+    ${field('البرنامج المالي', inp('funding', p?.funding || ''))}
     ${field('الأولوية', sel('priority', [['low', 'منخفضة'], ['normal', 'عادية'], ['high', 'مهمة'], ['urgent', 'عاجلة']], p?.priority || 'normal'))}
     ${field('الميزانية التقديرية (ر.س)', inp('budget', p?.budget || '', 'type="number" min="0" step="1"'))}
-    ${field('قيمة العقد (ر.س)', inp('contract_value', p?.contract_value || '', 'type="number" min="0" step="1"'))}
+    ${field('الميزانية المعتمدة (ر.س)', inp('budget_approved', p?.budget_approved || '', 'type="number" min="0" step="1"'))}
+    ${field('المبلغ الإضافي على العقد (ر.س)', inp('contract_extra', p?.contract_extra || '', 'type="number" min="0" step="1"'))}
+    ${field('إجمالي قيمة العقد (ر.س)', inp('contract_value', p?.contract_value || '', 'type="number" min="0" step="1"'))}
+    ${field('تاريخ الرفع للطرح', inp('tender_submit_date', p?.tender_submit_date || '', 'type="date"'))}
+    ${field('تاريخ الطرح', inp('tender_date', p?.tender_date || '', 'type="date"'))}
+    ${field('تاريخ الترسية', inp('award_date', p?.award_date || '', 'type="date"'))}
     ${field('المقاول', inp('contractor', p?.contractor || ''))}
     ${field('الاستشاري / المشرف', inp('consultant', p?.consultant || ''))}
     ${field('تاريخ المباشرة', inp('start_date', p?.start_date || '', 'type="date"'))}
     ${field('تاريخ الانتهاء التعاقدي', inp('end_date', p?.end_date || '', 'type="date"'))}
+    ${field('المدة الإضافية (أيام)', inp('extra_days', p?.extra_days ?? 0, 'type="number" min="0" step="1"'))}
+    ${field('تاريخ الانتهاء المعدّل', inp('revised_end_date', p?.revised_end_date || '', 'type="date"'))}
+    ${field('وصف الحالة', sel('status_note', [['', '—'], ['متأخر', 'متأخر'], ['متعثر', 'متعثر']], p?.status_note || ''))}
     ${field('الإنجاز المخطط %', inp('progress_planned', p?.progress_planned ?? 0, 'type="number" min="0" max="100" step="1"'))}
     ${field('الإنجاز الفعلي %', inp('progress_actual', p?.progress_actual ?? 0, 'type="number" min="0" max="100" step="1"'))}
     ${field('المدفوع حتى الآن (ر.س)', inp('paid_amount', p?.paid_amount ?? 0, 'type="number" min="0" step="1"'))}
@@ -76,7 +93,7 @@ async function editProject(p, done) {
   await modal(html, { title: isNew ? 'مشروع جديد' : 'تعديل بيانات المشروع', wide: true, onOpen: (w, close) => {
     $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target);
       const num = v => v === '' ? null : Number(v);
-      const row = { name: f.name.trim(), ref: f.ref.trim(), type: f.type, facility: f.facility.trim(), dept: f.dept.trim(), engineer_id: f.engineer_id || null, priority: f.priority, budget: num(f.budget), contract_value: num(f.contract_value), contractor: f.contractor.trim(), consultant: f.consultant.trim(), start_date: f.start_date || null, end_date: f.end_date || null, progress_planned: num(f.progress_planned) || 0, progress_actual: num(f.progress_actual) || 0, paid_amount: num(f.paid_amount) || 0, notes: f.notes };
+      const row = { name: f.name.trim(), ref: f.ref.trim(), category: f.category, type: f.type, facility: f.facility.trim(), beneficiary: f.beneficiary.trim(), dept: f.dept.trim(), engineer_id: f.engineer_id || null, engineer_name: f.engineer_name.trim(), funding: f.funding.trim(), priority: f.priority, budget: num(f.budget), budget_approved: num(f.budget_approved), contract_extra: num(f.contract_extra) || 0, contract_value: num(f.contract_value), tender_submit_date: f.tender_submit_date || null, tender_date: f.tender_date || null, award_date: f.award_date || null, contractor: f.contractor.trim(), consultant: f.consultant.trim(), start_date: f.start_date || null, end_date: f.end_date || null, extra_days: num(f.extra_days) || 0, revised_end_date: f.revised_end_date || null, status_note: f.status_note || null, progress_planned: num(f.progress_planned) || 0, progress_actual: num(f.progress_actual) || 0, paid_amount: num(f.paid_amount) || 0, notes: f.notes };
       try { let id = p?.id; if (isNew) { row.created_by = session.user.id; const r = await q(sb.from('projects').insert(row).select('id').single()); id = r.id; await sb.from('project_stage_log').insert({ project_id: id, from_stage: null, to_stage: 'request', note: 'إنشاء المشروع', by_user: session.user.id }); } else await q(sb.from('projects').update(row).eq('id', p.id)); toast('تم الحفظ'); close(); done && done(id); } catch (er) { err(er); } };
   } });
 }
@@ -87,14 +104,14 @@ export async function mountProject(root, id, tab = 'overview', sub) {
   await loadProfiles();
   const p = await q(sb.from('projects').select('*').eq('id', id).maybeSingle());
   if (!p) { root.innerHTML = '<div class="empty-boq">المشروع غير موجود</div>'; return; }
-  p.engineer_name = pname(p.engineer_id);
+  p.engineer_name = pname(p.engineer_id, p.engineer_name);
   if (tab === 'boq' && sub) { return mountBoq(root, sub, p, () => location.hash = `#/project/${id}/boq`); }
   const st = stageOf(p.stage);
-  const tabs = [['overview', 'نظرة عامة'], ['boq', 'جداول الكميات'], ['updates', 'التحديثات والملاحظات'], ['log', 'سجل المراحل']];
+  const tabs = [['overview', 'نظرة عامة'], ['challenges', 'التحديات والمخاطر'], ['boq', 'جداول الكميات'], ['updates', 'التحديثات والملاحظات'], ['log', 'سجل المراحل']];
   root.innerHTML = `<div class="phead">
     <div class="crumb"><a href="#/projects">المشاريع</a><span class="sep">›</span><span>${esc(p.name)}</span></div>
-    <div class="ptitle"><div><h1>${esc(p.name)}</h1><div class="muted">${esc(p.ref || '')} ${p.ref ? '·' : ''} ${esc(p.facility || '')} · ${esc(p.type || '')} · المهندس: ${esc(p.engineer_name)}</div></div>
-      <div class="btnrow">${stageBadge(p.stage)}${edit ? `<button class="btn primary" id="pStage">تغيير المرحلة</button><button class="btn" id="pEdit">تعديل البيانات</button>` : ''}${isAdmin() ? `<button class="btn ${p.archived ? '' : 'danger'}" id="pArch">${p.archived ? 'إلغاء الأرشفة' : 'أرشفة'}</button>` : ''}</div></div>
+    <div class="ptitle"><div><h1>${esc(p.name)}</h1><div class="muted">${esc(p.category || '')} · ${esc(p.type || '')} ${p.facility ? '· ' + esc(p.facility) : ''} ${p.beneficiary ? '· ' + esc(p.beneficiary) : ''} · مدير المشروع: ${esc(p.engineer_name)}</div></div>
+      <div class="btnrow">${stageBadge(p.stage)}${p.status_note ? `<span class="badge bad">${esc(p.status_note)}</span>` : ''}${edit ? `<button class="btn primary" id="pStage">تغيير المرحلة</button><button class="btn" id="pEdit">تعديل البيانات</button>` : ''}${isAdmin() ? `<button class="btn ${p.archived ? '' : 'danger'}" id="pArch">${p.archived ? 'إلغاء الأرشفة' : 'أرشفة'}</button>` : ''}</div></div>
     <div class="stageline">${STAGES.filter(s => !['onhold', 'cancelled'].includes(s.key)).map((s, i) => { const idx = STAGES.findIndex(x => x.key === p.stage); const done = i < idx, cur = s.key === p.stage; return `<div class="sl ${done ? 'done' : ''} ${cur ? 'cur' : ''}" style="${cur ? '--c:' + s.color : ''}"><i></i><span>${esc(s.ar)}</span></div>`; }).join('')}</div>
     <div class="tabs">${tabs.map(([k, t]) => `<a href="#/project/${id}/${k}" class="${tab === k ? 'on' : ''}">${t}</a>`).join('')}</div></div><div id="ptab"></div>`;
   if (edit) {
@@ -105,6 +122,7 @@ export async function mountProject(root, id, tab = 'overview', sub) {
   const t = $('#ptab');
   if (tab === 'overview') overview(t, p, edit);
   else if (tab === 'boq') boqList(t, p, edit);
+  else if (tab === 'challenges') challenges(t, p, edit);
   else if (tab === 'updates') updates(t, p, edit);
   else if (tab === 'log') stageLog(t, p);
 }
@@ -113,9 +131,9 @@ function overview(t, p, edit) {
   const remaining = Number(p.contract_value || 0) - Number(p.paid_amount || 0);
   const daysLeft = p.end_date ? Math.ceil((new Date(p.end_date) - new Date()) / 864e5) : null;
   t.innerHTML = `<div class="two">
-    <div class="pcard"><h2><span class="ic"></span>البيانات الأساسية</h2><div class="kvs">${V('رقم المشروع', esc(p.ref || '—'))}${V('النوع', esc(p.type || '—'))}${V('المنشأة', esc(p.facility || '—'))}${V('الجهة الطالبة', esc(p.dept || '—'))}${V('الأولوية', { low: 'منخفضة', normal: 'عادية', high: 'مهمة', urgent: 'عاجلة' }[p.priority] || '—')}${V('تاريخ الإنشاء', dateAr(p.created_at))}</div>
+    <div class="pcard"><h2><span class="ic"></span>البيانات الأساسية</h2><div class="kvs">${V('رقم المشروع', esc(p.ref || '—'))}${V('الفئة', esc(p.category || '—'))}${V('النوع', esc(p.type || '—'))}${V('المنشأة', esc(p.facility || '—'))}${V('الجهة المستفيدة', esc(p.beneficiary || '—'))}${V('البرنامج المالي', esc(p.funding || '—'))}${V('الرفع للطرح / الطرح / الترسية', `${dateAr(p.tender_submit_date)} / ${dateAr(p.tender_date)} / ${dateAr(p.award_date)}`)}${V('الأولوية', { low: 'منخفضة', normal: 'عادية', high: 'مهمة', urgent: 'عاجلة' }[p.priority] || '—')}${V('تاريخ الإنشاء', dateAr(p.created_at))}</div>
       ${p.notes ? `<h3 class="sub">نطاق العمل / ملاحظات</h3><p class="pre">${esc(p.notes)}</p>` : ''}</div>
-    <div class="pcard"><h2><span class="ic"></span>العقد والتنفيذ</h2><div class="kvs">${V('الميزانية التقديرية', money(p.budget) + ' ر.س')}${V('قيمة العقد', money(p.contract_value) + ' ر.س')}${V('المقاول', esc(p.contractor || '—'))}${V('الاستشاري', esc(p.consultant || '—'))}${V('المباشرة', dateAr(p.start_date))}${V('الانتهاء التعاقدي', dateAr(p.end_date) + (daysLeft !== null && p.stage === 'execution' ? ` <small class="${daysLeft < 0 ? 'bad' : 'muted'}">(${daysLeft < 0 ? 'متأخر ' + (-daysLeft) : 'متبقٍ ' + daysLeft} يوم)</small>` : ''))}${V('المدفوع', money(p.paid_amount) + ' ر.س')}${V('المتبقي من العقد', (p.contract_value ? money(remaining) : '—') + ' ر.س')}</div>
+    <div class="pcard"><h2><span class="ic"></span>العقد والتنفيذ</h2><div class="kvs">${V('الميزانية التقديرية', money(p.budget) + ' ر.س')}${V('الميزانية المعتمدة', money(p.budget_approved) + ' ر.س')}${V('الإضافي على العقد', money(p.contract_extra) + ' ر.س')}${V('إجمالي قيمة العقد', money(p.contract_value) + ' ر.س')}${V('المقاول', esc(p.contractor || '—'))}${V('الاستشاري', esc(p.consultant || '—'))}${V('المباشرة', dateAr(p.start_date))}${V('الانتهاء التعاقدي', dateAr(p.end_date) + (daysLeft !== null && p.stage === 'execution' ? ` <small class="${daysLeft < 0 ? 'bad' : 'muted'}">(${daysLeft < 0 ? 'متأخر ' + (-daysLeft) : 'متبقٍ ' + daysLeft} يوم)</small>` : ''))}${V('المدة الإضافية / الانتهاء المعدّل', `${p.extra_days || 0} يوم / ${dateAr(p.revised_end_date)}`)}${V('نسبة الصرف', p.contract_value ? Math.round(Number(p.paid_amount || 0) / Number(p.contract_value) * 100) + '%' : '—')}${V('المدفوع', money(p.paid_amount) + ' ر.س')}${V('المتبقي من العقد', (p.contract_value ? money(remaining) : '—') + ' ر.س')}</div>
       <div class="prog"><div class="pl"><span>الإنجاز المخطط</span><b>${p.progress_planned || 0}%</b></div><div class="bar"><i style="width:${p.progress_planned || 0}%;background:#A98736"></i></div><div class="pl"><span>الإنجاز الفعلي</span><b>${p.progress_actual || 0}%</b></div><div class="bar"><i style="width:${p.progress_actual || 0}%"></i></div></div></div></div>`;
 }
 async function boqList(t, p, edit) {
@@ -137,6 +155,21 @@ async function updates(t, p, edit) {
   if (edit) $('#uNew').onclick = () => modal(`<form id="f" class="pgrid">${field('النوع', sel('kind', Object.entries(UPDATE_KINDS), 'note'))}${field('التاريخ', inp('happened_on', today(), 'type="date"'))}${field('رقم المرجع / الخطاب (اختياري)', inp('ref_no', ''))}${field('المبلغ (للمستخلصات)', inp('amount', '', 'type="number" min="0" step="1"'))}${field('النص *', `<textarea name="body" rows="4" required></textarea>`, 'wide')}<div class="btnrow end wide"><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">حفظ</button></div></form>`, { title: 'تحديث جديد', onOpen: (w, close) => {
     $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target); try { await q(sb.from('project_updates').insert({ project_id: p.id, kind: f.kind, happened_on: f.happened_on, ref_no: f.ref_no, amount: f.amount ? Number(f.amount) : null, body: f.body.trim(), created_by: session.user.id })); if (f.kind === 'payment' && f.amount) { await q(sb.from('projects').update({ paid_amount: Number(p.paid_amount || 0) + Number(f.amount) }).eq('id', p.id)); p.paid_amount = Number(p.paid_amount || 0) + Number(f.amount); } close(); updates(t, p, edit); } catch (er) { err(er); } };
   } });
+}
+const CH_CATS = ['فني', 'تعاقدي', 'مالي', 'تنظيمي', 'إداري', 'أخرى'], SEV = ['منخفضة', 'متوسطة', 'عالية', 'حرجة'], LIK = ['منخفضة', 'متوسطة', 'عالية'], CH_ST = ['مفتوح', 'قيد المعالجة', 'مغلق'];
+const sevBadge = s => `<span class="badge ${s === 'حرجة' ? 'bad' : s === 'عالية' ? 'ovr' : 'skel'}">${esc(s)}</span>`;
+async function challenges(t, p, edit) {
+  const rows = await q(sb.from('challenges').select('*').eq('project_id', p.id).order('status').order('id', { ascending: false }));
+  t.innerHTML = `<div class="pcard"><div class="toolbar"><h2><span class="ic"></span>التحديات والمخاطر <span class="muted">(${rows.filter(r => r.status !== 'مغلق').length} مفتوح من ${rows.length})</span></h2><span style="flex:1"></span>${edit ? '<button class="btn primary" id="cNew">＋ تحدٍ جديد</button>' : ''}</div>
+    ${rows.length ? `<table class="lst"><thead><tr><th>التحدي</th><th>التصنيف</th><th>الخطورة</th><th>الاحتمالية</th><th>الأثر</th><th>الإجراء</th><th>المسؤول</th><th>الموعد</th><th>الحالة</th>${edit ? '<th></th>' : ''}</tr></thead><tbody>${rows.map(c => `<tr class="${c.status === 'مغلق' ? 'off' : ''}"><td><b>${esc(c.title)}</b><br><span class="muted">رُصد ${dateAr(c.detected_on)}</span></td><td>${esc(c.category || '')}</td><td>${sevBadge(c.severity)}</td><td>${esc(c.likelihood || '')}</td><td class="muted">${c.impact_days ? c.impact_days + ' يوم' : ''}${c.impact_days && c.impact_amount ? ' · ' : ''}${c.impact_amount ? money(c.impact_amount) + ' ر.س' : ''}</td><td class="muted">${esc(c.action || '')}</td><td>${esc(c.owner || '')}</td><td>${dateAr(c.due_date)}</td><td><span class="badge ${c.status === 'مغلق' ? 'full' : c.status === 'مفتوح' ? 'bad' : 'ovr'}">${esc(c.status)}</span></td>${edit ? `<td><button class="btn sm" data-ce="${c.id}">تعديل</button></td>` : ''}</tr>`).join('')}</tbody></table>` : '<p class="muted">لا توجد تحديات مسجلة.</p>'}</div>`;
+  const form = c => `<form id="f" class="pgrid">${field('وصف التحدي *', `<textarea name="title" rows="2" required>${esc(c?.title || '')}</textarea>`, 'wide')}${field('التصنيف', sel('category', CH_CATS, c?.category || 'فني'))}${field('درجة الخطورة', sel('severity', SEV, c?.severity || 'متوسطة'))}${field('الاحتمالية', sel('likelihood', LIK, c?.likelihood || 'متوسطة'))}${field('الحالة', sel('status', CH_ST, c?.status || 'مفتوح'))}${field('تأثير زمني (أيام)', inp('impact_days', c?.impact_days ?? '', 'type="number" min="0"'))}${field('تأثير مالي (ر.س)', inp('impact_amount', c?.impact_amount ?? '', 'type="number" min="0"'))}${field('تاريخ الرصد', inp('detected_on', c?.detected_on || today(), 'type="date"'))}${field('الموعد المستهدف', inp('due_date', c?.due_date || '', 'type="date"'))}${field('المسؤول', inp('owner', c?.owner || p.engineer_name || ''))}${field('الإجراء المتخذ', `<textarea name="action" rows="2">${esc(c?.action || '')}</textarea>`, 'wide')}${field('ملاحظات', `<textarea name="notes" rows="2">${esc(c?.notes || '')}</textarea>`, 'wide')}<div class="btnrow end wide">${c ? '<button type="button" class="btn danger" data-del>حذف</button>' : ''}<span style="flex:1"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">حفظ</button></div></form>`;
+  const open = c => modal(form(c), { title: c ? 'تعديل التحدي' : 'تحدٍ جديد', wide: true, onOpen: (w, close) => {
+    $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target); const n = v => v === '' ? null : Number(v);
+      const row = { project_id: p.id, title: f.title.trim(), category: f.category, severity: f.severity, likelihood: f.likelihood, status: f.status, impact_days: n(f.impact_days), impact_amount: n(f.impact_amount), detected_on: f.detected_on || null, due_date: f.due_date || null, owner: f.owner.trim(), action: f.action.trim(), notes: f.notes.trim() };
+      try { if (c) await q(sb.from('challenges').update(row).eq('id', c.id)); else await q(sb.from('challenges').insert({ ...row, created_by: session.user.id })); close(); challenges(t, p, edit); } catch (er) { err(er); } };
+    const del = $('[data-del]', w); if (del) del.onclick = async () => { if (!await confirm('حذف هذا التحدي؟', 'حذف', true)) return; await q(sb.from('challenges').delete().eq('id', c.id)); close(); challenges(t, p, edit); };
+  } });
+  if (edit) { $('#cNew').onclick = () => open(null); $$('[data-ce]', t).forEach(b => b.onclick = () => open(rows.find(x => x.id === +b.getAttribute('data-ce')))); }
 }
 async function stageLog(t, p) {
   const log = await q(sb.from('project_stage_log').select('*').eq('project_id', p.id).order('at', { ascending: false }));
