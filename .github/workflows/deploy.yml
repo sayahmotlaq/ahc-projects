@@ -59,7 +59,16 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
       - name: Seed reference data
-        run: node scripts/seed.mjs
+        id: seed
+        run: node scripts/seed.mjs 2>&1 | tee "$RUNNER_TEMP/seed.txt"; test ${PIPESTATUS[0]} -eq 0
+      - name: Publish seed log
+        if: always()
+        continue-on-error: true
+        run: |
+          git config user.name deploy-bot; git config user.email bot@users.noreply.github.com
+          (git fetch -q origin logs:logs 2>/dev/null && git checkout -q logs) || git checkout -q --orphan logs
+          mkdir -p logs; { echo "run ${{ github.run_id }} $(date -u)"; cat "$RUNNER_TEMP/seed.txt" 2>/dev/null | tail -40; } > logs/seed.txt
+          git add -f logs/seed.txt; git commit -qm "seed ${{ github.run_id }}" || true; git push -q origin HEAD:logs; git checkout -q main
 
   pages:
     needs: database
