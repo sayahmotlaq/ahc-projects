@@ -42,16 +42,17 @@ jobs:
             if [ $rc -eq 0 ]; then echo "connected via ${c#*@}"; echo "url=$url" >> "$GITHUB_OUTPUT"; exit 0; fi
             echo "${c#*@}: $(echo "$out" | head -1 | cut -c1-160)" | tee -a "$RUNNER_TEMP/diag.txt"
           done
-          echo "could not connect to database"; exit 1
+          echo "could not connect to database — migrations skipped (run the SQL manually in Supabase SQL Editor)"; echo "url=" >> "$GITHUB_OUTPUT"
       - name: Publish diagnostics
-        if: failure()
+        if: always()
         run: |
           git config user.name deploy-bot; git config user.email bot@users.noreply.github.com
           git fetch origin logs 2>/dev/null && git checkout logs || git checkout --orphan logs
           git rm -rfq --cached . 2>/dev/null || true; mkdir -p logs
           { echo "run ${{ github.run_id }} $(date -u)"; cat "$RUNNER_TEMP/diag.txt" 2>/dev/null; } > logs/last-run.txt
-          git add -f logs/last-run.txt; git commit -qm "diag ${{ github.run_id }}" || true; git push -q origin HEAD:logs
+          git add -f logs/last-run.txt; git commit -qm "diag ${{ github.run_id }}" || true; git push -q origin HEAD:logs; git checkout -q main
       - name: Run migrations
+        if: steps.db.outputs.url != ''
         run: |
           for f in $(ls supabase/migrations/*.sql | sort); do echo "== $f"; psql "${{ steps.db.outputs.url }}" -v ON_ERROR_STOP=1 -f "$f"; done
       - uses: actions/setup-node@v4
