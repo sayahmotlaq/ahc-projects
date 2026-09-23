@@ -2,6 +2,7 @@
 import { sb, REF, STAGES, stageOf, PROJECT_TYPES, UPDATE_KINDS, canEdit, isAdmin, q, session, today } from './api.js';
 import { $, $$, esc, fmt, fmt0, money, dateAr, toast, err, modal, confirm, field, inp, sel, formData } from './ui.js';
 import { mountBoq, calc, BOQ_STATUS } from './boq.js';
+import { projectTasks, projectRequests } from './tasks.js';
 
 const CATEGORIES = ['حكومي', 'شراء مباشر', 'شراكة مجتمعية'];
 let profiles = [];
@@ -18,10 +19,13 @@ export async function mountDashboard(root) {
   const active = projects.filter(p => !['closed', 'cancelled'].includes(p.stage));
   const late = active.filter(p => p.status_note || (p.end_date && p.end_date < today() && p.stage === 'execution'));
   const chs = await q(sb.from('challenges').select('id,project_id,title,severity,status,owner,projects(name)').neq('status', 'مغلق').order('severity'));
+  const tasks = await q(sb.from('tasks').select('id,status,due_date,assignee_id').in('status', ['open', 'in_progress']));
+  const reqs = await q(sb.from('requests').select('id,status').in('status', ['new', 'in_review']));
+  const lateTasks = tasks.filter(t => t.due_date && t.due_date < today());
   const totalV = active.reduce((a, p) => a + Number(p.contract_value || p.budget || 0), 0);
   const exec = projects.filter(p => p.stage === 'execution');
   root.innerHTML = `<div class="dash">
-    <div class="kpis"><div class="kpi"><b>${projects.length}</b><span>إجمالي المشاريع</span></div><div class="kpi"><b>${active.length}</b><span>مشاريع قائمة</span></div><div class="kpi"><b>${exec.length}</b><span>تحت التنفيذ</span></div><div class="kpi ${late.length ? 'bad' : ''}"><b>${late.length}</b><span>متأخرة / متعثرة</span></div><div class="kpi ${chs.length ? 'bad' : ''}"><b>${chs.length}</b><span>تحديات مفتوحة</span></div><div class="kpi"><b>${totalV >= 1e6 ? (totalV / 1e6).toFixed(1) + '<small> مليون</small>' : fmt0(totalV)}</b><span>القيمة الإجمالية (ر.س)</span></div></div>
+    <div class="kpis"><div class="kpi"><b>${projects.length}</b><span>إجمالي المشاريع</span></div><div class="kpi"><b>${active.length}</b><span>مشاريع قائمة</span></div><div class="kpi"><b>${exec.length}</b><span>تحت التنفيذ</span></div><div class="kpi ${late.length ? 'bad' : ''}"><b>${late.length}</b><span>متأخرة / متعثرة</span></div><div class="kpi ${chs.length ? 'bad' : ''}"><b>${chs.length}</b><span>تحديات مفتوحة</span></div><a class="kpi ${lateTasks.length ? 'bad' : ''}" href="#/tasks"><b>${tasks.length}</b><span>مهام مفتوحة${lateTasks.length ? ' · ' + lateTasks.length + ' متأخرة' : ''}</span></a><a class="kpi ${reqs.length ? 'bad' : ''}" href="#/requests"><b>${reqs.length}</b><span>طلبات بانتظار الرد</span></a><div class="kpi"><b>${totalV >= 1e6 ? (totalV / 1e6).toFixed(1) + '<small> مليون</small>' : fmt0(totalV)}</b><span>القيمة الإجمالية (ر.س)</span></div></div>
     <div class="pcard"><h2><span class="ic"></span>المشاريع حسب المرحلة</h2><div class="stagebar">${STAGES.map(s => `<a class="stagecell" href="#/projects?stage=${s.key}" style="border-top-color:${s.color}"><b>${byStage[s.key].n}</b><span>${esc(s.ar)}</span><small>${money(Math.round(byStage[s.key].v))}</small></a>`).join('')}</div></div>
     <div class="two">
       <div class="pcard"><h2><span class="ic"></span>تحت التنفيذ</h2>${exec.length ? `<table class="lst"><thead><tr><th>المشروع</th><th>المهندس</th><th class="c">مخطط</th><th class="c">فعلي</th><th>الانتهاء</th></tr></thead><tbody>${exec.map(p => `<tr data-open="${p.id}"><td><b>${esc(p.name)}</b><br><span class="muted">${esc(p.facility || '')}</span></td><td>${esc(pname(p.engineer_id, p.engineer_name))}</td><td class="c">${p.progress_planned || 0}%</td><td class="c"><div class="bar"><i style="width:${p.progress_actual || 0}%"></i></div>${p.progress_actual || 0}%</td><td class="${late.includes(p) ? 'bad' : ''}">${dateAr(p.end_date)}${p.status_note ? ' · ' + esc(p.status_note) : ''}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">لا توجد مشاريع تحت التنفيذ حالياً.</p>'}</div>
@@ -107,7 +111,7 @@ export async function mountProject(root, id, tab = 'overview', sub) {
   p.engineer_name = pname(p.engineer_id, p.engineer_name);
   if (tab === 'boq' && sub) { return mountBoq(root, sub, p, () => location.hash = `#/project/${id}/boq`); }
   const st = stageOf(p.stage);
-  const tabs = [['overview', 'نظرة عامة'], ['challenges', 'التحديات والمخاطر'], ['boq', 'جداول الكميات'], ['updates', 'التحديثات والملاحظات'], ['log', 'سجل المراحل']];
+  const tabs = [['overview', 'نظرة عامة'], ['tasks', 'المهام'], ['requests', 'الطلبات'], ['challenges', 'التحديات والمخاطر'], ['boq', 'جداول الكميات'], ['updates', 'التحديثات والملاحظات'], ['log', 'سجل المراحل']];
   root.innerHTML = `<div class="phead">
     <div class="crumb"><a href="#/projects">المشاريع</a><span class="sep">›</span><span>${esc(p.name)}</span></div>
     <div class="ptitle"><div><h1>${esc(p.name)}</h1><div class="muted">${esc(p.category || '')} · ${esc(p.type || '')} ${p.facility ? '· ' + esc(p.facility) : ''} ${p.beneficiary ? '· ' + esc(p.beneficiary) : ''} · مدير المشروع: ${esc(p.engineer_name)}</div></div>
@@ -123,6 +127,8 @@ export async function mountProject(root, id, tab = 'overview', sub) {
   if (tab === 'overview') overview(t, p, edit);
   else if (tab === 'boq') boqList(t, p, edit);
   else if (tab === 'challenges') challenges(t, p, edit);
+  else if (tab === 'tasks') projectTasks(t, p);
+  else if (tab === 'requests') projectRequests(t, p);
   else if (tab === 'updates') updates(t, p, edit);
   else if (tab === 'log') stageLog(t, p);
 }

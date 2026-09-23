@@ -301,3 +301,5 @@ h3.sub{font-size:13px;color:var(--navy);margin:14px 0 6px}
 
 .qsearch input,.cascade select{width:100%;font-family:inherit;font-size:13px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--text)}
 .qsearch input:focus,.cascade select:focus{outline:none;border-color:var(--lblue);box-shadow:0 0 0 2px rgba(39,168,223,.15)}
+
+a.kpi{text-decoration:none;color:inherit;display:block} a.kpi:hover{border-color:var(--lblue)}
