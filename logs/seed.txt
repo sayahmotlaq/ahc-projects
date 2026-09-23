@@ -1,0 +1,12 @@
+run 35875442580 Wed Sep 23 14:37:14 UTC 2026
+file:///home/runner/work/ahc-projects/ahc-projects/scripts/seed.mjs:7
+const ref = JSON.parse(fs.readFileSync(new URL('../data/reference.json', import.meta.url), 'utf8'));
+                                       ^
+
+TypeError: URL is not a constructor
+    at file:///home/runner/work/ahc-projects/ahc-projects/scripts/seed.mjs:7:40
+    at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+    at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+
+Node.js v20.20.2
