@@ -89,6 +89,10 @@ async function route() {
   } catch (e) { err(e); m.innerHTML = `<div class="empty-boq">تعذّر التحميل: ${esc(e.message || e)}</div>`; }
 }
 window.addEventListener('hashchange', route);
+// مراقبة صدور نسخة جديدة من المنصة
+let verNotified = false;
+async function checkVersion() { if (verNotified || !window.AHC_CONFIG?.version) return; try { const t = await (await fetch('config.js?t=' + Date.now(), { cache: 'no-store' })).text(); const m = t.match(/version:\s*"([^"]+)"/); if (m && m[1] !== window.AHC_CONFIG.version) { verNotified = true; const b = document.createElement('div'); b.className = 'verbar'; b.innerHTML = '⬆ صدرت نسخة جديدة من المنصة — <b>اضغط هنا للتحديث</b>'; b.onclick = () => location.reload(); document.body.appendChild(b); } } catch (e) { } }
+window.addEventListener('hashchange', checkVersion); document.addEventListener('visibilitychange', () => { if (!document.hidden) checkVersion(); }); setTimeout(checkVersion, 4000);
 
 async function boot() {
   app.innerHTML = '<div class="loading"><div class="spin"></div>جارٍ التحميل…</div>';

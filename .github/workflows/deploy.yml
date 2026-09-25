@@ -87,6 +87,12 @@ jobs:
           cat > site/config.js <<EOF
           window.AHC_CONFIG = { url: "${{ secrets.SUPABASE_URL }}", anon: "${{ secrets.SUPABASE_ANON_KEY }}", version: "${{ github.sha }}" };
           EOF
+      - name: Version-stamp modules (cache busting)
+        run: |
+          V="${GITHUB_SHA::10}"
+          sed -i "s#from '\./\([a-z_]*\)\.js'#from './\1.js?v=$V'#g; s#import('\./\([a-z_]*\)\.js')#import('./\1.js?v=$V')#g" site/js/*.js
+          sed -i "s#href=\"app.css\"#href=\"app.css?v=$V\"#; s#src=\"js/app.js\"#src=\"js/app.js?v=$V\"#" site/index.html
+          grep -c "?v=$V" site/js/app.js site/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with: { path: site }
