@@ -303,3 +303,34 @@ h3.sub{font-size:13px;color:var(--navy);margin:14px 0 6px}
 .qsearch input:focus,.cascade select:focus{outline:none;border-color:var(--lblue);box-shadow:0 0 0 2px rgba(39,168,223,.15)}
 
 a.kpi{text-decoration:none;color:inherit;display:block} a.kpi:hover{border-color:var(--lblue)}
+
+.tabs .cnt{background:var(--card);color:var(--grey);border-radius:10px;padding:1px 7px;font-size:11px;margin-inline-start:4px}
+.tabs a.on .cnt{background:var(--lblue);color:#fff}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-block;background:var(--goldbg);border:1px solid #E7D9B0;border-radius:20px;padding:5px 12px;font-size:12.5px;color:var(--navy);text-decoration:none}
+.chip small{color:#A6503B;margin-inline-start:4px}
+h2 a.small{font-weight:500;margin-inline-start:auto;font-size:11.5px}
+.pcard h2{display:flex;align-items:center}
+/* ===== التقرير التنفيذي ===== */
+.rep{max-width:210mm;margin:0 auto;color:#1d2b33}
+.rpage{background:#fff;border:1px solid var(--line);border-radius:8px;padding:14mm 12mm;margin-bottom:14px;box-shadow:0 2px 12px rgba(0,0,0,.05);page-break-after:always;break-after:page}
+.rpage:last-child{page-break-after:auto;break-after:auto}
+.rhead{display:flex;align-items:center;gap:14px;border-bottom:3px solid var(--navy);padding-bottom:10px;margin-bottom:12px}
+.rhead img{height:46px} .rhead .rt{flex:1} .rhead h1{font-size:19px;color:var(--navy);margin:0} .rhead .rs{font-size:11px;color:var(--grey)}
+.rmeta{display:flex;flex-direction:column;gap:2px;font-size:10.5px;text-align:left;min-width:170px} .rmeta span{color:var(--grey);margin-inline-end:6px} .rmeta b{color:var(--navy)}
+.rkpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.rk{background:var(--card);border-radius:10px;padding:8px 10px;text-align:center;border-top:3px solid var(--lblue)} .rk b{display:block;font-size:18px;color:var(--navy);line-height:1.2} .rk span{font-size:10px;color:var(--grey)} .rk.bad{border-top-color:#A6503B} .rk.bad b{color:#A6503B}
+.rtwo{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.rcard{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px;break-inside:avoid}
+.rcard h2{font-size:13px;color:var(--navy);margin:0 0 8px;padding-bottom:5px;border-bottom:1px solid var(--line)} .rcard h2 small{color:var(--grey);font-weight:500}
+.rcard h3{font-size:11.5px;color:var(--navy);margin:8px 0 4px}
+table.rt2{width:100%;border-collapse:collapse;font-size:10.5px} table.rt2 th{background:var(--navy);color:#fff;padding:5px 6px;text-align:right;font-weight:700} table.rt2 td{padding:4px 6px;border-bottom:1px solid #EEE9E2;vertical-align:middle} table.rt2 tr:nth-child(even) td{background:#FBFAF7} table.rt2 .c{text-align:center} table.rt2 .n{direction:ltr;text-align:right;font-variant-numeric:tabular-nums}
+.rrow{display:flex;align-items:center;gap:8px;font-size:11px;margin:4px 0} .rrow .rl{width:110px;color:var(--grey)} .rrow b{width:26px;text-align:left;color:var(--navy)}
+.rbar{flex:1;height:8px;background:#EDE9E2;border-radius:4px;overflow:hidden;min-width:50px} .rbar i{display:block;height:100%}
+table.rt2 .rbar{height:5px;margin-bottom:2px}
+.rb{display:inline-block;font-size:9.5px;font-weight:800;padding:1px 6px;border-radius:5px} .rb.bad{background:#F6E6E2;color:#A6503B} .rb.ok{background:var(--sagebg);color:var(--sage)} .rb.mid{background:var(--goldbg);color:var(--gold)}
+.rlist{margin:0;padding-inline-start:16px;font-size:11px;line-height:1.7}
+.rfoot{margin-top:14px;border-top:1px solid var(--line);padding-top:8px;font-size:10px;color:var(--grey)} .sig{display:flex;justify-content:space-between;gap:20px;margin-top:14px;font-size:10.5px;color:var(--text)} .sig>div{flex:1;border:1px dashed var(--line);border-radius:8px;padding:8px 10px;line-height:1.7}
+.pdfmode .rpage{border:0;box-shadow:none;border-radius:0;margin:0;padding:6mm 4mm}
+@media print{ .rep{max-width:none} .rpage{border:0;box-shadow:none;border-radius:0;margin:0;padding:0} @page{size:A4;margin:12mm} }
+@media (max-width:900px){ .rkpis{grid-template-columns:repeat(2,1fr)} .rtwo{grid-template-columns:1fr} .rhead{flex-wrap:wrap} .rmeta{text-align:right} }
