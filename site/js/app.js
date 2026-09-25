@@ -91,7 +91,7 @@ async function route() {
 window.addEventListener('hashchange', route);
 // مراقبة صدور نسخة جديدة من المنصة
 let verNotified = false;
-async function checkVersion() { if (verNotified || !window.AHC_CONFIG?.version) return; try { const t = await (await fetch('config.js?t=' + Date.now(), { cache: 'no-store' })).text(); const m = t.match(/version:\s*"([^"]+)"/); if (m && m[1] !== window.AHC_CONFIG.version) { verNotified = true; const b = document.createElement('div'); b.className = 'verbar'; b.innerHTML = '⬆ صدرت نسخة جديدة من المنصة — <b>اضغط هنا للتحديث</b>'; b.onclick = () => location.reload(); document.body.appendChild(b); } } catch (e) { } }
+async function checkVersion() { if (verNotified || !window.AHC_CONFIG?.version) return; try { const t = await (await fetch('config.js?t=' + Date.now(), { cache: 'no-store' })).text(); const m = t.match(/version:\s*"([^"]+)"/); if (m && m[1] !== window.AHC_CONFIG.version) { verNotified = true; let tried = ''; try { tried = sessionStorage.getItem('ahc_ver_try') || ''; } catch (e) { } if (tried === m[1]) return; const b = document.createElement('div'); b.className = 'verbar'; b.innerHTML = '⬆ صدرت نسخة جديدة من المنصة — <b>اضغط هنا للتحديث</b>'; b.onclick = () => { try { sessionStorage.setItem('ahc_ver_try', m[1]); } catch (e) { } location.replace(location.pathname + '?r=' + Date.now() + location.hash); }; document.body.appendChild(b); } } catch (e) { } }
 window.addEventListener('hashchange', checkVersion); document.addEventListener('visibilitychange', () => { if (!document.hidden) checkVersion(); }); setTimeout(checkVersion, 4000);
 
 async function boot() {
