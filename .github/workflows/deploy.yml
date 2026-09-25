@@ -3,6 +3,8 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    - cron: '0 5 * * *'
 
 permissions:
   contents: write
@@ -21,6 +23,7 @@ jobs:
       SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
       DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
       DB_URL: ${{ secrets.DB_URL }}
+      PUSH_SECRET: ${{ secrets.PUSH_SECRET }}
     steps:
       - uses: actions/checkout@v4
       - name: Install psql
@@ -65,6 +68,10 @@ jobs:
       - name: Import projects (one-time per file)
         if: steps.db.outputs.url != ''
         run: node scripts/import_projects.mjs 2>&1 | tee -a "$RUNNER_TEMP/seed.txt"; test ${PIPESTATUS[0]} -eq 0
+      - name: Push hook config + stale-project notifications
+        if: steps.db.outputs.url != ''
+        run: |
+          psql "${{ steps.db.outputs.url }}" -v ON_ERROR_STOP=1 -v url="$SUPABASE_URL/functions/v1/push" -v sec="$PUSH_SECRET" -c "insert into private.secrets(key,value) values ('push_url', :'url'), ('push_secret', :'sec') on conflict (key) do update set value = excluded.value;" -c "select public.notify_stale_projects() as stale_notified;" 2>&1 | tee -a "$RUNNER_TEMP/seed.txt"
       - name: Publish seed log
         if: always()
         continue-on-error: true
@@ -85,7 +92,7 @@ jobs:
       - name: Inject public config
         run: |
           cat > site/config.js <<EOF
-          window.AHC_CONFIG = { url: "${{ secrets.SUPABASE_URL }}", anon: "${{ secrets.SUPABASE_ANON_KEY }}", version: "${{ github.sha }}" };
+          window.AHC_CONFIG = { url: "${{ secrets.SUPABASE_URL }}", anon: "${{ secrets.SUPABASE_ANON_KEY }}", vapid: "${{ secrets.VAPID_PUBLIC }}", version: "${{ github.sha }}" };
           EOF
       - name: Version-stamp modules (cache busting)
         run: |
@@ -98,3 +105,18 @@ jobs:
         with: { path: site }
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  functions:
+    needs: database
+    runs-on: ubuntu-latest
+    if: ${{ vars.DEPLOY_FUNCTIONS == 'yes' }}
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Deploy push function
+        run: |
+          npx --yes supabase@latest functions deploy push --project-ref ejyebwykojqwsjkyriom --no-verify-jwt
+          npx --yes supabase@latest secrets set --project-ref ejyebwykojqwsjkyriom PUSH_SECRET="${{ secrets.PUSH_SECRET }}" VAPID_PUBLIC="${{ secrets.VAPID_PUBLIC }}" VAPID_PRIVATE="${{ secrets.VAPID_PRIVATE }}"

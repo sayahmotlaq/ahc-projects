@@ -17,11 +17,13 @@ function shell(inner) {
     <img class="logo" src="assets/logo.png" alt="تجمع الأحساء الصحي">
     <nav class="nav">${NAV.filter(n => !n[2] || role() === n[2]).map(n => n[3] ? `<div class="grp" data-nav="${n[0]}"><a href="#/${n[3][0][0]}" class="gt" data-grp>${n[1]} <small>▾</small></a><div class="dd">${n[3].map(c => `<a href="#/${c[0]}" data-nav="${c[0]}">${c[1]}</a>`).join('')}</div></div>` : `<a href="#/${n[0]}" data-nav="${n[0]}">${n[1]}</a>`).join('')}</nav>
     <span style="flex:1"></span>
+    <span id="bellhost"></span>
     <div class="who"><b>${esc(p?.full_name || '')}</b><span>${esc(ROLES[role()] || '')}</span></div>
     <button class="btn sm" id="logout">خروج</button>
     <button class="btn sm menubtn2" id="navbtn">☰</button>
   </header><main id="main">${inner || ''}</main>`;
   $('#logout').onclick = async () => { await sb.auth.signOut(); location.hash = ''; boot(); };
+  if (canRead()) import('./notif.js').then(n => { n.mountBell($('#bellhost')); n.registerSW(); });
   $('#navbtn').onclick = () => $('.nav').classList.toggle('show');
   $$('.grp .gt').forEach(a => a.onclick = e => { if (matchMedia('(max-width:900px)').matches || e.detail === 0) { e.preventDefault(); const g = a.parentElement; const open = g.classList.contains('open'); $$('.grp.open').forEach(x => x.classList.remove('open')); if (!open) g.classList.add('open'); } });
   document.addEventListener('click', e => { if (!e.target.closest('.grp')) $$('.grp.open').forEach(x => x.classList.remove('open')); });
@@ -81,6 +83,7 @@ async function route() {
     else if (parts[0] === 'treport') { const t = await import('./treports.js'); if (parts[1] === 'new') await t.mountTReportEditor(m, null, params); else if (parts[2] === 'edit') await t.mountTReportEditor(m, parts[1], params); else await t.mountTReport(m, parts[1]); }
     else if (parts[0] === 'documents') { const { mountDocsAll } = await import('./docs.js'); await mountDocsAll(m, params); }
     else if (parts[0] === 'drawings') { const { mountDrawingsAll } = await import('./docs.js'); await mountDrawingsAll(m, params); }
+    else if (parts[0] === 'settings') { const { mountSettings } = await import('./notif.js'); await mountSettings(m); }
     else if (parts[0] === 'submittals') { const { mountSubmittals } = await import('./docs.js'); await mountSubmittals(m, params); }
     else if (parts[0] === 'report') { const { mountReport } = await import('./report.js'); await mountReport(m, parts[1] || 'general', params); }
     else if (parts[0] === 'ref') { await ensureRef(); const { mountRef } = await import('./ref.js'); const code = parts[1] ? parts[1].replace(/-/g, ' ') : null; if (!m.querySelector('.refwrap')) mountRef(m, code); else if (code) { const { go } = await import('./ref.js'); go(code); } }
