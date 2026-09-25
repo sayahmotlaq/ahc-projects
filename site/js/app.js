@@ -3,7 +3,7 @@ import { sb, session, loadSession, loadRef, REF, role, isAdmin, canRead, ROLES }
 import { $, $$, esc, toast, err, modal, field, inp, formData } from './ui.js';
 
 const app = $('#app');
-const NAV = [['dashboard', 'لوحة المؤشرات'], ['projects', 'المشاريع'], ['tasks', 'المهام'], ['requests', 'الطلبات'], ['payments', 'المستخلصات'], ['report', 'التقارير'], ['ref', 'المرجع الفني'], ['admin', 'الإدارة', 'admin']];
+const NAV = [['dashboard', 'لوحة المؤشرات'], ['projects', 'المشاريع'], ['tasks', 'المهام'], ['requests', 'الطلبات'], ['payments', 'المستخلصات'], ['treports', 'التقارير الفنية'], ['report', 'التقارير'], ['ref', 'المرجع الفني'], ['admin', 'الإدارة', 'admin']];
 
 function shell(inner) {
   const p = session.profile;
@@ -61,7 +61,7 @@ async function route() {
   const h = location.hash.replace(/^#\/?/, '') || 'dashboard';
   const [path, query] = h.split('?'); const params = new URLSearchParams(query || '');
   const parts = path.split('/'); const main = $('#main'); if (!main) shell('');
-  const m = $('#main'); setNav(parts[0]);
+  const m = $('#main'); setNav(parts[0] === 'treport' ? 'treports' : parts[0]);
   try {
     if (parts[0] === 'dashboard') { const { mountDashboard } = await import('./projects.js'); await mountDashboard(m); }
     else if (parts[0] === 'projects') { const { mountProjects } = await import('./projects.js'); await mountProjects(m, params); }
@@ -69,6 +69,8 @@ async function route() {
     else if (parts[0] === 'tasks') { const { mountTasks } = await import('./tasks.js'); await mountTasks(m, params); }
     else if (parts[0] === 'requests') { const { mountRequests } = await import('./tasks.js'); await mountRequests(m, params); }
     else if (parts[0] === 'payments') { const { mountPayments } = await import('./payments.js'); await mountPayments(m, params); }
+    else if (parts[0] === 'treports') { const { mountTReports } = await import('./treports.js'); await mountTReports(m, params); }
+    else if (parts[0] === 'treport') { const t = await import('./treports.js'); if (parts[1] === 'new') await t.mountTReportEditor(m, null, params); else if (parts[2] === 'edit') await t.mountTReportEditor(m, parts[1], params); else await t.mountTReport(m, parts[1]); }
     else if (parts[0] === 'report') { const { mountReport } = await import('./report.js'); await mountReport(m, parts[1] || 'general', params); }
     else if (parts[0] === 'ref') { await ensureRef(); const { mountRef } = await import('./ref.js'); const code = parts[1] ? parts[1].replace(/-/g, ' ') : null; if (!m.querySelector('.refwrap')) mountRef(m, code); else if (code) { const { go } = await import('./ref.js'); go(code); } }
     else if (parts[0] === 'admin') { if (!isAdmin()) return location.hash = '#/dashboard'; const { mountAdmin } = await import('./admin.js'); await mountAdmin(m, parts[1] || 'users'); }

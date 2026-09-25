@@ -359,3 +359,25 @@ table.rt2 .rbar{height:5px;margin-bottom:2px}
 .pdfmode .rkpis.six{grid-template-columns:repeat(6,1fr)!important} .pdfmode .rproj .rtwo{grid-template-columns:1fr 1fr!important}
 @media print{ .rkpis.six{grid-template-columns:repeat(6,1fr)!important} .rbuild,.tabs.noprint{display:none!important} }
 @media screen and (max-width:900px){ .rkpis.six{grid-template-columns:repeat(3,1fr)} }
+
+/* التقارير الفنية */
+.trform .period .btnrow input{flex:1;min-width:120px}
+.itemrow{display:grid;grid-template-columns:3fr 1.2fr 1fr auto;gap:6px;margin-bottom:6px}
+.itemrow input{font-family:inherit;font-size:13px;padding:7px 9px;border:1px solid var(--line);border-radius:8px}
+.photogrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin:6px 0}
+.ph{position:relative;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fafafa}
+.ph img{width:100%;height:120px;object-fit:cover;display:block}
+.ph input{width:100%;border:0;border-top:1px solid var(--line);padding:6px 8px;font-family:inherit;font-size:12px}
+.ph .x{position:absolute;top:4px;left:4px;background:rgba(0,0,0,.55);color:#fff;border:0;border-radius:50%;width:24px;height:24px;cursor:pointer}
+.ph.new{outline:2px solid var(--lblue)}
+.rsec{margin:10px 0} .rsec h3{font-size:12.5px;color:var(--navy);margin:0 0 5px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.rsec .pre{font-size:11.5px;line-height:1.8;white-space:pre-wrap} .rsec .pre.bad{color:#8a3a28}
+.trkv{margin-bottom:6px}
+.photos{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.photos figure{margin:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff}
+.photos img{width:100%;height:210px;object-fit:cover;display:block;cursor:zoom-in}
+.photos figcaption{font-size:10.5px;padding:5px 8px;color:var(--text);min-height:26px}
+.btnrow.wrap{flex-wrap:wrap}
+.pdfmode .photos{grid-template-columns:1fr 1fr!important}
+@media print{ .photos{grid-template-columns:1fr 1fr!important} }
+@media screen and (max-width:900px){ .itemrow{grid-template-columns:1fr 1fr;} .itemrow input:first-child{grid-column:1/-1} .photos{grid-template-columns:1fr 1fr} }

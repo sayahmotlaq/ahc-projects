@@ -43,7 +43,7 @@ function header(title, sub, meta) {
 }
 const footer = (extra = '') => `<footer class="rfoot"><div>صدر من منصة إدارة مشاريع تجمع الأحساء الصحي بتاريخ ${esc(today())} — البيانات كما هي مسجلة في المنصة وقت الإصدار.${extra}</div><div class="sig"><div>إعداد: رئيس قسم المشاريع<br><br>الاسم: ...................... التوقيع: ..............</div><div>اعتماد: مدير إدارة الخدمات الفنية<br><br>الاسم: ...................... التوقيع: ..............</div></div></footer>`;
 
-async function exportPdf(el, filename) {
+export async function exportPdf(el, filename) {
   toast('جارٍ إنشاء ملف PDF…');
   try { await loadLib(); } catch (e) { return err('تعذّر تحميل مكتبة PDF — استخدم «طباعة / حفظ كـ PDF»'); }
   el.classList.add('pdfmode');
@@ -249,7 +249,7 @@ function customReport(root, params) {
 }
 
 // توزيع الكتل على صفحات A4 بحسب ارتفاعها الفعلي
-function paginate(rep, blocks) {
+export function paginate(rep, blocks) {
   const BUDGET = 1040; // px داخل الصفحة (A4 بعرض 210mm)
   rep.innerHTML = '<section class="rpage" id="rMeasure"></section>';
   const m = $('#rMeasure', rep); const pages = [[]]; let used = 0;

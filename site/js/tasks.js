@@ -16,17 +16,17 @@ async function loadProfiles() { if (!profiles.length) profiles = await q(sb.from
 const pname = (id, fb) => profiles.find(p => p.id === id)?.full_name || fb || '—';
 
 // ---------- نموذج المهمة (أدمن) / تحديث حالة (مكلّف)
-async function taskForm(t, project, done) {
-  await loadProfiles();
+export async function taskForm(t, project, done, preset = null) {
+  await loadProfiles(); const v = t || preset || {};
   const admin = isAdmin(); const me = session.user.id;
   const people = [['', '—'], ...profiles.filter(p => ['admin', 'engineer'].includes(p.role)).map(p => [p.id, p.full_name])];
   const html = admin ? `<form id="f" class="pgrid">
-      ${field('عنوان المهمة *', inp('title', t?.title || '', 'required'), 'wide')}
-      ${field('التفاصيل', `<textarea name="details" rows="3">${esc(t?.details || '')}</textarea>`, 'wide')}
-      ${field('المكلّف (حساب)', sel('assignee_id', people, t?.assignee_id || project?.engineer_id || ''))}
-      ${field('اسم المكلّف (إن لم يكن له حساب)', inp('assignee_name', t?.assignee_name || project?.engineer_name || ''))}
-      ${field('الأولوية', sel('priority', Object.entries(PRIO), t?.priority || 'normal'))}
-      ${field('الموعد', inp('due_date', t?.due_date || '', 'type="date"'))}
+      ${field('عنوان المهمة *', inp('title', v.title || '', 'required'), 'wide')}
+      ${field('التفاصيل', `<textarea name="details" rows="3">${esc(v.details || '')}</textarea>`, 'wide')}
+      ${field('المكلّف (حساب)', sel('assignee_id', people, v.assignee_id || project?.engineer_id || ''))}
+      ${field('اسم المكلّف (إن لم يكن له حساب)', inp('assignee_name', v.assignee_name || project?.engineer_name || ''))}
+      ${field('الأولوية', sel('priority', Object.entries(PRIO), v.priority || 'normal'))}
+      ${field('الموعد', inp('due_date', v.due_date || '', 'type="date"'))}
       ${t ? field('الحالة', sel('status', Object.entries(T_STATUS), t.status)) : ''}
       ${t ? field('ملاحظة الإنجاز', `<textarea name="progress_note" rows="2">${esc(t.progress_note || '')}</textarea>`, 'wide') : ''}
       <div class="btnrow end wide">${t ? '<button type="button" class="btn danger" data-del>حذف</button>' : ''}<span style="flex:1"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">حفظ</button></div></form>`
@@ -37,7 +37,7 @@ async function taskForm(t, project, done) {
   await modal(html, { title: t ? (admin ? 'تعديل المهمة' : 'تحديث حالة المهمة') : 'مهمة جديدة', wide: admin, onOpen: (w, close) => {
     $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target);
       try {
-        if (admin) { const row = { project_id: project.id, title: f.title.trim(), details: f.details.trim(), assignee_id: f.assignee_id || null, assignee_name: f.assignee_name.trim(), priority: f.priority, due_date: f.due_date || null }; if (t) { row.status = f.status; row.progress_note = f.progress_note; await q(sb.from('tasks').update(row).eq('id', t.id)); } else await q(sb.from('tasks').insert({ ...row, created_by: me })); }
+        if (admin) { const row = { project_id: project.id, title: f.title.trim(), details: f.details.trim(), assignee_id: f.assignee_id || null, assignee_name: f.assignee_name.trim(), priority: f.priority, due_date: f.due_date || null }; if (preset?.report_id) row.report_id = preset.report_id; if (t) { row.status = f.status; row.progress_note = f.progress_note; await q(sb.from('tasks').update(row).eq('id', t.id)); } else await q(sb.from('tasks').insert({ ...row, created_by: me })); }
         else await q(sb.from('tasks').update({ status: f.status, progress_note: f.progress_note }).eq('id', t.id));
         toast('تم الحفظ'); close(); done();
       } catch (er) { err(er); } };
