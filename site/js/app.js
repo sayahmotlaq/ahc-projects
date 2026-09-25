@@ -1,34 +1,61 @@
 // ===== التطبيق: الدخول، التوجيه، الهيكل =====
-import { sb, session, loadSession, loadRef, REF, role, isAdmin, canRead, ROLES } from './api.js';
-import { $, $$, esc, toast, err, modal, field, inp, formData } from './ui.js';
+import { sb, session, loadSession, loadRef, REF, role, isAdmin, canRead, ROLES, q } from './api.js';
+import { $, $$, esc, toast, err, modal, field, inp, formData, ico } from './ui.js';
 
 const app = $('#app');
 const NAV = [
-  ['dashboard', 'لوحة المؤشرات'], ['projects', 'المشاريع'],
-  ['work', 'المهام والطلبات', null, [['tasks', 'المهام'], ['requests', 'الطلبات']]],
-  ['docs', 'المستندات', null, [['documents', 'المستندات الرسمية'], ['drawings', 'المخططات'], ['submittals', 'الاعتمادات']]],
-  ['reports', 'التقارير', null, [['treports', 'التقارير الفنية والمحاضر'], ['report', 'التقرير التنفيذي'], ['report/custom', 'تقرير مخصص']]],
-  ['payments', 'المستخلصات'], ['ref', 'المرجع الفني'], ['admin', 'الإدارة', 'admin']];
-const PARENT = {}; NAV.forEach(n => (n[3] || []).forEach(c => PARENT[c[0].split('/')[0]] = n[0]));
+  ['dashboard', 'لوحة المؤشرات', 'dash'], ['projects', 'المشاريع', 'folder'],
+  ['sec', 'المتابعة'],
+  ['tasks', 'المهام', 'check'], ['requests', 'الطلبات', 'inbox'], ['treports', 'التقارير الفنية والمحاضر', 'file'],
+  ['sec', 'المستندات والمالية'],
+  ['submittals', 'الاعتمادات', 'stamp'], ['documents', 'المستندات الرسمية', 'doc'], ['drawings', 'المخططات', 'draw'], ['payments', 'المستخلصات', 'coins'],
+  ['sec', 'النظام'],
+  ['report', 'التقارير', 'chart'], ['ref', 'المرجع الفني', 'book'], ['settings', 'الإعدادات والإشعارات', 'bell'], ['admin', 'الإدارة', 'cog', 'admin']];
+const ALIAS = { treport: 'treports', project: 'projects' };
+const BOTTOM = [['dashboard', 'المؤشرات', 'dash'], ['projects', 'المشاريع', 'folder'], ['tasks', 'المهام', 'check'], ['treports', 'التقارير', 'file'], ['more', 'المزيد', 'menu']];
 
+let projIndex = null;
 function shell(inner) {
   const p = session.profile;
-  app.innerHTML = `<header class="top">
-    <img class="logo" src="assets/logo.png" alt="تجمع الأحساء الصحي">
-    <nav class="nav">${NAV.filter(n => !n[2] || role() === n[2]).map(n => n[3] ? `<div class="grp" data-nav="${n[0]}"><a href="#/${n[3][0][0]}" class="gt" data-grp>${n[1]} <small>▾</small></a><div class="dd">${n[3].map(c => `<a href="#/${c[0]}" data-nav="${c[0]}">${c[1]}</a>`).join('')}</div></div>` : `<a href="#/${n[0]}" data-nav="${n[0]}">${n[1]}</a>`).join('')}</nav>
-    <span style="flex:1"></span>
-    <span id="bellhost"></span>
-    <div class="who"><b>${esc(p?.full_name || '')}</b><span>${esc(ROLES[role()] || '')}</span></div>
-    <button class="btn sm" id="logout">خروج</button>
-    <button class="btn sm menubtn2" id="navbtn">☰</button>
-  </header><main id="main">${inner || ''}</main>`;
-  $('#logout').onclick = async () => { await sb.auth.signOut(); location.hash = ''; boot(); };
+  const navItems = NAV.filter(n => n[0] !== 'sec' ? (!n[3] || role() === n[3]) : true);
+  const links = (cls) => navItems.map(n => n[0] === 'sec' ? `<div class="sec">${n[1]}</div>` : `<a href="#/${n[0]}" data-nav="${n[0]}" class="${cls}">${ico(n[2])}<span>${n[1]}</span><span class="cnt" data-cnt="${n[0]}"></span></a>`).join('');
+  const mini = (() => { try { return localStorage.getItem('ahc_mini') === '1'; } catch (e) { return false; } })();
+  app.innerHTML = `<div class="app2 ${mini ? 'mini' : ''}" id="app2">
+    <aside class="side"><a class="brand" href="#/dashboard"><img src="assets/logo.png" alt=""><div><b>منصة إدارة المشاريع</b><small>تجمع الأحساء الصحي</small></div></a>
+      <nav class="snav">${links('')}</nav>
+      <button class="fold" id="fold" title="طيّ القائمة">${ico('fold')}</button></aside>
+    <div class="mainwrap">
+      <div class="topbar"><div class="gsearch" id="gsearch">${ico('search')}<span>ابحث عن مشروع…</span><kbd>⌘K</kbd></div><span style="flex:1"></span><span id="bellhost"></span>
+        <div class="user"><div><b>${esc(p?.full_name || '')}</b><small>${esc(ROLES[role()] || '')}</small></div><div class="av">${esc((p?.full_name || '?').trim().charAt(0))}</div></div>
+        <button class="ib" id="logout" title="خروج">${ico('logout')}</button></div>
+      <main id="main">${inner || ''}</main></div></div>
+    <nav class="bottom">${BOTTOM.map(b => `<a href="${b[0] === 'more' ? '#' : '#/' + b[0]}" data-nav="${b[0]}" ${b[0] === 'more' ? 'id="moreBtn"' : ''}>${ico(b[2])}${b[1]}<span class="cnt" data-cnt="${b[0]}"></span></a>`).join('')}</nav>
+    <div class="sheet" id="sheet"><div class="sh">${links('')}<a href="#" id="logout2">${ico('logout')}<span>خروج</span></a></div></div>`;
+  const out = async () => { await sb.auth.signOut(); location.hash = ''; boot(); };
+  $('#logout').onclick = out; $('#logout2').onclick = e => { e.preventDefault(); out(); };
+  $('#fold').onclick = () => { const a = $('#app2'); a.classList.toggle('mini'); try { localStorage.setItem('ahc_mini', a.classList.contains('mini') ? '1' : '0'); } catch (e) { } };
+  $('#moreBtn').onclick = e => { e.preventDefault(); $('#sheet').classList.toggle('show'); };
+  $('#sheet').addEventListener('click', e => { if (e.target === $('#sheet') || e.target.closest('a')) $('#sheet').classList.remove('show'); });
+  $('#gsearch').onclick = openPalette;
+  document.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openPalette(); } });
   if (canRead()) import('./notif.js').then(n => { n.mountBell($('#bellhost')); n.registerSW(); });
-  $('#navbtn').onclick = () => $('.nav').classList.toggle('show');
-  $$('.grp .gt').forEach(a => a.onclick = e => { if (matchMedia('(max-width:900px)').matches || e.detail === 0) { e.preventDefault(); const g = a.parentElement; const open = g.classList.contains('open'); $$('.grp.open').forEach(x => x.classList.remove('open')); if (!open) g.classList.add('open'); } });
-  document.addEventListener('click', e => { if (!e.target.closest('.grp')) $$('.grp.open').forEach(x => x.classList.remove('open')); });
 }
-function setNav(k, sub) { const key = sub ? k + '/' + sub : k; $$('[data-nav]').forEach(a => { const v = a.getAttribute('data-nav'); a.classList.toggle('on', v === key || (!sub && v === k) || v === PARENT[k]); }); $('.nav')?.classList.remove('show'); $$('.grp.open').forEach(x => x.classList.remove('open')); }
+function setNav(k) { const key = ALIAS[k] || k; $$('[data-nav]').forEach(a => a.classList.toggle('on', a.getAttribute('data-nav') === key)); $('#sheet')?.classList.remove('show'); }
+export function setCounts(map) { Object.entries(map).forEach(([k, v]) => $$(`[data-cnt="${k}"]`).forEach(el => { el.textContent = v || ''; el.classList.toggle('show', !!v); })); }
+async function openPalette() {
+  if ($('.pal')) return;
+  if (!projIndex) { try { projIndex = await q(sb.from('projects').select('id,name,ref,stage,category').eq('archived', false).order('name')); } catch (e) { projIndex = []; } }
+  const pages = NAV.filter(n => n[0] !== 'sec' && (!n[3] || role() === n[3])).map(n => ({ id: null, name: n[1], link: '#/' + n[0], kind: 'صفحة' }));
+  const w = document.createElement('div'); w.className = 'pal'; w.innerHTML = `<div class="box"><input id="palq" placeholder="اكتب اسم المشروع أو الصفحة…" autocomplete="off"><div class="list" id="pall"></div></div>`;
+  document.body.appendChild(w); const inp = $('#palq', w), list = $('#pall', w); let sel = 0, items = [];
+  const norm = s => (s || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي');
+  const render = () => { const qs = norm(inp.value.trim()); items = qs ? [...projIndex.filter(p => norm(p.name + ' ' + (p.ref || '')).includes(qs)).slice(0, 8).map(p => ({ name: p.name, link: '#/project/' + p.id, kind: p.category || 'مشروع' })), ...pages.filter(p => norm(p.name).includes(qs)).slice(0, 4)] : pages.slice(0, 8);
+    sel = 0; list.innerHTML = items.map((it, i) => `<a class="res ${i === sel ? 'sel' : ''}" href="${it.link}" data-i="${i}">${ico(it.id === null && it.kind === 'صفحة' ? 'dash' : 'folder')}<span>${esc(it.name)}</span><small>${esc(it.kind)}</small></a>`).join('') || '<p class="muted" style="padding:14px">لا نتائج</p>'; };
+  const close = () => w.remove();
+  inp.oninput = render; render(); inp.focus();
+  inp.onkeydown = e => { if (e.key === 'ArrowDown') { sel = Math.min(sel + 1, items.length - 1); } else if (e.key === 'ArrowUp') { sel = Math.max(sel - 1, 0); } else if (e.key === 'Enter') { if (items[sel]) { location.hash = items[sel].link; close(); } return; } else if (e.key === 'Escape') { close(); return; } else return; $$('.res', list).forEach((a, i) => a.classList.toggle('sel', i === sel)); };
+  w.addEventListener('click', e => { if (e.target === w) close(); if (e.target.closest('.res')) close(); });
+}
 
 // ---------- شاشات الدخول
 function authScreen(mode = 'login') {
@@ -71,7 +98,7 @@ async function route() {
   const h = location.hash.replace(/^#\/?/, '') || 'dashboard';
   const [path, query] = h.split('?'); const params = new URLSearchParams(query || '');
   const parts = path.split('/'); const main = $('#main'); if (!main) shell('');
-  const m = $('#main'); setNav(parts[0] === 'treport' ? 'treports' : parts[0], parts[0] === 'report' && parts[1] === 'custom' ? 'custom' : null);
+  const m = $('#main'); setNav(parts[0]);
   try {
     if (parts[0] === 'dashboard') { const { mountDashboard } = await import('./projects.js'); await mountDashboard(m); }
     else if (parts[0] === 'projects') { const { mountProjects } = await import('./projects.js'); await mountProjects(m, params); }

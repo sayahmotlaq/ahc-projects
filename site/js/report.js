@@ -1,6 +1,6 @@
 // ===== التقارير: التقرير التنفيذي العام + التقرير المخصص =====
 import { sb, STAGES, stageOf, q, session, today } from './api.js';
-import { $, $$, esc, fmt, fmt0, money, dateAr, toast, err } from './ui.js';
+import { $, $$, esc, fmt, fmt0, money, dateAr, toast, err, ico } from './ui.js';
 import { groupOf, isStale, loadActivity, STALE_DAYS } from './projects.js';
 import { P_STATUS, P_KIND } from './payments.js';
 
@@ -93,7 +93,7 @@ function generalReport(root, params) {
     // نشاط الفترة
     const A = { stages: D.log.filter(l => inP(l.at)).length, ups: D.ups.filter(u => inP(u.happened_on)).length, tasksDone: D.tasks.filter(t => t.status === 'done' && inP(t.done_at || t.updated_at)).length, reqs: D.reqs.filter(r => inP(r.created_at)).length, chs: D.chs.filter(c => inP(c.detected_on || c.created_at)).length, paid: D.pays.filter(p => p.status === 'paid' && inP(p.paid_on)).reduce((a, p) => a + Number(p.net_amount || 0), 0), paidN: D.pays.filter(p => p.status === 'paid' && inP(p.paid_on)).length };
     const refNo = 'AHC-EXR-' + today().replace(/-/g, '');
-    root.innerHTML = `<div class="filters noprint"><label class="fld"><span>من تاريخ</span><input type="date" id="rFrom" value="${from}"></label><label class="fld"><span>إلى تاريخ</span><input type="date" id="rTo" value="${to}"></label><div class="btnrow" style="align-self:flex-end"><button class="btn sm" data-q="month">هذا الشهر</button><button class="btn sm" data-q="quarter">هذا الربع</button><button class="btn sm" data-q="year">هذه السنة</button><button class="btn sm" data-q="all">الكل</button></div><span style="flex:1"></span><button class="btn primary" id="rPdf">⬇ تنزيل PDF</button><button class="btn" id="rPrint">طباعة / حفظ كـ PDF</button></div>
+    root.innerHTML = `<div class="filters noprint"><label class="fld"><span>من تاريخ</span><input type="date" id="rFrom" value="${from}"></label><label class="fld"><span>إلى تاريخ</span><input type="date" id="rTo" value="${to}"></label><div class="btnrow" style="align-self:flex-end"><button class="btn sm" data-q="month">هذا الشهر</button><button class="btn sm" data-q="quarter">هذا الربع</button><button class="btn sm" data-q="year">هذه السنة</button><button class="btn sm" data-q="all">الكل</button></div><span style="flex:1"></span><button class="btn primary" id="rPdf">${ico('download')} تنزيل PDF</button><button class="btn" id="rPrint">${ico('print')} طباعة</button></div>
     <div class="rep" id="rep">
     <section class="rpage">
       ${header('التقرير التنفيذي لمحفظة المشاريع', '', [['تاريخ الإصدار', esc(longDate())], ['فترة التقرير', periodLabel(from, to)], ['رقم التقرير', refNo, 1], ['أعدّه', esc(session.profile?.full_name || '')]])}
@@ -172,7 +172,7 @@ function customReport(root, params) {
       <div class="fld wide"><span>أقسام التقرير</span><div class="chips" id="cSecs">${SECTIONS.map(([k, t]) => `<label class="chip"><input type="checkbox" value="${k}"> ${t}</label>`).join('')}</div><label class="chk" style="margin-top:6px"><input type="checkbox" id="cAll"> إظهار كل السجلات (وليس المفتوحة/المعلقة فقط)</label></div>
       <label class="fld wide"><span>ملاحظات / مقدمة تظهر في التقرير</span><textarea id="cNotes" rows="2">${esc(st.notes)}</textarea></label>
     </div>
-    <div class="btnrow end"><button class="btn" id="cReset">إعادة الضبط</button><span style="flex:1"></span><button class="btn primary" id="cPdf">⬇ تنزيل PDF</button><button class="btn" id="cPrint">طباعة / حفظ كـ PDF</button></div>
+    <div class="btnrow end"><button class="btn" id="cReset">إعادة الضبط</button><span style="flex:1"></span><button class="btn primary" id="cPdf">${ico('download')} تنزيل PDF</button><button class="btn" id="cPrint">${ico('print')} طباعة</button></div>
   </div><div class="rep" id="rep"></div>`;
   const R = { title: $('#cTitle'), scope: $('#cScope'), one: $('#cOne'), from: $('#cFrom'), to: $('#cTo'), notes: $('#cNotes'), all: $('#cAll') };
   R.scope.value = st.scope; if (st.ids[0]) R.one.value = st.ids[0]; R.all.checked = st.all;

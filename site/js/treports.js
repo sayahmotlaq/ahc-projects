@@ -1,10 +1,10 @@
 // ===== التقارير الفنية ومحاضر الاجتماعات =====
 import { sb, canEdit, isAdmin, q, session, today } from './api.js';
-import { $, $$, esc, dateAr, toast, err, modal, confirm, field, inp, sel, formData } from './ui.js';
+import { $, $$, esc, dateAr, toast, err, modal, confirm, field, inp, sel, formData, ico } from './ui.js';
 
 export const TR_KIND = { visit: 'زيارة ميدانية', status: 'تقرير حالة', weekly: 'تقرير أسبوعي', monthly: 'تقرير شهري', incident: 'بلاغ / ملاحظة عاجلة', meeting: 'محضر اجتماع' };
 export const TR_STATUS = { draft: 'مسودة', published: 'بانتظار المراجعة', reviewed: 'تمت المراجعة', returned: 'مُعاد للمهندس' };
-export const trBadge = s => `<span class="badge ${s === 'reviewed' ? 'full' : s === 'published' ? 'bad' : s === 'returned' ? 'ovr' : 'skel'}">${TR_STATUS[s] || s}</span>`;
+export const trBadge = s => `<span class="badge ${s === 'reviewed' ? 'full' : s === 'published' ? 'ovr' : s === 'returned' ? 'bad' : 'skel'}">${TR_STATUS[s] || s}</span>`;
 const BUCKET = 'report-photos';
 let profiles = [];
 async function loadProfiles() { if (!profiles.length) profiles = await q(sb.from('profiles').select('id,full_name,role').order('full_name')); return profiles; }
@@ -82,7 +82,7 @@ export async function mountTReportEditor(root, id, params) {
       <div class="onlymeeting">${field('موعد الاجتماع القادم', inp('next_meeting', r.next_meeting || '', 'type="date"'))}</div>
       <div class="fld wide"><span>الصور</span>
         <div class="photogrid" id="pg"></div>
-        <div class="btnrow"><label class="btn"><input type="file" accept="image/*" capture="environment" multiple hidden id="cam">📷 التقاط صورة</label><label class="btn"><input type="file" accept="image/*" multiple hidden id="gal">🖼 من الاستوديو</label><span class="muted small" id="pinfo"></span></div></div>
+        <div class="btnrow"><label class="btn primary"><input type="file" accept="image/*" capture="environment" multiple hidden id="cam">${ico('camera')} التقاط صورة</label><label class="btn"><input type="file" accept="image/*" multiple hidden id="gal">${ico('image')} من الاستوديو</label><span class="muted small" id="pinfo"></span></div></div>
     </div>
     <div class="btnrow end" style="margin-top:12px">${id && (isAdmin() || r.status === 'draft') ? '<button type="button" class="btn danger" id="del">حذف</button>' : ''}<span style="flex:1"></span><a class="btn" href="#/${id ? 'treport/' + id : 'treports'}">إلغاء</a><button type="button" class="btn" id="saveDraft">حفظ كمسودة</button><button type="button" class="btn primary" id="publish">${r.status === 'reviewed' ? 'حفظ' : 'نشر التقرير'}</button></div>
   </form>`;
@@ -143,7 +143,7 @@ export async function mountTReport(root, id) {
   if (tasks.length) blocks.push(`<div class="rsec"><h3>المهام المرتبطة بالتقرير</h3><ul class="rlist">${tasks.map(t => `<li><a href="#/project/${r.project_id}/tasks">${esc(t.title)}</a> <span class="muted">— ${esc(pname(t.assignee_id) !== '—' ? pname(t.assignee_id) : t.assignee_name || '')} · ${TS[t.status]} · ${dateAr(t.due_date)}</span></li>`).join('')}</ul></div>`);
   blocks.push(`<footer class="rfoot"><div>صدر من منصة إدارة مشاريع تجمع الأحساء الصحي — ${esc(today())}</div><div class="sig"><div>المهندس: ${esc(pname(r.created_by))}<br><br>التوقيع: ..............</div><div>رئيس قسم المشاريع<br><br>التوقيع: ..............</div></div></footer>`);
   root.innerHTML = `<div class="phead noprint"><div class="crumb"><a href="#/treports">التقارير الفنية</a><span class="sep">›</span><a href="#/project/${r.project_id}/treports">${esc(r.projects?.name || '')}</a><span class="sep">›</span><span>${esc(r.title)}</span></div>
-    <div class="btnrow wrap">${trBadge(r.status)}<span style="flex:1"></span>${editable ? `<a class="btn" href="#/treport/${id}/edit">تعديل</a>` : ''}${r.status === 'draft' && mine(r) ? '<button class="btn primary" id="pub">نشر التقرير</button>' : ''}${r.status === 'returned' && mine(r) ? '<button class="btn primary" id="pub">إعادة النشر بعد التعديل</button>' : ''}${admin && r.status === 'published' ? '<button class="btn primary" id="rev">✓ تمت المراجعة</button><button class="btn" id="ret">إعادة للمهندس</button>' : ''}${admin ? '<button class="btn" id="mkTask">＋ مهمة من التقرير</button>' : ''}<button class="btn" id="pdf">⬇ PDF</button><button class="btn" id="prn">طباعة</button></div></div>
+    <div class="btnrow wrap">${trBadge(r.status)}<span style="flex:1"></span>${editable ? `<a class="btn" href="#/treport/${id}/edit">تعديل</a>` : ''}${r.status === 'draft' && mine(r) ? '<button class="btn primary" id="pub">نشر التقرير</button>' : ''}${r.status === 'returned' && mine(r) ? '<button class="btn primary" id="pub">إعادة النشر بعد التعديل</button>' : ''}${admin && r.status === 'published' ? '<button class="btn primary" id="rev">✓ تمت المراجعة</button><button class="btn" id="ret">إعادة للمهندس</button>' : ''}${admin ? '<button class="btn" id="mkTask">＋ مهمة من التقرير</button>' : ''}<button class="btn" id="pdf">${ico('download')} PDF</button><button class="btn" id="prn">${ico('print')} طباعة</button></div></div>
   <div class="rep" id="rep"></div>
   <div class="pcard noprint"><h2><span class="ic"></span>التعليقات <span class="muted">(${comments.length})</span></h2>${comments.length ? comments.map(c => `<div class="upd"><div class="uh"><b>${esc(pname(c.by_user))}</b> <span class="muted">· ${dateAr(c.at)}</span>${admin || c.by_user === session.user.id ? ` <button class="btn sm" data-delc="${c.id}">حذف</button>` : ''}</div><div class="ub">${esc(c.body)}</div></div>`).join('') : '<p class="muted">لا توجد تعليقات.</p>'}
     <form id="cf" class="btnrow" style="margin-top:8px"><input name="body" placeholder="اكتب تعليقاً…" required style="flex:1"><button class="btn primary">إرسال</button></form></div>`;

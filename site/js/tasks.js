@@ -7,8 +7,8 @@ export const R_STATUS = { new: 'جديد', in_review: 'قيد المراجعة',
 export const R_KIND = { approval: 'طلب اعتماد', review: 'طلب مراجعة', decision: 'طلب قرار', support: 'طلب دعم', other: 'أخرى' };
 const PRIO = { low: 'منخفضة', normal: 'عادية', high: 'مهمة', urgent: 'عاجلة' };
 const prioBadge = p => p === 'urgent' ? '<span class="badge bad">عاجلة</span>' : p === 'high' ? '<span class="badge ovr">مهمة</span>' : '';
-const tBadge = s => `<span class="badge ${s === 'done' ? 'full' : s === 'in_progress' ? 'ovr' : s === 'cancelled' ? 'skel' : 'bad'}">${T_STATUS[s] || s}</span>`;
-const rBadge = s => `<span class="badge ${s === 'approved' || s === 'done' ? 'full' : s === 'rejected' ? 'skel' : s === 'in_review' ? 'ovr' : 'bad'}">${R_STATUS[s] || s}</span>`;
+const tBadge = s => `<span class="badge ${s === 'done' ? 'full' : s === 'in_progress' ? 'info' : s === 'cancelled' ? 'skel' : 'ovr'}">${T_STATUS[s] || s}</span>`;
+const rBadge = s => `<span class="badge ${s === 'approved' || s === 'done' ? 'full' : s === 'rejected' ? 'bad' : s === 'in_review' ? 'info' : 'ovr'}">${R_STATUS[s] || s}</span>`;
 const isLate = (r, doneStates) => r.due_date && r.due_date < today() && !doneStates.includes(r.status);
 
 let profiles = [];

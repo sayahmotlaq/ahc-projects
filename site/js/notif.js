@@ -1,6 +1,6 @@
 // ===== مركز الإشعارات (الجرس) + إشعارات الجهاز (Web Push) =====
 import { sb, q, session } from './api.js';
-import { $, $$, esc, dateAr, toast, err } from './ui.js';
+import { $, $$, esc, dateAr, toast, err, ico } from './ui.js';
 
 export const N_KINDS = { task: 'المهام', request: 'الطلبات', treport: 'التقارير الفنية', comment: 'التعليقات', payment: 'المستخلصات', submittal: 'الاعتمادات', challenge: 'التحديات العالية', stage: 'تغيير المراحل', stale: 'مشاريع بلا تحديث' };
 const ICON = { task: '✅', request: '📨', treport: '📋', comment: '💬', payment: '💰', submittal: '📐', challenge: '⚠️', stage: '🚩', stale: '⏳', info: 'ℹ️' };
@@ -18,7 +18,7 @@ export async function refresh() {
   } catch (e) { }
 }
 export function mountBell(host) {
-  host.insertAdjacentHTML('beforeend', `<div class="nwrap"><button class="nbell" id="nbell" title="الإشعارات">🔔<span id="ncount">0</span></button><div class="npanel" id="npanel"><div class="nhead"><b>الإشعارات</b><span style="flex:1"></span><button class="btn sm" id="nread">تعليم الكل كمقروء</button><a class="btn sm" href="#/settings">⚙</a></div><div id="nlist"></div></div></div>`);
+  host.insertAdjacentHTML('beforeend', `<div class="nwrap"><button class="nbell" id="nbell" title="الإشعارات">${ico('bell')}<span id="ncount">0</span></button><div class="npanel" id="npanel"><div class="nhead"><b>الإشعارات</b><span style="flex:1"></span><button class="btn sm" id="nread">تعليم الكل كمقروء</button><a class="btn sm" href="#/settings">الإعدادات</a></div><div id="nlist"></div></div></div>`);
   $('#nbell').onclick = e => { e.stopPropagation(); open = !open; $('#npanel').classList.toggle('show', open); if (open) renderList(); };
   document.addEventListener('click', e => { if (open && !e.target.closest('.nwrap')) { open = false; $('#npanel')?.classList.remove('show'); } });
   $('#nread').onclick = async () => { const ids = cache.filter(n => !n.read_at).map(n => n.id); if (ids.length) await q(sb.from('notifications').update({ read_at: new Date().toISOString() }).in('id', ids)); refresh(); };

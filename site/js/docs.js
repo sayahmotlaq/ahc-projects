@@ -1,6 +1,6 @@
 // ===== المستندات الرسمية + المخططات + الاعتمادات =====
 import { sb, REF, loadRef, canEdit, isAdmin, q, session, today } from './api.js';
-import { $, $$, esc, norm, money, dateAr, toast, err, modal, confirm, field, inp, sel, formData } from './ui.js';
+import { $, $$, esc, norm, money, dateAr, toast, err, modal, confirm, field, inp, sel, formData, ico } from './ui.js';
 import { compress } from './treports.js';
 
 const BUCKET = 'project-files';
@@ -11,8 +11,8 @@ export const DWG_ST = { design: 'تصميم', for_approval: 'للاعتماد', 
 export const SUB_KIND = { material: 'عينة / مادة', shop_drawing: 'مخطط تنفيذي', method: 'طريقة تنفيذ', subcontractor: 'مقاول باطن', supplier: 'مورد', other: 'أخرى' };
 export const DECISION = { approved: 'معتمد (A)', approved_notes: 'معتمد بملاحظات (B)', resubmit: 'أعد التقديم (C)', rejected: 'مرفوض (D)' };
 export const SUB_ST = { submitted: 'مقدَّم — بانتظار المهندس', reviewed: 'راجعه المهندس — بانتظار القرار', decided: 'صدر القرار' };
-const dwgBadge = s => `<span class="badge ${['approved', 'as_built'].includes(s) ? 'full' : s === 'approved_notes' ? 'ovr' : s === 'rejected' ? 'bad' : 'skel'}">${DWG_ST[s] || s}</span>`;
-export const decBadge = d => d ? `<span class="badge ${d === 'approved' ? 'full' : d === 'approved_notes' ? 'ovr' : 'bad'}">${DECISION[d]}</span>` : '';
+const dwgBadge = s => `<span class="badge ${['approved', 'as_built'].includes(s) ? 'full' : s === 'approved_notes' ? 'sky' : s === 'rejected' ? 'bad' : s === 'for_approval' ? 'ovr' : 'skel'}">${DWG_ST[s] || s}</span>`;
+export const decBadge = d => d ? `<span class="badge ${d === 'approved' ? 'full' : d === 'approved_notes' ? 'sky' : d === 'resubmit' ? 'ovr' : 'bad'}">${DECISION[d]}</span>` : '';
 export const isOverdue = s => s.status !== 'decided' && s.due_on && s.due_on < today();
 const kb = n => n ? (n > 1048576 ? (n / 1048576).toFixed(1) + ' م.ب' : Math.round(n / 1024) + ' ك.ب') : '';
 let profiles = [];
@@ -33,7 +33,7 @@ export async function openFile(row) {
   const { data, error } = await sb.storage.from(BUCKET).createSignedUrl(row.path, 3600); if (error) return err(error);
   window.open(data.signedUrl, '_blank');
 }
-const fileCell = r => r.path ? `<button class="btn sm" data-file="${r.id}">📎 ${esc((r.file_name || 'ملف').slice(0, 28))}${r.file_size ? ` <small class="muted">${kb(r.file_size)}</small>` : ''}</button>` : r.link ? `<a class="btn sm" href="${esc(r.link)}" target="_blank" rel="noopener">🔗 رابط</a>` : '<span class="muted">—</span>';
+const fileCell = r => r.path ? `<button class="btn sm" data-file="${r.id}">${ico('clip')} ${esc((r.file_name || 'ملف').slice(0, 28))}${r.file_size ? ` <small class="muted">${kb(r.file_size)}</small>` : ''}</button>` : r.link ? `<a class="btn sm" href="${esc(r.link)}" target="_blank" rel="noopener">🔗 رابط</a>` : '<span class="muted">—</span>';
 const fileFields = (r, cls = '') => `<div class="fld ${cls}"><span>الملف (PDF / صورة / أوفيس / DWG — حتى 50 م.ب)</span><input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx,.dwg,.dxf,.zip">${r?.path ? `<small class="muted">الملف الحالي: ${esc(r.file_name || '')} — اختيار ملف جديد يستبدله</small>` : ''}</div>${field('أو رابط خارجي (OneDrive / SharePoint)', inp('link', r?.link || '', 'dir="ltr" placeholder="https://…"'), cls)}`;
 async function withFile(form, row, prefix) { const f = form.querySelector('[name=file]'); if (f?.files?.[0]) { toast('جارٍ رفع الملف…'); const u = await uploadOne(f.files[0], prefix); if (row._old) { try { await sb.storage.from(BUCKET).remove([row._old]); } catch (e) { } } Object.assign(row, u); } return row; }
 function bindFiles(root, rows) { $$('[data-file]', root).forEach(b => b.onclick = () => openFile(rows.find(x => x.id === +b.getAttribute('data-file')))); }
@@ -125,7 +125,7 @@ async function revForm(d, rs, p, done) {
 let SLA = 7;
 async function loadSla() { try { const s = await q(sb.from('settings').select('value').eq('key', 'submittal_sla_days').maybeSingle()); if (s?.value) SLA = Number(s.value) || 7; } catch (e) { } }
 function subRows(rows, opts = {}) {
-  return `<table class="lst"><thead><tr>${opts.project ? '<th>المشروع</th>' : ''}<th class="c">رقم</th><th>النوع</th><th>العنوان</th><th>مقدّمه</th><th>تاريخ التقديم</th><th>موعد الرد</th><th>الحالة</th><th></th></tr></thead><tbody>${rows.map(s => `<tr class="${s.status === 'decided' ? 'off' : ''}">${opts.project ? `<td><a href="#/project/${s.project_id}/submittals">${esc(s.projects?.name || '')}</a></td>` : ''}<td class="c ltr"><b>SUB-${String(s.no).padStart(3, '0')}${s.rev ? '-R' + s.rev : ''}</b></td><td>${SUB_KIND[s.kind]}</td><td><b>${esc(s.title)}</b>${s.spec_ref ? `<br><small class="muted"><span class="cd">${esc(s.spec_ref)}</span> ${esc(s.spec_title || '')}</small>` : ''}</td><td>${esc(s.submitted_by || '')}</td><td>${dateAr(s.submitted_on)}</td><td class="${isOverdue(s) ? 'bad' : ''}">${dateAr(s.due_on)}${isOverdue(s) ? ' ⚠' : ''}</td><td>${s.status === 'decided' ? decBadge(s.decision) : `<span class="badge ${s.status === 'reviewed' ? 'ovr' : 'bad'}">${SUB_ST[s.status]}</span>`}</td><td><button class="btn sm" data-s="${s.id}">فتح</button></td></tr>`).join('')}</tbody></table>`;
+  return `<table class="lst"><thead><tr>${opts.project ? '<th>المشروع</th>' : ''}<th class="c">رقم</th><th>النوع</th><th>العنوان</th><th>مقدّمه</th><th>تاريخ التقديم</th><th>موعد الرد</th><th>الحالة</th><th></th></tr></thead><tbody>${rows.map(s => `<tr class="${s.status === 'decided' ? 'off' : ''}">${opts.project ? `<td><a href="#/project/${s.project_id}/submittals">${esc(s.projects?.name || '')}</a></td>` : ''}<td class="c ltr"><b>SUB-${String(s.no).padStart(3, '0')}${s.rev ? '-R' + s.rev : ''}</b></td><td>${SUB_KIND[s.kind]}</td><td><b>${esc(s.title)}</b>${s.spec_ref ? `<br><small class="muted"><span class="cd">${esc(s.spec_ref)}</span> ${esc(s.spec_title || '')}</small>` : ''}</td><td>${esc(s.submitted_by || '')}</td><td>${dateAr(s.submitted_on)}</td><td class="${isOverdue(s) ? 'bad' : ''}">${dateAr(s.due_on)}${isOverdue(s) ? ' ⚠' : ''}</td><td>${s.status === 'decided' ? decBadge(s.decision) : `<span class="badge ${s.status === 'reviewed' ? 'info' : 'ovr'}">${SUB_ST[s.status]}</span>`}</td><td><button class="btn sm" data-s="${s.id}">فتح</button></td></tr>`).join('')}</tbody></table>`;
 }
 export async function projectSubmittals(t, p) {
   await loadProfiles(); await loadSla();

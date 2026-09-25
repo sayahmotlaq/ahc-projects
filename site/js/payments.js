@@ -5,7 +5,7 @@ import { $, $$, esc, money, fmt, dateAr, toast, err, modal, confirm, field, inp,
 export const P_STATUS = { draft: 'مسودة', submitted: 'مقدَّم', review: 'قيد المراجعة', approved: 'معتمد', finance: 'محال للمالية', paid: 'مصروف', rejected: 'مرفوض' };
 export const P_KIND = { advance: 'دفعة مقدمة', interim: 'مستخلص جارٍ', final: 'مستخلص ختامي', retention_release: 'إفراج عن الضمان' };
 const PENDING = ['submitted', 'review', 'approved'];
-export const pBadge = s => `<span class="badge ${s === 'paid' ? 'full' : s === 'rejected' ? 'skel' : s === 'draft' ? '' : s === 'finance' ? 'ovr' : 'bad'}">${P_STATUS[s] || s}</span>`;
+export const pBadge = s => `<span class="badge ${s === 'paid' ? 'full' : s === 'rejected' ? 'bad' : s === 'draft' ? 'skel' : s === 'finance' ? 'info' : s === 'approved' ? 'sky' : 'ovr'}">${P_STATUS[s] || s}</span>`;
 const isFin = () => role() === 'finance';
 const num = v => Number(String(v ?? '').replace(/,/g, '')) || 0;
 
