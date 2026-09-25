@@ -19,7 +19,7 @@ export const STAGES = [
   { key: 'cancelled', ar: 'ملغى',               color: '#7A2E22' },
 ];
 export const stageOf = k => STAGES.find(s => s.key === k) || { key: k, ar: k, color: '#999' };
-export const ROLES = { admin: 'مدير النظام', engineer: 'مهندس مشاريع', viewer: 'مطّلع (قراءة فقط)', pending: 'بانتظار الاعتماد', disabled: 'موقوف' };
+export const ROLES = { admin: 'مدير النظام', engineer: 'مهندس مشاريع', viewer: 'مطّلع (قراءة فقط)', finance: 'مالية (تسجيل الصرف فقط)', pending: 'بانتظار الاعتماد', disabled: 'موقوف' };
 export const PROJECT_TYPES = ['إنشاء جديد', 'تجديد وتأهيل', 'توسعة', 'صيانة وإصلاح', 'توريد وتركيب', 'أعمال خارجية', 'دراسة'];
 export const UPDATE_KINDS = { note: 'ملاحظة', visit: 'زيارة ميدانية', issue: 'معوّق / مشكلة', letter: 'خطاب', payment: 'مستخلص / دفعة', milestone: 'إنجاز' };
 
@@ -38,7 +38,7 @@ export async function loadSession() {
 export const role = () => session.profile?.role || 'anon';
 export const isAdmin = () => role() === 'admin';
 export const canEdit = () => ['admin', 'engineer'].includes(role());
-export const canRead = () => ['admin', 'engineer', 'viewer'].includes(role());
+export const canRead = () => ['admin', 'engineer', 'viewer', 'finance'].includes(role());
 
 // ---------- المرجع الفني (مخزّن محلياً)
 export const REF = { loaded: false, divisions: [], sections: [], items: [], variants: [], byDiv: {}, bySec: {}, byItem: {}, byVar: {}, version: null };
