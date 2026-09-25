@@ -381,3 +381,10 @@ table.rt2 .rbar{height:5px;margin-bottom:2px}
 .pdfmode .photos{grid-template-columns:1fr 1fr!important}
 @media print{ .photos{grid-template-columns:1fr 1fr!important} }
 @media screen and (max-width:900px){ .itemrow{grid-template-columns:1fr 1fr;} .itemrow input:first-child{grid-column:1/-1} .photos{grid-template-columns:1fr 1fr} }
+
+/* المستندات والاعتمادات */
+.alert.warn{background:#FBF3E2;color:#7a5410;border:1px solid #efd9a6}
+.ltr{direction:ltr;unicode-bidi:isolate;display:inline-block}
+.specdrop{position:relative} .specdrop .opt{padding:6px 10px;border:1px solid var(--line);border-top:0;background:#fff;cursor:pointer;font-size:12.5px} .specdrop .opt:hover{background:#F3F7FA}
+.specbox{background:#F6F9FB;border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:12.5px;margin:8px 0}
+.fld input[type=file]{padding:6px;background:#fafafa}

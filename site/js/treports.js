@@ -13,7 +13,7 @@ const mine = r => r.created_by === session.user.id;
 const canEditReport = r => isAdmin() || (canEdit() && mine(r) && r.status !== 'reviewed');
 
 // ضغط الصورة في المتصفح قبل الرفع (≈ 300 كيلوبايت بدل عدة ميجابايت)
-function compress(file, max = 1600, qual = 0.82) {
+export function compress(file, max = 1600, qual = 0.82) {
   return new Promise((res, rej) => {
     const img = new Image(); const url = URL.createObjectURL(file);
     img.onload = () => { const s = Math.min(1, max / Math.max(img.width, img.height)); const c = document.createElement('canvas'); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url); c.toBlob(b => b ? res(b) : rej(new Error('compress')), 'image/jpeg', qual); };
