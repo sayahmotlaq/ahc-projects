@@ -4,7 +4,8 @@ import { $, $$, esc, fmt0, money, dateAr, toast, err } from './ui.js';
 import { groupOf, isStale, loadActivity, STALE_DAYS } from './projects.js';
 
 const R_KIND = { approval: 'اعتماد', review: 'مراجعة', decision: 'قرار', support: 'دعم', other: 'أخرى' };
-function loadLib() { return new Promise((res, rej) => { if (window.html2pdf) return res(); const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'; s.onload = res; s.onerror = () => rej(new Error('cdn')); document.head.appendChild(s); }); }
+const loadScript = src => new Promise((res, rej) => { const el = document.createElement('script'); el.src = src; el.onload = res; el.onerror = () => rej(new Error('cdn')); document.head.appendChild(el); });
+async function loadLib() { if (!window.html2canvas) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'); if (!window.jspdf) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'); }
 const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
 const mln = v => v >= 1e6 ? (v / 1e6).toFixed(1) + ' مليون' : fmt0(v);
 
@@ -75,6 +76,18 @@ export async function mountReport(root) {
     toast('جارٍ إنشاء ملف PDF…');
     try { await loadLib(); } catch (e) { return err('تعذّر تحميل مكتبة PDF — استخدم «طباعة / حفظ كـ PDF»'); }
     const el = $('#rep'); el.classList.add('pdfmode');
-    try { await window.html2pdf().set({ margin: [8, 8, 8, 8], filename: `التقرير التنفيذي - ${today()}.pdf`, image: { type: 'jpeg', quality: 0.95 }, html2canvas: { scale: 2, useCORS: true, letterRendering: true, windowWidth: 1200, width: el.scrollWidth }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }, pagebreak: { mode: ['css', 'legacy'], before: '.rpage + .rpage' } }).from(el).save(); toast('تم تنزيل التقرير'); } catch (e) { err(e); } finally { el.classList.remove('pdfmode'); }
+    try {
+      const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
+      const W = 210, H = 297, M = 8, iw = W - 2 * M, ih = H - 2 * M;
+      const pages = $$('.rpage', el);
+      for (let i = 0; i < pages.length; i++) {
+        const canvas = await window.html2canvas(pages[i], { scale: 2, useCORS: true, backgroundColor: '#ffffff', windowWidth: 1200, scrollX: 0, scrollY: -window.scrollY });
+        let w = iw, h = iw * canvas.height / canvas.width; if (h > ih) { h = ih; w = ih * canvas.width / canvas.height; }
+        if (i > 0) pdf.addPage();
+        pdf.addImage(canvas.toDataURL('image/jpeg', 0.94), 'JPEG', (W - w) / 2, M, w, h);
+        pdf.setFontSize(8); pdf.setTextColor(120); pdf.text(`${i + 1} / ${pages.length}`, W / 2, H - 4, { align: 'center' });
+      }
+      pdf.save(`التقرير التنفيذي - ${today()}.pdf`); toast('تم تنزيل التقرير');
+    } catch (e) { err(e); } finally { el.classList.remove('pdfmode'); }
   };
 }
