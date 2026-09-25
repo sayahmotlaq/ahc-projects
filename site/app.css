@@ -344,3 +344,18 @@ table.rt2 .rbar{height:5px;margin-bottom:2px}
 .alert.bad{background:#fbeae6;color:#8a3a28;border:1px solid #efc7bd}
 .kpis.fin{margin:6px 0 12px}
 .sub-h{font-size:14px;color:var(--navy);margin:14px 0 6px}
+
+/* التقارير المخصصة */
+.rbuild{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:14px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;max-height:160px;overflow:auto}
+.chip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:20px;padding:4px 10px;font-size:12px;cursor:pointer;background:#fafafa}
+.chip:has(input:checked){background:var(--navy);color:#fff;border-color:var(--navy)}
+.chip input{margin:0}
+.rkpis.six{grid-template-columns:repeat(6,1fr);margin-bottom:0}
+.rstrip{padding:8px 12px}
+.rnote{background:#FBF9F4;font-size:11.5px;line-height:1.7}
+.rsm{font-size:10.5px;margin:6px 0 0;color:var(--text)}
+.rproj .kvs{gap:2px 14px} .rproj .kv{font-size:10.5px;padding:3px 0}
+.pdfmode .rkpis.six{grid-template-columns:repeat(6,1fr)!important} .pdfmode .rproj .rtwo{grid-template-columns:1fr 1fr!important}
+@media print{ .rkpis.six{grid-template-columns:repeat(6,1fr)!important} .rbuild,.tabs.noprint{display:none!important} }
+@media screen and (max-width:900px){ .rkpis.six{grid-template-columns:repeat(3,1fr)} }

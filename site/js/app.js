@@ -3,7 +3,7 @@ import { sb, session, loadSession, loadRef, REF, role, isAdmin, canRead, ROLES }
 import { $, $$, esc, toast, err, modal, field, inp, formData } from './ui.js';
 
 const app = $('#app');
-const NAV = [['dashboard', 'لوحة المؤشرات'], ['projects', 'المشاريع'], ['tasks', 'المهام'], ['requests', 'الطلبات'], ['payments', 'المستخلصات'], ['report', 'التقرير التنفيذي'], ['ref', 'المرجع الفني'], ['admin', 'الإدارة', 'admin']];
+const NAV = [['dashboard', 'لوحة المؤشرات'], ['projects', 'المشاريع'], ['tasks', 'المهام'], ['requests', 'الطلبات'], ['payments', 'المستخلصات'], ['report', 'التقارير'], ['ref', 'المرجع الفني'], ['admin', 'الإدارة', 'admin']];
 
 function shell(inner) {
   const p = session.profile;
@@ -69,7 +69,7 @@ async function route() {
     else if (parts[0] === 'tasks') { const { mountTasks } = await import('./tasks.js'); await mountTasks(m, params); }
     else if (parts[0] === 'requests') { const { mountRequests } = await import('./tasks.js'); await mountRequests(m, params); }
     else if (parts[0] === 'payments') { const { mountPayments } = await import('./payments.js'); await mountPayments(m, params); }
-    else if (parts[0] === 'report') { const { mountReport } = await import('./report.js'); await mountReport(m); }
+    else if (parts[0] === 'report') { const { mountReport } = await import('./report.js'); await mountReport(m, parts[1] || 'general', params); }
     else if (parts[0] === 'ref') { await ensureRef(); const { mountRef } = await import('./ref.js'); const code = parts[1] ? parts[1].replace(/-/g, ' ') : null; if (!m.querySelector('.refwrap')) mountRef(m, code); else if (code) { const { go } = await import('./ref.js'); go(code); } }
     else if (parts[0] === 'admin') { if (!isAdmin()) return location.hash = '#/dashboard'; const { mountAdmin } = await import('./admin.js'); await mountAdmin(m, parts[1] || 'users'); }
     else location.hash = '#/dashboard';
