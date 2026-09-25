@@ -566,3 +566,5 @@ table.lst tfoot td{font-weight:700;background:var(--surface2)}
 .brand img{max-width:96px} .brand b{font-size:12.5px}
 @media screen and (max-width:900px){ .gsearch{max-width:none;flex:1;padding:8px 10px} .topbar .user{order:-1} }
 .two>*,.g3>*,.stack>*,.kpis>*,.dash>*{min-width:0} .inbox .it{min-width:0}
+.tabs{overflow-x:auto;overflow-y:hidden;scrollbar-width:none;padding-bottom:1px} .tabs::-webkit-scrollbar{display:none}
+.brand div{white-space:normal} .brand b{font-size:12.5px;line-height:1.25} .brand small{display:block}
