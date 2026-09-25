@@ -3,13 +3,19 @@ import { sb, session, loadSession, loadRef, REF, role, isAdmin, canRead, ROLES }
 import { $, $$, esc, toast, err, modal, field, inp, formData } from './ui.js';
 
 const app = $('#app');
-const NAV = [['dashboard', 'لوحة المؤشرات'], ['projects', 'المشاريع'], ['tasks', 'المهام'], ['requests', 'الطلبات'], ['payments', 'المستخلصات'], ['treports', 'التقارير الفنية'], ['submittals', 'الاعتمادات'], ['report', 'التقارير'], ['ref', 'المرجع الفني'], ['admin', 'الإدارة', 'admin']];
+const NAV = [
+  ['dashboard', 'لوحة المؤشرات'], ['projects', 'المشاريع'],
+  ['work', 'المهام والطلبات', null, [['tasks', 'المهام'], ['requests', 'الطلبات']]],
+  ['docs', 'المستندات', null, [['documents', 'المستندات الرسمية'], ['drawings', 'المخططات'], ['submittals', 'الاعتمادات']]],
+  ['reports', 'التقارير', null, [['treports', 'التقارير الفنية والمحاضر'], ['report', 'التقرير التنفيذي'], ['report/custom', 'تقرير مخصص']]],
+  ['payments', 'المستخلصات'], ['ref', 'المرجع الفني'], ['admin', 'الإدارة', 'admin']];
+const PARENT = {}; NAV.forEach(n => (n[3] || []).forEach(c => PARENT[c[0].split('/')[0]] = n[0]));
 
 function shell(inner) {
   const p = session.profile;
   app.innerHTML = `<header class="top">
     <img class="logo" src="assets/logo.png" alt="تجمع الأحساء الصحي">
-    <nav class="nav">${NAV.filter(n => !n[2] || role() === n[2]).map(n => `<a href="#/${n[0]}" data-nav="${n[0]}">${n[1]}</a>`).join('')}</nav>
+    <nav class="nav">${NAV.filter(n => !n[2] || role() === n[2]).map(n => n[3] ? `<div class="grp" data-nav="${n[0]}"><a href="#/${n[3][0][0]}" class="gt" data-grp>${n[1]} <small>▾</small></a><div class="dd">${n[3].map(c => `<a href="#/${c[0]}" data-nav="${c[0]}">${c[1]}</a>`).join('')}</div></div>` : `<a href="#/${n[0]}" data-nav="${n[0]}">${n[1]}</a>`).join('')}</nav>
     <span style="flex:1"></span>
     <div class="who"><b>${esc(p?.full_name || '')}</b><span>${esc(ROLES[role()] || '')}</span></div>
     <button class="btn sm" id="logout">خروج</button>
@@ -17,8 +23,10 @@ function shell(inner) {
   </header><main id="main">${inner || ''}</main>`;
   $('#logout').onclick = async () => { await sb.auth.signOut(); location.hash = ''; boot(); };
   $('#navbtn').onclick = () => $('.nav').classList.toggle('show');
+  $$('.grp .gt').forEach(a => a.onclick = e => { if (matchMedia('(max-width:900px)').matches || e.detail === 0) { e.preventDefault(); const g = a.parentElement; const open = g.classList.contains('open'); $$('.grp.open').forEach(x => x.classList.remove('open')); if (!open) g.classList.add('open'); } });
+  document.addEventListener('click', e => { if (!e.target.closest('.grp')) $$('.grp.open').forEach(x => x.classList.remove('open')); });
 }
-function setNav(k) { $$('[data-nav]').forEach(a => a.classList.toggle('on', a.getAttribute('data-nav') === k)); $('.nav')?.classList.remove('show'); }
+function setNav(k, sub) { const key = sub ? k + '/' + sub : k; $$('[data-nav]').forEach(a => { const v = a.getAttribute('data-nav'); a.classList.toggle('on', v === key || (!sub && v === k) || v === PARENT[k]); }); $('.nav')?.classList.remove('show'); $$('.grp.open').forEach(x => x.classList.remove('open')); }
 
 // ---------- شاشات الدخول
 function authScreen(mode = 'login') {
@@ -61,7 +69,7 @@ async function route() {
   const h = location.hash.replace(/^#\/?/, '') || 'dashboard';
   const [path, query] = h.split('?'); const params = new URLSearchParams(query || '');
   const parts = path.split('/'); const main = $('#main'); if (!main) shell('');
-  const m = $('#main'); setNav(parts[0] === 'treport' ? 'treports' : parts[0]);
+  const m = $('#main'); setNav(parts[0] === 'treport' ? 'treports' : parts[0], parts[0] === 'report' && parts[1] === 'custom' ? 'custom' : null);
   try {
     if (parts[0] === 'dashboard') { const { mountDashboard } = await import('./projects.js'); await mountDashboard(m); }
     else if (parts[0] === 'projects') { const { mountProjects } = await import('./projects.js'); await mountProjects(m, params); }
@@ -71,6 +79,8 @@ async function route() {
     else if (parts[0] === 'payments') { const { mountPayments } = await import('./payments.js'); await mountPayments(m, params); }
     else if (parts[0] === 'treports') { const { mountTReports } = await import('./treports.js'); await mountTReports(m, params); }
     else if (parts[0] === 'treport') { const t = await import('./treports.js'); if (parts[1] === 'new') await t.mountTReportEditor(m, null, params); else if (parts[2] === 'edit') await t.mountTReportEditor(m, parts[1], params); else await t.mountTReport(m, parts[1]); }
+    else if (parts[0] === 'documents') { const { mountDocsAll } = await import('./docs.js'); await mountDocsAll(m, params); }
+    else if (parts[0] === 'drawings') { const { mountDrawingsAll } = await import('./docs.js'); await mountDrawingsAll(m, params); }
     else if (parts[0] === 'submittals') { const { mountSubmittals } = await import('./docs.js'); await mountSubmittals(m, params); }
     else if (parts[0] === 'report') { const { mountReport } = await import('./report.js'); await mountReport(m, parts[1] || 'general', params); }
     else if (parts[0] === 'ref') { await ensureRef(); const { mountRef } = await import('./ref.js'); const code = parts[1] ? parts[1].replace(/-/g, ' ') : null; if (!m.querySelector('.refwrap')) mountRef(m, code); else if (code) { const { go } = await import('./ref.js'); go(code); } }
