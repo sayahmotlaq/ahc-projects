@@ -8,6 +8,7 @@ import { projectPayments } from './payments.js';
 import { projectTReports } from './treports.js';
 import { projectDocs, projectDrawings, projectSubmittals, isOverdue as subLate } from './docs.js';
 import { projectChanges, projectCloseout } from './closeout.js';
+import { projectSchedule } from './schedule.js';
 
 const CATEGORIES = ['حكومي', 'شراء مباشر', 'شراكة مجتمعية'];
 let profiles = [];
@@ -175,15 +176,16 @@ async function editProject(p, done) {
     ${field('تاريخ الانتهاء التعاقدي', inp('end_date', p?.end_date || '', 'type="date"'))}
     ${field('المدة الإضافية المعتمدة (من أوامر التغيير)', inp('_days', (p?.extra_days || 0) + ' يوم' + (p?.revised_end_date ? ' — الانتهاء المعدّل ' + dateAr(p.revised_end_date) : ''), 'disabled'))}
     ${field('وصف الحالة', sel('status_note', [['', '—'], ['متأخر', 'متأخر'], ['متعثر', 'متعثر']], p?.status_note || ''))}
-    ${field('الإنجاز المخطط %', inp('progress_planned', p?.progress_planned ?? 0, 'type="number" min="0" max="100" step="1"'))}
-    ${field('الإنجاز الفعلي %', inp('progress_actual', p?.progress_actual ?? 0, 'type="number" min="0" max="100" step="1"'))}
+    ${p?.progress_mode === 'schedule' ? `<div class="wide small muted" style="background:var(--bg);border-radius:10px;padding:8px 12px">نسبتا الإنجاز تُحتسبان تلقائياً من <b>الجدول الزمني</b> لهذا المشروع ولا تُعدّلان يدوياً (يمكن الرجوع للإدخال اليدوي من تبويب الجدول الزمني).</div>` : ''}
+    ${field('الإنجاز المخطط %', inp('progress_planned', p?.progress_planned ?? 0, 'type="number" min="0" max="100" step="1"' + (p?.progress_mode === 'schedule' ? ' disabled' : '')))}
+    ${field('الإنجاز الفعلي %', inp('progress_actual', p?.progress_actual ?? 0, 'type="number" min="0" max="100" step="1"' + (p?.progress_mode === 'schedule' ? ' disabled' : '')))}
     ${field('مدفوعات سابقة خارج المنصة (ر.س)', money_inp('paid_opening', p?.paid_opening ?? p?.paid_amount ?? 0, 'title="المصروف عبر المستخلصات يُحتسب تلقائياً ويُضاف إلى هذا الرصيد"'))}
     ${field('نطاق العمل / ملاحظات', `<textarea name="notes" rows="3">${esc(p?.notes || '')}</textarea>`, 'wide')}
     <div class="btnrow end wide"><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">حفظ</button></div></form>`;
   await modal(html, { title: isNew ? 'مشروع جديد' : 'تعديل بيانات المشروع', wide: true, onOpen: (w, close) => {
     $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target);
       const num = v => v === '' ? null : Number(v);
-      const row = { name: f.name.trim(), ref: f.ref.trim(), category: f.category, type: f.type, facility: f.facility.trim(), beneficiary: f.beneficiary.trim(), dept: f.dept.trim(), engineer_id: f.engineer_id || null, engineer_name: f.engineer_name.trim(), funding: f.funding.trim(), priority: f.priority, budget: num(f.budget), budget_approved: num(f.budget_approved), contract_base: num(f.contract_base), contract_value: num(f.contract_base) === null ? null : num(f.contract_base) + Number(p?.contract_extra || 0), tender_submit_date: f.tender_submit_date || null, tender_date: f.tender_date || null, award_date: f.award_date || null, contractor: f.contractor.trim(), consultant: f.consultant.trim(), start_date: f.start_date || null, end_date: f.end_date || null, status_note: f.status_note || null, progress_planned: num(f.progress_planned) || 0, progress_actual: num(f.progress_actual) || 0, paid_opening: num(f.paid_opening) || 0, notes: f.notes };
+      const row = { name: f.name.trim(), ref: f.ref.trim(), category: f.category, type: f.type, facility: f.facility.trim(), beneficiary: f.beneficiary.trim(), dept: f.dept.trim(), engineer_id: f.engineer_id || null, engineer_name: f.engineer_name.trim(), funding: f.funding.trim(), priority: f.priority, budget: num(f.budget), budget_approved: num(f.budget_approved), contract_base: num(f.contract_base), contract_value: num(f.contract_base) === null ? null : num(f.contract_base) + Number(p?.contract_extra || 0), tender_submit_date: f.tender_submit_date || null, tender_date: f.tender_date || null, award_date: f.award_date || null, contractor: f.contractor.trim(), consultant: f.consultant.trim(), start_date: f.start_date || null, end_date: f.end_date || null, status_note: f.status_note || null, progress_planned: p?.progress_mode === 'schedule' ? p.progress_planned : (num(f.progress_planned) || 0), progress_actual: p?.progress_mode === 'schedule' ? p.progress_actual : (num(f.progress_actual) || 0), paid_opening: num(f.paid_opening) || 0, notes: f.notes };
       try { let id = p?.id; if (isNew) { row.created_by = session.user.id; const r = await q(sb.from('projects').insert(row).select('id').single()); id = r.id; await sb.from('project_stage_log').insert({ project_id: id, from_stage: null, to_stage: 'request', note: 'إنشاء المشروع', by_user: session.user.id }); } else await q(sb.from('projects').update(row).eq('id', p.id)); toast('تم الحفظ'); close(); done && done(id); } catch (er) { err(er); } };
   } });
 }
@@ -198,7 +200,7 @@ export async function mountProject(root, id, tab = 'overview', sub) {
   const own = isAdmin() || (edit && p.engineer_id === session.user.id);
   if (tab === 'boq' && sub) { return mountBoq(root, sub, p, () => location.hash = `#/project/${id}/boq`); }
   const st = stageOf(p.stage);
-  const TG = [['overview', 'نظرة عامة', 'dash', [['overview', 'الملخص']]], ['follow', 'المتابعة', 'check', [['tasks', 'المهام'], ['requests', 'الطلبات'], ['challenges', 'التحديات والمخاطر'], ['updates', 'التحديثات والملاحظات'], ['log', 'سجل المراحل'], ['closeout', 'الإغلاق والضمان']]], ['fin', 'المالية', 'coins', [['boq', 'جداول الكميات'], ['payments', 'المستخلصات'], ['changes', 'أوامر التغيير والتمديدات']]], ['docs', 'المستندات', 'doc', [['docs', 'المستندات الرسمية'], ['drawings', 'المخططات'], ['submittals', 'الاعتمادات'], ['treports', 'التقارير الفنية والمحاضر']]]];
+  const TG = [['overview', 'نظرة عامة', 'dash', [['overview', 'الملخص']]], ['follow', 'المتابعة', 'check', [['schedule', 'الجدول الزمني'], ['tasks', 'المهام'], ['requests', 'الطلبات'], ['challenges', 'التحديات والمخاطر'], ['updates', 'التحديثات والملاحظات'], ['log', 'سجل المراحل'], ['closeout', 'الإغلاق والضمان']]], ['fin', 'المالية', 'coins', [['boq', 'جداول الكميات'], ['payments', 'المستخلصات'], ['changes', 'أوامر التغيير والتمديدات']]], ['docs', 'المستندات', 'doc', [['docs', 'المستندات الرسمية'], ['drawings', 'المخططات'], ['submittals', 'الاعتمادات'], ['treports', 'التقارير الفنية والمحاضر']]]];
   const grp = TG.find(g => g[3].some(x => x[0] === tab)) || TG[0];
   const act0 = await loadActivity();
   root.innerHTML = `<div class="phead">
@@ -222,6 +224,7 @@ export async function mountProject(root, id, tab = 'overview', sub) {
   else if (tab === 'payments') projectPayments(t, p);
   else if (tab === 'treports') projectTReports(t, p);
   else if (tab === 'changes') projectChanges(t, p);
+  else if (tab === 'schedule') projectSchedule(t, p);
   else if (tab === 'closeout') projectCloseout(t, p);
   else if (tab === 'docs') projectDocs(t, p);
   else if (tab === 'drawings') projectDrawings(t, p);

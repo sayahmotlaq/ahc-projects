@@ -575,3 +575,32 @@ table.lst tfoot td{font-weight:700;background:var(--surface2)}
 .today .nitem{border-bottom:1px solid var(--line2);border-radius:8px} .today .nitem.new{background:var(--sky2)}
 .fld input.money{text-align:left;font-variant-numeric:tabular-nums;direction:ltr}
 .cl-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line2)} .cl-item.done b{color:var(--muted);text-decoration:line-through} .cl-item .chk{flex:1;font-size:13.5px} .cl-item .btn.ghost{border:0;background:none;padding:4px}
+
+/* ===== الجدول الزمني ===== */
+.sched .toolbar{flex-wrap:wrap;gap:8px}
+.sched #sMode{max-width:100%}
+.guide{background:linear-gradient(135deg,#fff 0%,#EEF6FB 100%);border:1px solid #CFE6F3}
+.guide h2{margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.guide .steps{display:grid;gap:10px}
+.guide .step{display:flex;gap:12px;align-items:flex-start}
+.guide .step>i{flex:none;width:30px;height:30px;border-radius:50%;background:var(--navy);color:#fff;font-style:normal;font-weight:800;display:grid;place-items:center;font-size:14px}
+.guide .step b{display:block;margin-bottom:2px}
+.guide .step p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.75}
+.scurve text{font-family:inherit}
+table.gantt th{position:relative}
+.gt-months{position:relative;height:18px;direction:ltr}
+.gt-months span{position:absolute;top:0;transform:translateX(-50%);font-size:11px;color:var(--muted);white-space:nowrap}
+.gt-track{position:relative;height:22px;background:repeating-linear-gradient(90deg,transparent 0 24px,var(--line2) 24px 25px);border-radius:6px;direction:ltr;min-width:340px}
+.gt-bar{position:absolute;top:4px;height:14px;background:#D6E9F5;border:1px solid #9FCBE6;border-radius:4px;overflow:hidden}
+.gt-bar>i{display:block;height:100%;background:var(--lblue)}
+.gt-bar.late{border-color:var(--red);background:#FBE1E1}
+.gt-bar.late>i{background:var(--red)}
+.gt-base{position:absolute;top:19px;height:3px;background:var(--faint);border-radius:2px}
+.gt-ms{position:absolute;top:5px;width:12px;height:12px;background:var(--navy);transform:translateX(-50%) rotate(45deg);border-radius:2px}
+.gt-ms.ok{background:var(--sage)}.gt-ms.late{background:var(--red)}.gt-ms.act{background:var(--sage);opacity:.5;width:8px;height:8px;top:7px}
+.gt-today{position:absolute;top:0;bottom:0;width:0;border-left:2px dashed var(--gold);z-index:1}
+.gt-months .gt-today{top:-4px;bottom:-4px}
+table.gantt tr.ms td{background:#FBFCFE}
+.pct-in{width:64px;padding:5px 6px;border:1px solid var(--line);border-radius:8px;text-align:center;font-weight:700;font-family:inherit}
+.pct-in:focus{border-color:var(--lblue);outline:none;box-shadow:0 0 0 3px rgba(39,168,223,.15)}
+@media (max-width:720px){.gt-track{min-width:260px}.sched .toolbar .btn{padding:6px 10px;font-size:13px}}
