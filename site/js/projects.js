@@ -142,8 +142,8 @@ async function editProject(p, done) {
     ${field('المنشأة / الموقع', inp('facility', p?.facility || ''))}
     ${field('الجهة المستفيدة', inp('beneficiary', p?.beneficiary || ''))}
     ${field('الجهة الطالبة', inp('dept', p?.dept || ''))}
-    ${field('المهندس المسؤول (حساب)', sel('engineer_id', engs, p?.engineer_id || ''))}
-    ${field('اسم مدير المشروع', inp('engineer_name', p?.engineer_name || '', 'placeholder="يُستخدم إن لم يكن له حساب بعد"'))}
+    ${isAdmin() ? field('المهندس المسؤول (حساب)', sel('engineer_id', engs, p?.engineer_id || '')) : `<input type="hidden" name="engineer_id" value="${session.user.id}">` + field('المهندس المسؤول', inp('_eng_show', session.profile?.full_name || '', 'disabled'))}
+    ${field('اسم مدير المشروع', inp('engineer_name', p?.engineer_name || (!isAdmin() && isNew ? session.profile?.full_name || '' : ''), 'placeholder="يُستخدم إن لم يكن له حساب بعد"'))}
     ${field('البرنامج المالي', inp('funding', p?.funding || ''))}
     ${field('الأولوية', sel('priority', [['low', 'منخفضة'], ['normal', 'عادية'], ['high', 'مهمة'], ['urgent', 'عاجلة']], p?.priority || 'normal'))}
     ${field('الميزانية التقديرية (ر.س)', inp('budget', p?.budget || '', 'type="number" min="0" step="1"'))}
@@ -180,6 +180,7 @@ export async function mountProject(root, id, tab = 'overview', sub) {
   const p = await q(sb.from('projects').select('*').eq('id', id).maybeSingle());
   if (!p) { root.innerHTML = '<div class="empty-boq">المشروع غير موجود</div>'; return; }
   p.engineer_name = pname(p.engineer_id, p.engineer_name);
+  const own = isAdmin() || (edit && p.engineer_id === session.user.id);
   if (tab === 'boq' && sub) { return mountBoq(root, sub, p, () => location.hash = `#/project/${id}/boq`); }
   const st = stageOf(p.stage);
   const TG = [['overview', 'نظرة عامة', 'dash', [['overview', 'الملخص']]], ['follow', 'المتابعة', 'check', [['tasks', 'المهام'], ['requests', 'الطلبات'], ['challenges', 'التحديات والمخاطر'], ['updates', 'التحديثات والملاحظات'], ['log', 'سجل المراحل']]], ['fin', 'المالية', 'coins', [['boq', 'جداول الكميات'], ['payments', 'المستخلصات']]], ['docs', 'المستندات', 'doc', [['docs', 'المستندات الرسمية'], ['drawings', 'المخططات'], ['submittals', 'الاعتمادات'], ['treports', 'التقارير الفنية والمحاضر']]]];
@@ -188,11 +189,11 @@ export async function mountProject(root, id, tab = 'overview', sub) {
   root.innerHTML = `<div class="phead">
     <div class="crumb"><a href="#/projects">المشاريع</a><span class="sep">›</span><a href="#/projects?g=${groupOf(p)}">${({ gov: 'الحكومية', partner: 'الشراكة المجتمعية', study: 'تحت الدراسة' })[groupOf(p)]}</a><span class="sep">›</span><span>${esc(p.name)}</span></div>
     <div class="ptitle"><div><h1>${esc(p.name)}</h1><div class="muted small" style="display:flex;flex-wrap:wrap;gap:4px 14px">${p.ref ? `<span class="ltr">${esc(p.ref)}</span>` : ''}<span>${esc(p.category || '')}${p.type ? ' · ' + esc(p.type) : ''}</span>${p.facility ? `<span>${esc(p.facility)}</span>` : ''}<span>مدير المشروع: ${esc(p.engineer_name)}</span>${p.contractor ? `<span>المقاول: ${esc(p.contractor)}</span>` : ''}</div></div>
-      <div class="btnrow">${stageBadge(p.stage)}${p.status_note ? `<span class="badge bad">${esc(p.status_note)}</span>` : ''}${isStale(p, act0) ? '<span class="badge ovr">بلا تحديث منذ أسبوعين</span>' : ''}<a class="btn" href="#/report/custom?p=${id}">${ico('file')} تقرير المشروع</a>${edit ? `<button class="btn" id="pStage">تغيير المرحلة</button><button class="btn primary" id="pEdit">${ico('edit')} تعديل البيانات</button>` : ''}${isAdmin() ? `<button class="btn ${p.archived ? '' : 'danger'}" id="pArch">${p.archived ? 'إلغاء الأرشفة' : 'أرشفة'}</button>` : ''}</div></div>
+      <div class="btnrow">${stageBadge(p.stage)}${p.status_note ? `<span class="badge bad">${esc(p.status_note)}</span>` : ''}${isStale(p, act0) ? '<span class="badge ovr">بلا تحديث منذ أسبوعين</span>' : ''}<a class="btn" href="#/report/custom?p=${id}">${ico('file')} تقرير المشروع</a>${own ? `<button class="btn" id="pStage">تغيير المرحلة</button><button class="btn primary" id="pEdit">${ico('edit')} تعديل البيانات</button>` : ''}${isAdmin() ? `<button class="btn ${p.archived ? '' : 'danger'}" id="pArch">${p.archived ? 'إلغاء الأرشفة' : 'أرشفة'}</button>` : ''}</div></div>
     <div class="stageline">${STAGES.filter(s => !['onhold', 'cancelled'].includes(s.key)).map((s, i) => { const idx = STAGES.findIndex(x => x.key === p.stage); const done = i < idx, cur = s.key === p.stage; return `<div class="sl ${done ? 'done' : ''} ${cur ? 'cur' : ''}" style="${cur ? '--c:' + s.color : ''}"><i></i><span>${esc(s.ar)}</span></div>`; }).join('')}</div>
     <div class="tabs">${TG.map(g => `<a href="#/project/${id}/${g[3][0][0]}" class="${grp === g ? 'on' : ''}">${ico(g[2])} ${g[1]}</a>`).join('')}</div>
     ${grp[3].length > 1 ? `<div class="subtabs">${grp[3].map(([k, t]) => `<a href="#/project/${id}/${k}" class="${tab === k ? 'on' : ''}">${t}</a>`).join('')}</div>` : ''}</div><div id="ptab"></div>`;
-  if (edit) {
+  if (own) {
     $('#pStage').onclick = () => changeStage(p, () => mountProject(root, id, tab));
     $('#pEdit').onclick = () => editProject(p, () => mountProject(root, id, tab));
   }
