@@ -7,6 +7,7 @@ import { projectTasks, projectRequests } from './tasks.js';
 import { projectPayments } from './payments.js';
 import { projectTReports } from './treports.js';
 import { projectDocs, projectDrawings, projectSubmittals, isOverdue as subLate } from './docs.js';
+import { projectChanges, projectCloseout } from './closeout.js';
 
 const CATEGORIES = ['حكومي', 'شراء مباشر', 'شراكة مجتمعية'];
 let profiles = [];
@@ -44,6 +45,9 @@ export async function loadDashData() {
   const payPend = pays.filter(r => r.status !== 'finance'), payFin = pays.filter(r => r.status === 'finance');
   const ago = d => { if (!d) return ''; const m = Math.floor((Date.now() - new Date(d)) / 864e5); return m <= 0 ? 'اليوم' : m === 1 ? 'أمس' : `منذ ${m} يوم`; };
   // ---- صندوق الإجراءات: ما ينتظر المستخدم الحالي تحديداً
+  const alertW = (() => { const d = new Date(); d.setDate(d.getDate() + (Number(SETTINGS.warranty_alert_days) || 60)); return d.toISOString().slice(0, 10); })();
+  const D_changes = admin ? await q(sb.from('change_orders').select('id,project_id,no,title,amount,days,requested_on,projects(name)').eq('status', 'submitted')) : [];
+  const D_warr = (await q(sb.from('projects').select('id,name,warranty_end,engineer_id').in('stage', ['handover', 'warranty']).not('warranty_end', 'is', null).lte('warranty_end', alertW))).filter(p => admin || p.engineer_id === me);
   const inbox = [];
   const push = (cls, ic, title, sub, link, age, act, bad) => inbox.push({ cls, ic, title, sub, link, age, act, bad });
   if (admin) {
@@ -60,6 +64,8 @@ export async function loadDashData() {
   } else {
     lateTasks.slice(0, 5).forEach(t => push('d', 'check', `مهمة متأخرة: ${t.title}`, `${t.projects?.name || ''} · ${pname(t.assignee_id, t.assignee_name)} · ${dateAr(t.due_date)}`, `#/project/${t.project_id}/tasks`, t.due_date, 'متابعة', true));
   }
+  if (admin) D_changes.forEach(c => push('a', 'edit', `أمر تغيير رقم ${c.no}: ${c.title}`, `${c.projects?.name || ''}${c.amount ? ' · ' + money(c.amount) + ' ر.س' : ''}${c.days ? ' · ' + c.days + ' يوم' : ''}`, `#/project/${c.project_id}/changes`, c.requested_on, 'اعتماد'));
+  D_warr.forEach(p => push('a', 'clock', `فترة الضمان تنتهي ${dateAr(p.warranty_end)}: ${p.name}`, 'جولة فحص العيوب قبل الانتهاء', `#/project/${p.id}/closeout`, p.warranty_end, 'عرض', p.warranty_end < today()));
   expiring.forEach(d => push('a', 'doc', `${d.category === 'bank_guarantee' ? 'ضمان بنكي' : 'وثيقة تأمين'} ${d.expiry_date < today() ? 'منتهية' : 'تنتهي ' + dateAr(d.expiry_date)}`, `${d.projects?.name || ''} · ${d.title}`, `#/project/${d.project_id}/docs`, d.expiry_date, 'عرض', d.expiry_date < today()));
   if (stale.length) push('d', 'clock', `${stale.length} مشاريع بلا أي تحديث منذ ${STALE_DAYS} يوماً`, stale.slice(0, 3).map(p => p.name).join(' · ') + (stale.length > 3 ? ' …' : ''), '#/projects?flag=stale', null, 'عرض');
   return { me, admin, fin, projects, chs, tasks, reqs, act, pays, subs, docsExp, trs, ups, active, exec, late, stale, totalV, paid, avgA, avgP, expiring, lateTasks, subsLate, payPend, payFin, inbox, ago };
@@ -158,8 +164,8 @@ async function editProject(p, done) {
     ${field('الأولوية', sel('priority', [['low', 'منخفضة'], ['normal', 'عادية'], ['high', 'مهمة'], ['urgent', 'عاجلة']], p?.priority || 'normal'))}
     ${field('الميزانية التقديرية (ر.س)', money_inp('budget', p?.budget || ''))}
     ${field('الميزانية المعتمدة (ر.س)', money_inp('budget_approved', p?.budget_approved || ''))}
-    ${field('المبلغ الإضافي على العقد (ر.س)', money_inp('contract_extra', p?.contract_extra || ''))}
-    ${field('إجمالي قيمة العقد (ر.س)', money_inp('contract_value', p?.contract_value || ''))}
+    ${field('قيمة العقد الأصلية (ر.س)', money_inp('contract_base', p?.contract_base ?? (p?.contract_value ? Number(p.contract_value) - Number(p.contract_extra || 0) : '')))}
+    ${field('الإضافي المعتمد (من أوامر التغيير)', inp('_extra', money(p?.contract_extra || 0), 'disabled'))}
     ${field('تاريخ الرفع للطرح', inp('tender_submit_date', p?.tender_submit_date || '', 'type="date"'))}
     ${field('تاريخ الطرح', inp('tender_date', p?.tender_date || '', 'type="date"'))}
     ${field('تاريخ الترسية', inp('award_date', p?.award_date || '', 'type="date"'))}
@@ -167,8 +173,7 @@ async function editProject(p, done) {
     ${field('الاستشاري / المشرف', inp('consultant', p?.consultant || ''))}
     ${field('تاريخ المباشرة', inp('start_date', p?.start_date || '', 'type="date"'))}
     ${field('تاريخ الانتهاء التعاقدي', inp('end_date', p?.end_date || '', 'type="date"'))}
-    ${field('المدة الإضافية (أيام)', inp('extra_days', p?.extra_days ?? 0, 'type="number" min="0" step="1"'))}
-    ${field('تاريخ الانتهاء المعدّل', inp('revised_end_date', p?.revised_end_date || '', 'type="date"'))}
+    ${field('المدة الإضافية المعتمدة (من أوامر التغيير)', inp('_days', (p?.extra_days || 0) + ' يوم' + (p?.revised_end_date ? ' — الانتهاء المعدّل ' + dateAr(p.revised_end_date) : ''), 'disabled'))}
     ${field('وصف الحالة', sel('status_note', [['', '—'], ['متأخر', 'متأخر'], ['متعثر', 'متعثر']], p?.status_note || ''))}
     ${field('الإنجاز المخطط %', inp('progress_planned', p?.progress_planned ?? 0, 'type="number" min="0" max="100" step="1"'))}
     ${field('الإنجاز الفعلي %', inp('progress_actual', p?.progress_actual ?? 0, 'type="number" min="0" max="100" step="1"'))}
@@ -178,7 +183,7 @@ async function editProject(p, done) {
   await modal(html, { title: isNew ? 'مشروع جديد' : 'تعديل بيانات المشروع', wide: true, onOpen: (w, close) => {
     $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target);
       const num = v => v === '' ? null : Number(v);
-      const row = { name: f.name.trim(), ref: f.ref.trim(), category: f.category, type: f.type, facility: f.facility.trim(), beneficiary: f.beneficiary.trim(), dept: f.dept.trim(), engineer_id: f.engineer_id || null, engineer_name: f.engineer_name.trim(), funding: f.funding.trim(), priority: f.priority, budget: num(f.budget), budget_approved: num(f.budget_approved), contract_extra: num(f.contract_extra) || 0, contract_value: num(f.contract_value), tender_submit_date: f.tender_submit_date || null, tender_date: f.tender_date || null, award_date: f.award_date || null, contractor: f.contractor.trim(), consultant: f.consultant.trim(), start_date: f.start_date || null, end_date: f.end_date || null, extra_days: num(f.extra_days) || 0, revised_end_date: f.revised_end_date || null, status_note: f.status_note || null, progress_planned: num(f.progress_planned) || 0, progress_actual: num(f.progress_actual) || 0, paid_opening: num(f.paid_opening) || 0, notes: f.notes };
+      const row = { name: f.name.trim(), ref: f.ref.trim(), category: f.category, type: f.type, facility: f.facility.trim(), beneficiary: f.beneficiary.trim(), dept: f.dept.trim(), engineer_id: f.engineer_id || null, engineer_name: f.engineer_name.trim(), funding: f.funding.trim(), priority: f.priority, budget: num(f.budget), budget_approved: num(f.budget_approved), contract_base: num(f.contract_base), contract_value: num(f.contract_base) === null ? null : num(f.contract_base) + Number(p?.contract_extra || 0), tender_submit_date: f.tender_submit_date || null, tender_date: f.tender_date || null, award_date: f.award_date || null, contractor: f.contractor.trim(), consultant: f.consultant.trim(), start_date: f.start_date || null, end_date: f.end_date || null, status_note: f.status_note || null, progress_planned: num(f.progress_planned) || 0, progress_actual: num(f.progress_actual) || 0, paid_opening: num(f.paid_opening) || 0, notes: f.notes };
       try { let id = p?.id; if (isNew) { row.created_by = session.user.id; const r = await q(sb.from('projects').insert(row).select('id').single()); id = r.id; await sb.from('project_stage_log').insert({ project_id: id, from_stage: null, to_stage: 'request', note: 'إنشاء المشروع', by_user: session.user.id }); } else await q(sb.from('projects').update(row).eq('id', p.id)); toast('تم الحفظ'); close(); done && done(id); } catch (er) { err(er); } };
   } });
 }
@@ -193,7 +198,7 @@ export async function mountProject(root, id, tab = 'overview', sub) {
   const own = isAdmin() || (edit && p.engineer_id === session.user.id);
   if (tab === 'boq' && sub) { return mountBoq(root, sub, p, () => location.hash = `#/project/${id}/boq`); }
   const st = stageOf(p.stage);
-  const TG = [['overview', 'نظرة عامة', 'dash', [['overview', 'الملخص']]], ['follow', 'المتابعة', 'check', [['tasks', 'المهام'], ['requests', 'الطلبات'], ['challenges', 'التحديات والمخاطر'], ['updates', 'التحديثات والملاحظات'], ['log', 'سجل المراحل']]], ['fin', 'المالية', 'coins', [['boq', 'جداول الكميات'], ['payments', 'المستخلصات']]], ['docs', 'المستندات', 'doc', [['docs', 'المستندات الرسمية'], ['drawings', 'المخططات'], ['submittals', 'الاعتمادات'], ['treports', 'التقارير الفنية والمحاضر']]]];
+  const TG = [['overview', 'نظرة عامة', 'dash', [['overview', 'الملخص']]], ['follow', 'المتابعة', 'check', [['tasks', 'المهام'], ['requests', 'الطلبات'], ['challenges', 'التحديات والمخاطر'], ['updates', 'التحديثات والملاحظات'], ['log', 'سجل المراحل'], ['closeout', 'الإغلاق والضمان']]], ['fin', 'المالية', 'coins', [['boq', 'جداول الكميات'], ['payments', 'المستخلصات'], ['changes', 'أوامر التغيير والتمديدات']]], ['docs', 'المستندات', 'doc', [['docs', 'المستندات الرسمية'], ['drawings', 'المخططات'], ['submittals', 'الاعتمادات'], ['treports', 'التقارير الفنية والمحاضر']]]];
   const grp = TG.find(g => g[3].some(x => x[0] === tab)) || TG[0];
   const act0 = await loadActivity();
   root.innerHTML = `<div class="phead">
@@ -216,6 +221,8 @@ export async function mountProject(root, id, tab = 'overview', sub) {
   else if (tab === 'requests') projectRequests(t, p);
   else if (tab === 'payments') projectPayments(t, p);
   else if (tab === 'treports') projectTReports(t, p);
+  else if (tab === 'changes') projectChanges(t, p);
+  else if (tab === 'closeout') projectCloseout(t, p);
   else if (tab === 'docs') projectDocs(t, p);
   else if (tab === 'drawings') projectDrawings(t, p);
   else if (tab === 'submittals') projectSubmittals(t, p);
