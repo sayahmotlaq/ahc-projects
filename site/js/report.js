@@ -1,8 +1,9 @@
 // ===== التقارير: التقرير التنفيذي العام + التقرير المخصص =====
-import { sb, STAGES, stageOf, q, session, today } from './api.js';
+import { sb, STAGES, stageOf, q, session, today, isAdmin } from './api.js';
 import { $, $$, esc, fmt, fmt0, money, dateAr, toast, err, ico } from './ui.js';
 import { groupOf, isStale, isLate, loadActivity, STALE_DAYS } from './projects.js';
 import { P_STATUS, P_KIND } from './payments.js';
+import { publishShare, manageShares } from './share.js';
 
 const R_KIND = { approval: 'اعتماد', review: 'مراجعة', decision: 'قرار', support: 'دعم', other: 'أخرى' };
 const T_STATUS = { open: 'مفتوحة', in_progress: 'قيد التنفيذ', done: 'منجزة', cancelled: 'ملغاة' };
@@ -68,6 +69,7 @@ export async function mountReport(root, tab = 'general', params = new URLSearchP
   const body = $('#rbody');
   await loadData();
   if (tab === 'custom') customReport(body, params); else generalReport(body, params);
+  if (params.get('notes') && isAdmin()) manageShares(+params.get('notes'));
 }
 
 // ============ 1) التقرير التنفيذي العام (صفحتان)
@@ -93,7 +95,7 @@ function generalReport(root, params) {
     // نشاط الفترة
     const A = { stages: D.log.filter(l => inP(l.at)).length, ups: D.ups.filter(u => inP(u.happened_on)).length, tasksDone: D.tasks.filter(t => t.status === 'done' && inP(t.done_at || t.updated_at)).length, reqs: D.reqs.filter(r => inP(r.created_at)).length, chs: D.chs.filter(c => inP(c.detected_on || c.created_at)).length, paid: D.pays.filter(p => p.status === 'paid' && inP(p.paid_on)).reduce((a, p) => a + Number(p.net_amount || 0), 0), paidN: D.pays.filter(p => p.status === 'paid' && inP(p.paid_on)).length };
     const refNo = 'AHC-EXR-' + today().replace(/-/g, '');
-    root.innerHTML = `<div class="filters noprint"><label class="fld"><span>من تاريخ</span><input type="date" id="rFrom" value="${from}"></label><label class="fld"><span>إلى تاريخ</span><input type="date" id="rTo" value="${to}"></label><div class="btnrow" style="align-self:flex-end"><button class="btn sm" data-q="month">هذا الشهر</button><button class="btn sm" data-q="quarter">هذا الربع</button><button class="btn sm" data-q="year">هذه السنة</button><button class="btn sm" data-q="all">الكل</button></div><span class="sp"></span><button class="btn primary" id="rPdf">${ico('download')} تنزيل PDF</button><button class="btn" id="rPrint">${ico('print')} طباعة</button></div>
+    root.innerHTML = `<div class="filters noprint"><label class="fld"><span>من تاريخ</span><input type="date" id="rFrom" value="${from}"></label><label class="fld"><span>إلى تاريخ</span><input type="date" id="rTo" value="${to}"></label><div class="btnrow" style="align-self:flex-end"><button class="btn sm" data-q="month">هذا الشهر</button><button class="btn sm" data-q="quarter">هذا الربع</button><button class="btn sm" data-q="year">هذه السنة</button><button class="btn sm" data-q="all">الكل</button></div><span class="sp"></span><button class="btn primary" id="rPdf">${ico('download')} تنزيل PDF</button>${isAdmin() ? `<button class="btn primary" id="rShare" style="background:var(--sage);border-color:var(--sage)">${ico('users')} نشر رابط للإدارة</button><button class="btn" id="rShares">الروابط المنشورة</button>` : ''}<button class="btn" id="rPrint">${ico('print')} طباعة</button></div>
     <div class="rep" id="rep">
     <section class="rpage">
       ${header('التقرير التنفيذي لمحفظة المشاريع', '', [['تاريخ الإصدار', esc(longDate())], ['فترة التقرير', periodLabel(from, to)], ['رقم التقرير', refNo, 1], ['أعدّه', esc(session.profile?.full_name || '')]])}
@@ -130,6 +132,7 @@ function generalReport(root, params) {
     </section></div>`;
     $('#rPrint').onclick = () => window.print();
     $('#rPdf').onclick = () => exportPdf($('#rep'), `التقرير التنفيذي - ${today()}.pdf`);
+    const sh = $('#rShare'); if (sh) sh.onclick = () => publishShare(from, to); const shs = $('#rShares'); if (shs) shs.onclick = () => manageShares();
     const apply = () => { from = $('#rFrom').value; to = $('#rTo').value; render(); };
     $('#rFrom').onchange = apply; $('#rTo').onchange = apply;
     $$('[data-q]').forEach(b => b.onclick = () => { const r = quick(b.getAttribute('data-q')); from = r[0]; to = r[1]; render(); });
