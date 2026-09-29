@@ -30,8 +30,8 @@ export async function taskForm(t, project, done, preset = null) {
       ${field('الموعد', inp('due_date', v.due_date || '', 'type="date"'))}
       ${t ? field('الحالة', sel('status', Object.entries(T_STATUS), t.status)) : ''}
       ${t ? field('ملاحظة الإنجاز', `<textarea name="progress_note" rows="2">${esc(t.progress_note || '')}</textarea>`, 'wide') : ''}
-      <div class="btnrow end wide">${t ? '<button type="button" class="btn danger" data-del>حذف</button>' : ''}<span style="flex:1"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">حفظ</button></div></form>`
-    : `<div class="pre" style="margin-bottom:10px"><b>${esc(t.title)}</b><br><span class="muted">${esc(t.details || '')}</span></div><form id="f" class="pgrid">
+      <div class="btnrow end wide">${t ? '<button type="button" class="btn danger" data-del>حذف</button>' : ''}<span class="sp"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">حفظ</button></div></form>`
+    : `<div class="mb10 pre" ><b>${esc(t.title)}</b><br><span class="muted">${esc(t.details || '')}</span></div><form id="f" class="pgrid">
       ${field('الحالة', sel('status', [['open', 'مفتوحة'], ['in_progress', 'قيد التنفيذ'], ['done', 'منجزة']], t.status))}
       ${field('ملاحظة الإنجاز', `<textarea name="progress_note" rows="3">${esc(t.progress_note || '')}</textarea>`, 'wide')}
       <div class="btnrow end wide"><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">تحديث</button></div></form>`;
@@ -57,13 +57,13 @@ async function requestForm(r, project, done) {
   await loadProfiles();
   const canEditBody = !r || mine || admin;
   const html = `<div>
-    ${r ? `<div class="pcard" style="padding:12px 14px;margin-bottom:10px"><div class="uh"><span class="badge skel">${R_KIND[r.kind]}</span> ${rBadge(r.status)} ${prioBadge(r.priority)} <span class="muted">· ${esc(pname(r.created_by))} · ${dateAr(r.created_at)}</span></div><b>${esc(r.title)}</b><div class="pre muted">${esc(r.details || '')}</div>${r.response ? `<div class="notice" style="margin-top:8px"><b>رد الإدارة:</b> ${esc(r.response)} <span class="muted">— ${esc(pname(r.responded_by))} ${dateAr(r.responded_at)}</span></div>` : ''}
+    ${r ? `<div class="pcard" style="padding:12px 14px;margin-bottom:10px"><div class="uh"><span class="badge skel">${R_KIND[r.kind]}</span> ${rBadge(r.status)} ${prioBadge(r.priority)} <span class="muted">· ${esc(pname(r.created_by))} · ${dateAr(r.created_at)}</span></div><b>${esc(r.title)}</b><div class="pre muted">${esc(r.details || '')}</div>${r.response ? `<div class="mt8 notice" ><b>رد الإدارة:</b> ${esc(r.response)} <span class="muted">— ${esc(pname(r.responded_by))} ${dateAr(r.responded_at)}</span></div>` : ''}
       ${replies.length ? `<h3 class="sub">المتابعات</h3>${replies.map(x => `<div class="upd"><div class="uh"><b>${esc(pname(x.by_user))}</b> <span class="muted">${dateAr(x.at)}</span>${x.status_after ? ' ' + rBadge(x.status_after) : ''}</div><div class="ub">${esc(x.body)}</div></div>`).join('')}` : ''}</div>` : ''}
     <form id="f" class="pgrid">
       ${canEditBody ? `${field('نوع الطلب', sel('kind', Object.entries(R_KIND), r?.kind || 'approval'))}${field('الأولوية', sel('priority', Object.entries(PRIO), r?.priority || 'normal'))}${field('عنوان الطلب *', inp('title', r?.title || '', 'required'), 'wide')}${field('التفاصيل / المبررات', `<textarea name="details" rows="3">${esc(r?.details || '')}</textarea>`, 'wide')}${field('المطلوب قبل', inp('due_date', r?.due_date || '', 'type="date"'))}` : ''}
       ${admin && r ? `${field('حالة الطلب', sel('status', Object.entries(R_STATUS), r.status))}${field('رد الإدارة', `<textarea name="response" rows="3">${esc(r.response || '')}</textarea>`, 'wide')}` : ''}
       ${r ? field('إضافة متابعة / تعليق', `<textarea name="reply" rows="2" placeholder="اختياري — يُحفظ في سجل الطلب"></textarea>`, 'wide') : ''}
-      <div class="btnrow end wide">${r && (admin || mine) ? '<button type="button" class="btn danger" data-del>حذف</button>' : ''}<span style="flex:1"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">${r ? 'حفظ' : 'إرسال الطلب'}</button></div></form></div>`;
+      <div class="btnrow end wide">${r && (admin || mine) ? '<button type="button" class="btn danger" data-del>حذف</button>' : ''}<span class="sp"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">${r ? 'حفظ' : 'إرسال الطلب'}</button></div></form></div>`;
   await modal(html, { title: r ? 'الطلب #' + r.id : 'طلب جديد إلى الإدارة', wide: true, onOpen: (w, close) => {
     $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target);
       try {
@@ -85,7 +85,7 @@ export async function projectTasks(t, p) {
   await loadProfiles();
   const rows = await q(sb.from('tasks').select('*').eq('project_id', p.id).order('status').order('due_date', { ascending: true, nullsFirst: false }).order('id', { ascending: false }));
   const open = rows.filter(r => !['done', 'cancelled'].includes(r.status));
-  t.innerHTML = `<div class="pcard"><div class="toolbar"><h2><span class="ic"></span>المهام <span class="muted">(${open.length} مفتوحة من ${rows.length})</span></h2><span style="flex:1"></span>${isAdmin() ? '<button class="btn primary" id="tNew">＋ مهمة جديدة</button>' : ''}</div>${rows.length ? taskRows(rows) : '<p class="muted">لا توجد مهام على هذا المشروع.</p>'}</div>`;
+  t.innerHTML = `<div class="pcard"><div class="toolbar"><h2><span class="ic"></span>المهام <span class="muted">(${open.length} مفتوحة من ${rows.length})</span></h2><span class="sp"></span>${isAdmin() ? '<button class="btn primary" id="tNew">＋ مهمة جديدة</button>' : ''}</div>${rows.length ? taskRows(rows) : '<p class="muted">لا توجد مهام على هذا المشروع.</p>'}</div>`;
   if (isAdmin()) $('#tNew').onclick = () => taskForm(null, p, () => projectTasks(t, p));
   $$('[data-t]', t).forEach(b => b.onclick = () => taskForm(rows.find(x => x.id === +b.getAttribute('data-t')), p, () => projectTasks(t, p)));
 }
@@ -93,7 +93,7 @@ export async function projectRequests(t, p) {
   await loadProfiles();
   const rows = await q(sb.from('requests').select('*').eq('project_id', p.id).order('id', { ascending: false }));
   const pending = rows.filter(r => ['new', 'in_review'].includes(r.status));
-  t.innerHTML = `<div class="pcard"><div class="toolbar"><h2><span class="ic"></span>الطلبات إلى الإدارة <span class="muted">(${pending.length} بانتظار الرد من ${rows.length})</span></h2><span style="flex:1"></span>${canEdit() ? '<button class="btn primary" id="rNew">＋ طلب جديد</button>' : ''}</div>${rows.length ? requestRows(rows) : '<p class="muted">لا توجد طلبات على هذا المشروع.</p>'}</div>`;
+  t.innerHTML = `<div class="pcard"><div class="toolbar"><h2><span class="ic"></span>الطلبات إلى الإدارة <span class="muted">(${pending.length} بانتظار الرد من ${rows.length})</span></h2><span class="sp"></span>${canEdit() ? '<button class="btn primary" id="rNew">＋ طلب جديد</button>' : ''}</div>${rows.length ? requestRows(rows) : '<p class="muted">لا توجد طلبات على هذا المشروع.</p>'}</div>`;
   if (canEdit()) $('#rNew').onclick = () => requestForm(null, p, () => projectRequests(t, p));
   $$('[data-r]', t).forEach(b => b.onclick = () => requestForm(rows.find(x => x.id === +b.getAttribute('data-r')), p, () => projectRequests(t, p)));
 }
@@ -102,7 +102,7 @@ export async function projectRequests(t, p) {
 export async function mountTasks(root, params) {
   await loadProfiles();
   const me = session.user.id;
-  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">المهام</h1><span style="flex:1"></span>${xbtn()}</div>
+  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">المهام</h1><span class="sp"></span>${xbtn()}</div>
     <div class="filters"><input id="fq" placeholder="بحث…"><select id="fSt"><option value="">المفتوحة وقيد التنفيذ</option><option value="all">الكل</option>${Object.entries(T_STATUS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select><select id="fAs"><option value="">كل المكلفين</option>${!isAdmin() ? '' : ''}${profiles.filter(p => ['admin', 'engineer'].includes(p.role)).map(p => `<option value="${p.id}" ${params.get('me') && p.id === me ? 'selected' : ''}>${esc(p.full_name)}</option>`).join('')}</select><label class="chk"><input type="checkbox" id="fLate"> المتأخرة فقط</label></div><div id="tl"><p class="muted">…</p></div>`;
   const all = await q(sb.from('tasks').select('*, projects(name)').order('due_date', { ascending: true, nullsFirst: false }).order('id', { ascending: false }));
   const render = () => { const qs = $('#fq').value.toLowerCase(), st = $('#fSt').value, as = $('#fAs').value, late = $('#fLate').checked;

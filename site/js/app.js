@@ -1,6 +1,7 @@
 // ===== التطبيق: الدخول، التوجيه، الهيكل =====
 import { sb, session, loadSession, loadRef, REF, role, isAdmin, canRead, ROLES, q } from './api.js';
 import { $, $$, esc, toast, err, modal, field, inp, formData, ico } from './ui.js';
+import { skeleton, markRoute, watch } from './fx.js';
 
 const app = $('#app');
 const NAV = [
@@ -26,7 +27,7 @@ function shell(inner) {
       <nav class="snav">${links('')}</nav>
       <button class="fold" id="fold" title="طيّ القائمة">${ico('fold')}</button></aside>
     <div class="mainwrap">
-      <div class="topbar"><div class="gsearch" id="gsearch">${ico('search')}<span>ابحث عن مشروع…</span><kbd>⌘K</kbd></div><span style="flex:1"></span><span id="bellhost"></span>
+      <div class="topbar"><div class="gsearch" id="gsearch">${ico('search')}<span>ابحث عن مشروع…</span><kbd>⌘K</kbd></div><span class="sp"></span><span id="bellhost"></span>
         <div class="user"><div><b>${esc(p?.full_name || '')}</b><small>${esc(ROLES[role()] || '')}</small></div><div class="av">${esc((p?.full_name || '?').trim().charAt(0))}</div></div>
         <button class="ib" id="logout" title="خروج">${ico('logout')}</button></div>
       <main id="main">${inner || ''}</main></div></div>
@@ -99,7 +100,8 @@ async function route() {
   const h = location.hash.replace(/^#\/?/, '') || 'today';
   const [path, query] = h.split('?'); const params = new URLSearchParams(query || '');
   const parts = path.split('/'); const main = $('#main'); if (!main) shell('');
-  const m = $('#main'); setNav(parts[0]);
+  const m = $('#main'); setNav(parts[0]); watch(m);
+  const rkey = parts.slice(0, 2).join('/'); if (m._rkey !== rkey && parts[0] !== 'ref') { m._rkey = rkey; markRoute(); m.innerHTML = skeleton(parts[0] === 'project' ? 'page' : ['dashboard', 'today', 'performance', 'me'].includes(parts[0]) ? 'page' : 'list'); m.classList.remove('pagein'); void m.offsetWidth; m.classList.add('pagein'); }
   try {
     if (parts[0] === 'today') { const { mountToday } = await import('./today.js'); await mountToday(m); }
     else if (parts[0] === 'dashboard') { const { mountDashboard } = await import('./projects.js'); await mountDashboard(m); }

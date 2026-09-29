@@ -212,7 +212,7 @@ async function editVariant(v, it) {
     ${field('سعر الوحدة الاسترشادي (ر.س) *', money_inp('price', v?.price ?? 0, 'required'))}
     ${field('نشط', sel('active', [['true', 'نعم'], ['false', 'موقوف']], String(v?.active !== false)))}
     ${isNew ? '' : field('ملاحظة تغيير السعر (اختياري)', inp('note', ''), 'wide')}
-    <div class="btnrow end wide">${isNew ? '' : '<button type="button" class="btn danger" data-del>حذف الخيار</button>'}<span style="flex:1"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary" type="submit">حفظ</button></div></form>`;
+    <div class="btnrow end wide">${isNew ? '' : '<button type="button" class="btn danger" data-del>حذف الخيار</button>'}<span class="sp"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary" type="submit">حفظ</button></div></form>`;
   await modal(html, { title: isNew ? 'خيار جديد — ' + it.ar : 'تعديل الخيار ' + v.code, onOpen: (w, close) => {
     $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target);
       const row = { code: f.code.trim(), item_code: it.code, ar: f.ar.trim(), en: f.en.trim(), unit: f.unit, spec: f.spec.trim(), price: Number(f.price), active: f.active === 'true', updated_by: session.user.id };

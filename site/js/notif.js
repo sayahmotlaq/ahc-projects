@@ -18,7 +18,7 @@ export async function refresh() {
   } catch (e) { }
 }
 export function mountBell(host) {
-  host.insertAdjacentHTML('beforeend', `<div class="nwrap"><button class="nbell" id="nbell" title="الإشعارات">${ico('bell')}<span id="ncount">0</span></button><div class="npanel" id="npanel"><div class="nhead"><b>الإشعارات</b><span style="flex:1"></span><button class="btn sm" id="nread">تعليم الكل كمقروء</button><a class="btn sm" href="#/settings">الإعدادات</a></div><div id="nlist"></div></div></div>`);
+  host.insertAdjacentHTML('beforeend', `<div class="nwrap"><button class="nbell" id="nbell" title="الإشعارات">${ico('bell')}<span id="ncount">0</span></button><div class="npanel" id="npanel"><div class="nhead"><b>الإشعارات</b><span class="sp"></span><button class="btn sm" id="nread">تعليم الكل كمقروء</button><a class="btn sm" href="#/settings">الإعدادات</a></div><div id="nlist"></div></div></div>`);
   $('#nbell').onclick = e => { e.stopPropagation(); open = !open; $('#npanel').classList.toggle('show', open); if (open) renderList(); };
   document.addEventListener('click', e => { if (open && !e.target.closest('.nwrap')) { open = false; $('#npanel')?.classList.remove('show'); } });
   $('#nread').onclick = async () => { const ids = cache.filter(n => !n.read_at).map(n => n.id); if (ids.length) await q(sb.from('notifications').update({ read_at: new Date().toISOString() }).in('id', ids)); refresh(); };
@@ -68,10 +68,10 @@ export async function mountSettings(root) {
       ${subs.length ? `<h3 class="sub-h">الأجهزة المفعّلة (${subs.length})</h3><ul class="rlist">${subs.map(s => `<li>${esc(devName(s.ua))} <span class="muted">— ${dateAr(s.created_at)}</span></li>`).join('')}</ul>` : ''}
     </div>
     <div class="pcard"><h2><span class="ic"></span>ما الذي يصلني على الجهاز؟</h2><p class="muted small">كل الإشعارات تظهر دائماً في الجرس داخل المنصة؛ هنا تختار ما يُدفع منها إلى جوالك.</p>
-      <label class="chk" style="margin-bottom:8px"><input type="checkbox" id="pushAll" ${prefs.push === false ? '' : 'checked'}> إرسال الإشعارات إلى أجهزتي</label>
-      <label class="chk" style="margin-bottom:8px"><input type="checkbox" id="digest" ${prefs.digest === false ? '' : 'checked'}> ملخص الصباح (7:45) وختام اليوم (3:30) أيام العمل</label>
+      <label class="mb8 chk" ><input type="checkbox" id="pushAll" ${prefs.push === false ? '' : 'checked'}> إرسال الإشعارات إلى أجهزتي</label>
+      <label class="mb8 chk" ><input type="checkbox" id="digest" ${prefs.digest === false ? '' : 'checked'}> ملخص الصباح (7:45) وختام اليوم (3:30) أيام العمل</label>
       <div class="chips">${Object.entries(N_KINDS).map(([k, v]) => `<label class="chip"><input type="checkbox" data-k="${k}" ${kinds[k] === false ? '' : 'checked'}> ${v}</label>`).join('')}</div>
-      <div class="btnrow end" style="margin-top:10px"><button class="btn primary" id="savePrefs">حفظ التفضيلات</button></div></div></div>`;
+      <div class="mt10 btnrow end" ><button class="btn primary" id="savePrefs">حفظ التفضيلات</button></div></div></div>`;
   const on = $('#pOn'); if (on) on.onclick = async () => { on.disabled = true; try { await enablePush(); toast('تم تفعيل الإشعارات على هذا الجهاز'); mountSettings(root); } catch (e) { err(e); on.disabled = false; } };
   const off = $('#pOff'); if (off) off.onclick = async () => { try { await disablePush(); toast('أُوقفت الإشعارات على هذا الجهاز'); mountSettings(root); } catch (e) { err(e); } };
   const t = $('#pTest'); if (t) t.onclick = async () => { try { const reg = await navigator.serviceWorker.ready; await reg.showNotification('منصة إدارة المشاريع', { body: 'هذا إشعار تجريبي — الإشعارات تعمل على هذا الجهاز ✅', icon: 'assets/logo.png', dir: 'rtl', lang: 'ar' }); } catch (e) { err(e); } };

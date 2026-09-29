@@ -31,7 +31,7 @@ export async function mountBoq(root, boqId, project, onBack) {
     <div class="toolbar">
       <button class="btn" id="bBack">‹ المشروع</button>
       <div class="titleblock"><b>${esc(project.name)}</b><span class="muted">جدول الكميات: ${esc(boq.name)} · <span class="badge skel">${STATUS[boq.status] || boq.status}</span></span></div>
-      <span style="flex:1"></span>
+      <span class="sp"></span>
       <button class="btn primary" id="bExcel">⬇ تصدير Excel</button>
       ${edit ? `<button class="btn" id="bSettings">إعدادات الجدول</button><button class="btn" id="bRefresh" title="تحديث أسعار البنود من المرجع الحالي">تحديث الأسعار</button>` : ''}
       <button class="btn" onclick="window.print()">طباعة</button>
@@ -68,7 +68,7 @@ export async function mountBoq(root, boqId, project, onBack) {
   renderTable();
 
   function settings() {
-    modal(`<form id="f" class="pgrid">${field('اسم الجدول', inp('name', boq.name))}${field('الحالة', sel('status', Object.entries(STATUS), boq.status))}${field('نسبة الاحتياطي %', inp('contingency', boq.contingency, 'type="number" min="0" max="30" step="0.5"'))}${field('ضريبة القيمة المضافة %', inp('vat', boq.vat, 'type="number" min="0" max="20" step="1"'))}${field('مُعامل تعديل الأسعار', inp('factor', boq.factor, 'type="number" min="0.5" max="2" step="0.01"'))}${field('ملاحظات', `<textarea name="notes" rows="2">${esc(boq.notes || '')}</textarea>`, 'wide')}<div class="btnrow end wide"><button type="button" class="btn danger" data-del>حذف الجدول</button><span style="flex:1"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">حفظ</button></div></form>`, { title: 'إعدادات جدول الكميات', onOpen: (w, close) => {
+    modal(`<form id="f" class="pgrid">${field('اسم الجدول', inp('name', boq.name))}${field('الحالة', sel('status', Object.entries(STATUS), boq.status))}${field('نسبة الاحتياطي %', inp('contingency', boq.contingency, 'type="number" min="0" max="30" step="0.5"'))}${field('ضريبة القيمة المضافة %', inp('vat', boq.vat, 'type="number" min="0" max="20" step="1"'))}${field('مُعامل تعديل الأسعار', inp('factor', boq.factor, 'type="number" min="0.5" max="2" step="0.01"'))}${field('ملاحظات', `<textarea name="notes" rows="2">${esc(boq.notes || '')}</textarea>`, 'wide')}<div class="btnrow end wide"><button type="button" class="btn danger" data-del>حذف الجدول</button><span class="sp"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">حفظ</button></div></form>`, { title: 'إعدادات جدول الكميات', onOpen: (w, close) => {
       $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target); const row = { name: f.name, status: f.status, contingency: Number(f.contingency), vat: Number(f.vat), factor: Number(f.factor), notes: f.notes }; try { await q(sb.from('boqs').update(row).eq('id', boq.id)); Object.assign(boq, row); close(); $('.titleblock .muted').innerHTML = `جدول الكميات: ${esc(boq.name)} · <span class="badge skel">${STATUS[boq.status]}</span>`; renderTable(); } catch (er) { err(er); } };
       $('[data-del]', w).onclick = async () => { if (!await confirm('حذف جدول الكميات وكل بنوده نهائياً؟', 'حذف', true)) return; try { await q(sb.from('boqs').delete().eq('id', boq.id)); close(); onBack(); } catch (er) { err(er); } };
     } });
