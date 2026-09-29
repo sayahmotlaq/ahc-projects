@@ -39,7 +39,7 @@ jobs:
           node scripts/backup_xlsx.mjs "out/ahc-$D.xlsx" "out/ahc-$D.json"
           if pg_dump "$DB_URL_RESOLVED" -Fc --no-owner --no-privileges --schema=public -f "out/ahc-$D.dump"; then
             openssl enc -aes-256-cbc -pbkdf2 -salt -in "out/ahc-$D.dump" -out "out/ahc-$D.dump.enc" -pass env:BACKUP_PASS && rm "out/ahc-$D.dump"
-          else echo "pg_dump failed — JSON/XLSX backup only"; fi
+          else echo "pg_dump failed — JSON/XLSX backup only"; rm -f "out/ahc-$D.dump"; fi
           openssl enc -aes-256-cbc -pbkdf2 -salt -in "out/ahc-$D.json" -out "out/ahc-$D.json.enc" -pass env:BACKUP_PASS && rm "out/ahc-$D.json"
           ls -la out
       - name: Push to private backups repo
