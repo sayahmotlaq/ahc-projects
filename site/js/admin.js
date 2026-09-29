@@ -3,10 +3,10 @@ import { sb, ROLES, q, session, invalidateRef } from './api.js';
 import { $, $$, esc, money, dateAr, toast, err, confirm, modal, field, inp, sel, formData } from './ui.js';
 
 export async function mountAdmin(root, tab = 'users') {
-  const tabs = [['users', 'المستخدمون'], ['prices', 'سجل الأسعار'], ['audit', 'سجل التدقيق'], ['settings', 'الإعدادات']];
+  const tabs = [['users', 'المستخدمون'], ['quality', 'جودة البيانات'], ['prices', 'سجل الأسعار'], ['audit', 'سجل التدقيق'], ['settings', 'الإعدادات']];
   root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">الإدارة</h1></div><div class="tabs">${tabs.map(([k, t]) => `<a href="#/admin/${k}" class="${tab === k ? 'on' : ''}">${t}</a>`).join('')}</div><div id="atab"><p class="muted">…</p></div>`;
   const t = $('#atab');
-  if (tab === 'users') users(t); else if (tab === 'prices') prices(t); else if (tab === 'audit') audit(t); else settings(t);
+  if (tab === 'users') users(t); else if (tab === 'quality') quality(t); else if (tab === 'prices') prices(t); else if (tab === 'audit') audit(t); else settings(t);
 }
 async function users(t) {
   const rows = await q(sb.from('profiles').select('*').order('created_at'));
@@ -42,4 +42,56 @@ async function settings(t) {
     <h3 class="sub">المرجع الفني</h3><p class="muted">إصدار البيانات: ${esc(JSON.stringify(rv))}</p><div class="btnrow"><button class="btn" id="clearCache">إعادة تحميل المرجع من الخادم</button></div></div>`;
   $('#f', t).onsubmit = async e => { e.preventDefault(); const f = formData(e.target); try { await q(sb.from('settings').upsert([{ key: 'org', value: { name: f.name, dept: f.dept } }, { key: 'admin_emails', value: f.admins.split(/[,،]/).map(x => x.trim().toLowerCase()).filter(Boolean) }])); toast('تم الحفظ'); } catch (er) { err(er); } };
   $('#clearCache').onclick = () => { invalidateRef(); location.reload(); };
+}
+
+// ---------- جودة البيانات: نواقص تشوّه المؤشرات
+async function quality(t) {
+  t.innerHTML = '<div class="loading"><div class="spin"></div>جارٍ فحص البيانات…</div>';
+  const today = new Date().toISOString().slice(0, 10); const ago = n => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
+  const [projects, profiles, pays, trs, subs, tasks, chs, docs, dwgs, revs] = await Promise.all([
+    q(sb.from('projects').select('id,name,stage,category,type,engineer_id,engineer_name,contract_value,budget,start_date,end_date,contractor,progress_actual,progress_planned,award_date,tender_date,updated_at').eq('archived', false)),
+    q(sb.from('profiles').select('id,full_name,role,title,created_at')),
+    q(sb.from('payments').select('id,project_id,no,kind,status,period_from,period_to,payment_order_no,work_amount')),
+    q(sb.from('tech_reports').select('id,project_id,title,status,created_at')),
+    q(sb.from('submittals').select('id,project_id,no,title,status,spec_ref,spec_title,due_on')),
+    q(sb.from('tasks').select('id,project_id,title,status,due_date,assignee_id,assignee_name')),
+    q(sb.from('challenges').select('id,project_id,title,status,owner,action,detected_on,created_at')),
+    q(sb.from('documents').select('id,project_id,category,expiry_date')),
+    q(sb.from('drawings').select('id,project_id,dwg_no,title')),
+    q(sb.from('drawing_revisions').select('id,drawing_id,path,link')),
+  ]);
+  const pn = id => projects.find(p => p.id === id)?.name || '—';
+  const act = projects.filter(p => !['closed', 'cancelled'].includes(p.stage));
+  const exec = act.filter(p => p.stage === 'execution'); const contracted = act.filter(p => ['award', 'execution', 'handover', 'warranty'].includes(p.stage));
+  const study = act.filter(p => ['request', 'study', 'approval', 'design', 'tender'].includes(p.stage));
+  const P = (arr, link) => arr.map(p => ({ t: p.name, l: `#/project/${p.id}${link || ''}` }));
+  const checks = [
+    ['bad', 'مشاريع متعاقد عليها بلا قيمة عقد', 'تشوّه قيمة المحفظة ونسب الصرف', P(contracted.filter(p => !Number(p.contract_value)))],
+    ['bad', 'مشاريع تحت التنفيذ بلا تاريخ انتهاء تعاقدي', 'لا يمكن حساب التأخر', P(exec.filter(p => !p.end_date))],
+    ['bad', 'مشاريع تحت التنفيذ بلا تاريخ مباشرة', '', P(exec.filter(p => !p.start_date))],
+    ['bad', 'مشاريع قائمة بلا حساب مهندس مسؤول', 'لا تصله إشعاراته ولا تُحسب مؤشراته', P(act.filter(p => !p.engineer_id), '')],
+    ['warn', 'مشاريع متعاقد عليها بلا اسم مقاول', '', P(contracted.filter(p => !p.contractor))],
+    ['warn', 'مشاريع تنفيذ بدأت منذ أكثر من 30 يوماً وإنجازها 0%', 'غالباً لم يُحدّث الإنجاز', P(exec.filter(p => p.start_date && p.start_date < ago(30) && !Number(p.progress_actual)))],
+    ['warn', 'مشاريع تنفيذ بلا إنجاز مخطط', 'لا يمكن قياس الانحراف', P(exec.filter(p => !Number(p.progress_planned)))],
+    ['warn', 'مشاريع تحت الدراسة بلا ميزانية تقديرية', '', P(study.filter(p => !Number(p.budget)))],
+    ['warn', 'مشاريع بلا فئة أو نوع', '', P(act.filter(p => !p.category || !p.type))],
+    ['warn', 'مشاريع تنفيذ ناقصة مستندات أساسية', 'العقد، محضر تسليم الموقع، الضمان البنكي، التأمين', exec.filter(p => ['contract', 'site_handover', 'bank_guarantee', 'insurance'].some(c => !docs.some(d => d.project_id === p.id && d.category === c))).map(p => ({ t: p.name, l: `#/project/${p.id}/docs` }))],
+    ['bad', 'ضمانات أو تأمينات منتهية', '', docs.filter(d => ['bank_guarantee', 'insurance'].includes(d.category) && d.expiry_date && d.expiry_date < today).map(d => ({ t: pn(d.project_id) + ' — ' + (d.category === 'bank_guarantee' ? 'ضمان بنكي' : 'تأمين'), l: `#/project/${d.project_id}/docs` }))],
+    ['warn', 'مستخلصات مقدَّمة بلا فترة', '', pays.filter(p => p.status !== 'draft' && p.kind !== 'advance' && (!p.period_from || !p.period_to)).map(p => ({ t: `${pn(p.project_id)} — مستخلص ${p.no}`, l: `#/project/${p.project_id}/payments` }))],
+    ['warn', 'مستخلصات مصروفة بلا رقم أمر دفع', '', pays.filter(p => p.status === 'paid' && !p.payment_order_no).map(p => ({ t: `${pn(p.project_id)} — مستخلص ${p.no}`, l: `#/project/${p.project_id}/payments` }))],
+    ['warn', 'تقارير فنية مسودة منذ أكثر من 7 أيام', 'إما تُنشر أو تُحذف', trs.filter(r => r.status === 'draft' && r.created_at < ago(7)).map(r => ({ t: r.title, l: `#/treport/${r.id}` }))],
+    ['warn', 'طلبات اعتماد بلا بند مرجعي', 'يصعب التحقق من المطابقة', subs.filter(s => !s.spec_ref && !s.spec_title).map(s => ({ t: `${pn(s.project_id)} — SUB-${String(s.no).padStart(3, '0')}`, l: `#/project/${s.project_id}/submittals` }))],
+    ['warn', 'مهام مفتوحة بلا موعد', 'لا تدخل في قياس الالتزام', tasks.filter(x => ['open', 'in_progress'].includes(x.status) && !x.due_date).map(x => ({ t: `${pn(x.project_id)} — ${x.title}`, l: `#/project/${x.project_id}/tasks` }))],
+    ['warn', 'مهام مفتوحة بلا مكلَّف بحساب', 'لا تصل إشعاراتها لأحد', tasks.filter(x => ['open', 'in_progress'].includes(x.status) && !x.assignee_id).map(x => ({ t: `${pn(x.project_id)} — ${x.title}`, l: `#/project/${x.project_id}/tasks` }))],
+    ['warn', 'تحديات مفتوحة بلا مسؤول أو إجراء', '', chs.filter(c => c.status !== 'مغلق' && (!c.owner || !c.action)).map(c => ({ t: `${pn(c.project_id)} — ${c.title}`, l: `#/project/${c.project_id}/challenges` }))],
+    ['warn', 'تحديات مفتوحة منذ أكثر من 60 يوماً', 'تحتاج إغلاقاً أو تصعيداً', chs.filter(c => c.status !== 'مغلق' && (c.detected_on || c.created_at) < ago(60)).map(c => ({ t: `${pn(c.project_id)} — ${c.title}`, l: `#/project/${c.project_id}/challenges` }))],
+    ['warn', 'مخططات بلا ملف ولا رابط', '', dwgs.filter(d => !revs.some(r => r.drawing_id === d.id && (r.path || r.link))).map(d => ({ t: `${pn(d.project_id)} — ${d.dwg_no || d.title}`, l: `#/project/${d.project_id}/drawings` }))],
+    ['warn', 'حسابات بانتظار الاعتماد', '', profiles.filter(p => p.role === 'pending').map(p => ({ t: p.full_name || '—', l: '#/admin/users' }))],
+  ];
+  const issues = checks.reduce((a, c) => a + c[3].length, 0); const bad = checks.filter(c => c[0] === 'bad').reduce((a, c) => a + c[3].length, 0);
+  const denom = Math.max(1, act.length * 6); const score = Math.max(0, Math.min(100, Math.round(100 - issues / denom * 100)));
+  t.innerHTML = `<div class="kpis"><div class="kpi"><span>اكتمال البيانات</span><b class="${score >= 85 ? '' : 'bad'}">${score}%</b></div><div class="kpi ${bad ? 'bad' : ''}"><span>نواقص مؤثرة</span><b>${bad}</b></div><div class="kpi"><span>ملاحظات</span><b>${issues - bad}</b></div><div class="kpi"><span>مشاريع قائمة مفحوصة</span><b>${act.length}</b></div></div>
+    <p class="muted small" style="margin:-6px 0 12px">الفحص يُحسب لحظياً من البيانات الحالية. النواقص المؤثرة (بالأحمر) تشوّه لوحة المؤشرات والتقارير مباشرة؛ الملاحظات تحسّن الدقة والمتابعة.</p>
+    ${checks.filter(c => c[3].length).map(c => `<div class="pcard"><h2><span class="badge ${c[0]}">${c[3].length}</span> ${c[1]}${c[2] ? ` <small class="muted" style="font-weight:500">— ${c[2]}</small>` : ''}</h2><div class="chips">${c[3].slice(0, 40).map(i => `<a class="chip" href="${i.l}">${esc(i.t)}</a>`).join('')}${c[3].length > 40 ? `<span class="muted small">و${c[3].length - 40} أخرى…</span>` : ''}</div></div>`).join('') || '<div class="empty-boq">✅ لا توجد نواقص — البيانات مكتملة.</div>'}
+    ${checks.filter(c => !c[3].length).length ? `<div class="pcard"><h2>فحوصات سليمة <span class="badge full">${checks.filter(c => !c[3].length).length}</span></h2><div class="chips">${checks.filter(c => !c[3].length).map(c => `<span class="chip">✓ ${c[1]}</span>`).join('')}</div></div>` : ''}`;
 }
