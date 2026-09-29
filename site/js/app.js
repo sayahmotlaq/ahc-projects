@@ -10,14 +10,15 @@ const NAV = [
   ['sec', 'المستندات والمالية'],
   ['submittals', 'الاعتمادات', 'stamp'], ['documents', 'المستندات الرسمية', 'doc'], ['drawings', 'المخططات', 'draw'], ['payments', 'المستخلصات', 'coins'],
   ['sec', 'النظام'],
-  ['report', 'التقارير', 'chart'], ['performance', 'الأداء والإنجازات', 'users', 'admin'], ['me', 'إنجازاتي', 'users', 'engineer'], ['ref', 'المرجع الفني', 'book'], ['settings', 'الإعدادات والإشعارات', 'bell'], ['admin', 'الإدارة', 'cog', 'admin']];
+  ['report', 'التقارير', 'chart'], ['performance', 'الأداء والإنجازات', 'users', 'admin'], ['me', 'إنجازاتي', 'users', ['engineer', 'clerk']], ['ref', 'المرجع الفني', 'book'], ['settings', 'الإعدادات والإشعارات', 'bell'], ['admin', 'الإدارة', 'cog', 'admin']];
 const ALIAS = { treport: 'treports', project: 'projects' };
 const BOTTOM = [['dashboard', 'المؤشرات', 'dash'], ['projects', 'المشاريع', 'folder'], ['tasks', 'المهام', 'check'], ['treports', 'التقارير', 'file'], ['more', 'المزيد', 'menu']];
 
 let projIndex = null;
 function shell(inner) {
   const p = session.profile;
-  const navItems = NAV.filter(n => n[0] !== 'sec' ? (!n[3] || role() === n[3]) : true);
+  const okRole = r => !r || (Array.isArray(r) ? r.includes(role()) : role() === r);
+  const navItems = NAV.filter(n => n[0] !== 'sec' ? okRole(n[3]) : true);
   const links = (cls) => navItems.map(n => n[0] === 'sec' ? `<div class="sec">${n[1]}</div>` : `<a href="#/${n[0]}" data-nav="${n[0]}" class="${cls}">${ico(n[2])}<span>${n[1]}</span><span class="cnt" data-cnt="${n[0]}"></span></a>`).join('');
   const mini = (() => { try { return localStorage.getItem('ahc_mini') === '1'; } catch (e) { return false; } })();
   app.innerHTML = `<div class="app2 ${mini ? 'mini' : ''}" id="app2">
@@ -45,7 +46,7 @@ export function setCounts(map) { Object.entries(map).forEach(([k, v]) => $$(`[da
 async function openPalette() {
   if ($('.pal')) return;
   if (!projIndex) { try { projIndex = await q(sb.from('projects').select('id,name,ref,stage,category').eq('archived', false).order('name')); } catch (e) { projIndex = []; } }
-  const pages = NAV.filter(n => n[0] !== 'sec' && (!n[3] || role() === n[3])).map(n => ({ id: null, name: n[1], link: '#/' + n[0], kind: 'صفحة' }));
+  const pages = NAV.filter(n => n[0] !== 'sec' && (!n[3] || (Array.isArray(n[3]) ? n[3].includes(role()) : role() === n[3]))).map(n => ({ id: null, name: n[1], link: '#/' + n[0], kind: 'صفحة' }));
   const w = document.createElement('div'); w.className = 'pal'; w.innerHTML = `<div class="box"><input id="palq" placeholder="اكتب اسم المشروع أو الصفحة…" autocomplete="off"><div class="list" id="pall"></div></div>`;
   document.body.appendChild(w); const inp = $('#palq', w), list = $('#pall', w); let sel = 0, items = [];
   const norm = s => (s || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي');
