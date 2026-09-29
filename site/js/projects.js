@@ -9,6 +9,7 @@ import { projectTReports } from './treports.js';
 import { projectDocs, projectDrawings, projectSubmittals, isOverdue as subLate } from './docs.js';
 import { projectChanges, projectCloseout } from './closeout.js';
 import { projectSchedule } from './schedule.js';
+import { projectChallenges } from './challenges.js';
 
 const CATEGORIES = ['حكومي', 'شراء مباشر', 'شراكة مجتمعية'];
 let profiles = [];
@@ -21,8 +22,8 @@ export async function loadDashData() {
   const me = session.user.id; const admin = isAdmin(); const fin = role() === 'finance';
   const [projects] = await Promise.all([q(sb.from('projects').select('id,name,ref,facility,stage,priority,budget,contract_value,paid_amount,progress_actual,progress_planned,end_date,updated_at,engineer_id,engineer_name,status_note,category').eq('archived', false)), loadProfiles()]);
   const [chs, tasks, reqs, act, pays, subs, docsExp, trs, ups] = await Promise.all([
-    q(sb.from('challenges').select('id,project_id,title,severity,status,owner,created_at,projects(name)').neq('status', 'مغلق').order('severity')),
-    q(sb.from('tasks').select('id,project_id,title,status,due_date,assignee_id,assignee_name,priority,created_at,projects(name)').in('status', ['open', 'in_progress']).order('due_date', { ascending: true, nullsFirst: false })),
+    q(sb.from('challenges').select('id,project_id,title,severity,likelihood,score,status,owner,due_date,created_at,projects(name,engineer_id)').neq('status', 'مغلق').order('score', { ascending: false })),
+    q(sb.from('tasks').select('id,project_id,title,status,due_date,assignee_id,assignee_name,priority,created_at,challenge_id,projects(name)').in('status', ['open', 'in_progress']).order('due_date', { ascending: true, nullsFirst: false })),
     q(sb.from('requests').select('id,project_id,title,kind,status,priority,created_by,created_at,projects(name)').in('status', ['new', 'in_review']).order('id', { ascending: false })),
     loadActivity(),
     q(sb.from('payments').select('id,project_id,no,status,net_amount,created_by,updated_at,projects(name)').in('status', ['submitted', 'review', 'approved', 'finance'])),
@@ -56,7 +57,6 @@ export async function loadDashData() {
     payPend.forEach(r => push('a', 'coins', `مستخلص رقم ${r.no} — ${r.projects?.name || ''}`, `الصافي ${money(Math.round(r.net_amount))} ر.س · ${({ submitted: 'مقدَّم', review: 'قيد المراجعة', approved: 'معتمد — للإحالة' })[r.status]}`, `#/project/${r.project_id}/payments`, r.updated_at, 'اعتماد'));
     subs.filter(s => s.status === 'reviewed').forEach(s => push('b', 'stamp', `SUB-${String(s.no).padStart(3, '0')}${s.rev ? '-R' + s.rev : ''} ${s.title}`, `${s.projects?.name || ''} · راجعه المهندس`, `#/project/${s.project_id}/submittals`, s.submitted_on, 'القرار', subLate(s)));
     trs.forEach(r => push('c', 'file', r.title, `${r.projects?.name || ''} · ${pname(r.created_by)}`, `#/treport/${r.id}`, r.published_at, 'مراجعة'));
-    chs.filter(c => ['حرجة', 'عالية'].includes(c.severity)).slice(0, 5).forEach(c => push('d', 'alert', `تحدٍ ${c.severity}: ${c.title}`, c.projects?.name || '', `#/project/${c.project_id}/challenges`, c.created_at, 'عرض'));
   }
   if (fin) payFin.forEach(r => push('a', 'coins', `مستخلص رقم ${r.no} — ${r.projects?.name || ''}`, `الصافي ${money(Math.round(r.net_amount))} ر.س · محال للمالية`, `#/project/${r.project_id}/payments`, r.updated_at, 'تسجيل الصرف'));
   if (!admin) {
@@ -65,6 +65,8 @@ export async function loadDashData() {
   } else {
     lateTasks.slice(0, 5).forEach(t => push('d', 'check', `مهمة متأخرة: ${t.title}`, `${t.projects?.name || ''} · ${pname(t.assignee_id, t.assignee_name)} · ${dateAr(t.due_date)}`, `#/project/${t.project_id}/tasks`, t.due_date, 'متابعة', true));
   }
+  const chNeeds = chs.filter(c => (admin || c.projects?.engineer_id === me) && ((c.due_date && c.due_date < today()) || (Number(c.score || 0) >= 8 && !tasks.some(t => t.challenge_id === c.id))));
+  chNeeds.slice(0, 6).forEach(c => push('d', 'alert', `${c.due_date && c.due_date < today() ? 'تحدٍ تجاوز موعده' : 'تحدٍ بدرجة ' + c.score + ' بلا مهام'}: ${c.title}`, `${c.projects?.name || ''}${c.due_date ? ' · الموعد ' + dateAr(c.due_date) : ''}`, `#/challenges?id=${c.id}`, c.due_date || c.created_at, admin ? 'كلّف بمهمة' : 'متابعة', true));
   if (admin) D_changes.forEach(c => push('a', 'edit', `أمر تغيير رقم ${c.no}: ${c.title}`, `${c.projects?.name || ''}${c.amount ? ' · ' + money(c.amount) + ' ر.س' : ''}${c.days ? ' · ' + c.days + ' يوم' : ''}`, `#/project/${c.project_id}/changes`, c.requested_on, 'اعتماد'));
   D_warr.forEach(p => push('a', 'clock', `فترة الضمان تنتهي ${dateAr(p.warranty_end)}: ${p.name}`, 'جولة فحص العيوب قبل الانتهاء', `#/project/${p.id}/closeout`, p.warranty_end, 'عرض', p.warranty_end < today()));
   expiring.forEach(d => push('a', 'doc', `${d.category === 'bank_guarantee' ? 'ضمان بنكي' : 'وثيقة تأمين'} ${d.expiry_date < today() ? 'منتهية' : 'تنتهي ' + dateAr(d.expiry_date)}`, `${d.projects?.name || ''} · ${d.title}`, `#/project/${d.project_id}/docs`, d.expiry_date, 'عرض', d.expiry_date < today()));
@@ -218,7 +220,7 @@ export async function mountProject(root, id, tab = 'overview', sub) {
   const t = $('#ptab');
   if (tab === 'overview') overview(t, p, edit);
   else if (tab === 'boq') boqList(t, p, edit);
-  else if (tab === 'challenges') challenges(t, p, edit);
+  else if (tab === 'challenges') projectChallenges(t, p);
   else if (tab === 'tasks') projectTasks(t, p);
   else if (tab === 'requests') projectRequests(t, p);
   else if (tab === 'payments') projectPayments(t, p);
@@ -241,7 +243,7 @@ async function overview(t, p, edit) {
   const [tasks, reqs, chs, pays, subs, docs, ups, log, trs] = await Promise.all([
     q(sb.from('tasks').select('id,title,status,due_date,assignee_id,assignee_name').eq('project_id', p.id).in('status', ['open', 'in_progress'])),
     q(sb.from('requests').select('id,title,status').eq('project_id', p.id).in('status', ['new', 'in_review'])),
-    q(sb.from('challenges').select('id,title,severity,status').eq('project_id', p.id).neq('status', 'مغلق')),
+    q(sb.from('challenges').select('id,title,severity,score,status,due_date').eq('project_id', p.id).neq('status', 'مغلق')),
     q(sb.from('payments').select('id,no,status,net_amount,retention_amount,work_amount,kind').eq('project_id', p.id)),
     q(sb.from('submittals').select('id,no,rev,title,status,due_on').eq('project_id', p.id).neq('status', 'decided')),
     q(sb.from('documents').select('id,category,title,expiry_date').eq('project_id', p.id)),
@@ -260,7 +262,7 @@ async function overview(t, p, edit) {
   const payW = pays.filter(x => ['submitted', 'review', 'approved', 'finance'].includes(x.status)); if (payW.length) att.push(['a', 'coins', `${payW.length} مستخلص قيد الاعتماد / لدى المالية`, money(Math.round(payW.reduce((a, x) => a + Number(x.net_amount || 0), 0))) + ' ر.س', `#/project/${p.id}/payments`]);
   const lateT = tasks.filter(x => x.due_date && x.due_date < today()); if (lateT.length) att.push(['d', 'check', `${lateT.length} مهمة متأخرة`, lateT.map(x => x.title).slice(0, 2).join('، '), `#/project/${p.id}/tasks`]);
   if (reqs.length) att.push(['b', 'inbox', `${reqs.length} طلب بانتظار رد الإدارة`, '', `#/project/${p.id}/requests`]);
-  chs.filter(c => ['حرجة', 'عالية'].includes(c.severity)).forEach(c => att.push(['d', 'alert', `تحدٍ ${c.severity}: ${c.title}`, '', `#/project/${p.id}/challenges`]));
+  chs.filter(c => Number(c.score || 0) >= 8 || (c.due_date && c.due_date < today())).forEach(c => att.push(['d', 'alert', `${c.due_date && c.due_date < today() ? 'تحدٍ تجاوز موعده' : 'تحدٍ بدرجة ' + c.score}: ${c.title}`, '', `#/challenges?id=${c.id}`]));
   const retention = pays.filter(x => ['approved', 'finance', 'paid'].includes(x.status)).reduce((a, x) => a + Number(x.retention_amount || 0), 0);
   const timeline = [...ups.map(u => ({ at: u.happened_on, ic: ({ visit: '📍', issue: '⚠', payment: '💰', letter: '✉', milestone: '★' })[u.kind] || '•', t: u.body, s: `${UPDATE_KINDS[u.kind] || ''} · ${dateAr(u.happened_on)} · ${pname(u.created_by)}`, l: `#/project/${p.id}/updates` })), ...log.map(l => ({ at: l.at, ic: '🚩', t: `انتقل إلى مرحلة ${stageOf(l.to_stage).ar}`, s: `${dateAr(l.at)}${l.note ? ' · ' + l.note : ''}`, l: `#/project/${p.id}/log` })), ...trs.map(r => ({ at: r.report_date, ic: '📋', t: r.title, s: dateAr(r.report_date), l: `#/treport/${r.id}` }))].sort((a, b) => (b.at || '').localeCompare(a.at || '')).slice(0, 7);
   t.innerHTML = `<div class="g3">
@@ -295,21 +297,6 @@ async function updates(t, p, edit) {
   if (edit) $('#uNew').onclick = () => modal(`<form id="f" class="pgrid">${field('النوع', sel('kind', Object.entries(UPDATE_KINDS), 'note'))}${field('التاريخ', inp('happened_on', today(), 'type="date"'))}${field('رقم المرجع / الخطاب (اختياري)', inp('ref_no', ''))}${field('المبلغ (للمستخلصات)', money_inp('amount', ''))}${field('النص *', `<textarea name="body" rows="4" required></textarea>`, 'wide')}<div class="btnrow end wide"><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">حفظ</button></div></form>`, { title: 'تحديث جديد', onOpen: (w, close) => {
     $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target); try { await q(sb.from('project_updates').insert({ project_id: p.id, kind: f.kind, happened_on: f.happened_on, ref_no: f.ref_no, amount: f.amount ? Number(f.amount) : null, body: f.body.trim(), created_by: session.user.id })); close(); updates(t, p, edit); } catch (er) { err(er); } };
   } });
-}
-const CH_CATS = ['فني', 'تعاقدي', 'مالي', 'تنظيمي', 'إداري', 'أخرى'], SEV = ['منخفضة', 'متوسطة', 'عالية', 'حرجة'], LIK = ['منخفضة', 'متوسطة', 'عالية'], CH_ST = ['مفتوح', 'قيد المعالجة', 'مغلق'];
-const sevBadge = s => `<span class="badge ${s === 'حرجة' ? 'bad' : s === 'عالية' ? 'ovr' : 'skel'}">${esc(s)}</span>`;
-async function challenges(t, p, edit) {
-  const rows = await q(sb.from('challenges').select('*').eq('project_id', p.id).order('status').order('id', { ascending: false }));
-  t.innerHTML = `<div class="pcard"><div class="toolbar"><h2><span class="ic"></span>التحديات والمخاطر <span class="muted">(${rows.filter(r => r.status !== 'مغلق').length} مفتوح من ${rows.length})</span></h2><span style="flex:1"></span>${edit ? '<button class="btn primary" id="cNew">＋ تحدٍ جديد</button>' : ''}</div>
-    ${rows.length ? `<table class="lst"><thead><tr><th>التحدي</th><th>التصنيف</th><th>الخطورة</th><th>الاحتمالية</th><th>الأثر</th><th>الإجراء</th><th>المسؤول</th><th>الموعد</th><th>الحالة</th>${edit ? '<th></th>' : ''}</tr></thead><tbody>${rows.map(c => `<tr class="${c.status === 'مغلق' ? 'off' : ''}"><td><b>${esc(c.title)}</b><br><span class="muted">رُصد ${dateAr(c.detected_on)}</span></td><td>${esc(c.category || '')}</td><td>${sevBadge(c.severity)}</td><td>${esc(c.likelihood || '')}</td><td class="muted">${c.impact_days ? c.impact_days + ' يوم' : ''}${c.impact_days && c.impact_amount ? ' · ' : ''}${c.impact_amount ? money(c.impact_amount) + ' ر.س' : ''}</td><td class="muted">${esc(c.action || '')}</td><td>${esc(c.owner || '')}</td><td>${dateAr(c.due_date)}</td><td><span class="badge ${c.status === 'مغلق' ? 'full' : c.status === 'مفتوح' ? 'bad' : 'ovr'}">${esc(c.status)}</span></td>${edit ? `<td><button class="btn sm" data-ce="${c.id}">تعديل</button></td>` : ''}</tr>`).join('')}</tbody></table>` : '<p class="muted">لا توجد تحديات مسجلة.</p>'}</div>`;
-  const form = c => `<form id="f" class="pgrid">${field('وصف التحدي *', `<textarea name="title" rows="2" required>${esc(c?.title || '')}</textarea>`, 'wide')}${field('التصنيف', sel('category', CH_CATS, c?.category || 'فني'))}${field('درجة الخطورة', sel('severity', SEV, c?.severity || 'متوسطة'))}${field('الاحتمالية', sel('likelihood', LIK, c?.likelihood || 'متوسطة'))}${field('الحالة', sel('status', CH_ST, c?.status || 'مفتوح'))}${field('تأثير زمني (أيام)', inp('impact_days', c?.impact_days ?? '', 'type="number" min="0"'))}${field('تأثير مالي (ر.س)', money_inp('impact_amount', c?.impact_amount ?? ''))}${field('تاريخ الرصد', inp('detected_on', c?.detected_on || today(), 'type="date"'))}${field('الموعد المستهدف', inp('due_date', c?.due_date || '', 'type="date"'))}${field('المسؤول', inp('owner', c?.owner || p.engineer_name || ''))}${field('الإجراء المتخذ', `<textarea name="action" rows="2">${esc(c?.action || '')}</textarea>`, 'wide')}${field('ملاحظات', `<textarea name="notes" rows="2">${esc(c?.notes || '')}</textarea>`, 'wide')}<div class="btnrow end wide">${c ? '<button type="button" class="btn danger" data-del>حذف</button>' : ''}<span style="flex:1"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">حفظ</button></div></form>`;
-  const open = c => modal(form(c), { title: c ? 'تعديل التحدي' : 'تحدٍ جديد', wide: true, onOpen: (w, close) => {
-    $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target); const n = v => v === '' ? null : Number(v);
-      const row = { project_id: p.id, title: f.title.trim(), category: f.category, severity: f.severity, likelihood: f.likelihood, status: f.status, impact_days: n(f.impact_days), impact_amount: n(f.impact_amount), detected_on: f.detected_on || null, due_date: f.due_date || null, owner: f.owner.trim(), action: f.action.trim(), notes: f.notes.trim() };
-      try { if (c) await q(sb.from('challenges').update(row).eq('id', c.id)); else await q(sb.from('challenges').insert({ ...row, created_by: session.user.id })); close(); challenges(t, p, edit); } catch (er) { err(er); } };
-    const del = $('[data-del]', w); if (del) del.onclick = async () => { if (!await confirm('حذف هذا التحدي؟', 'حذف', true)) return; await q(sb.from('challenges').delete().eq('id', c.id)); close(); challenges(t, p, edit); };
-  } });
-  if (edit) { $('#cNew').onclick = () => open(null); $$('[data-ce]', t).forEach(b => b.onclick = () => open(rows.find(x => x.id === +b.getAttribute('data-ce')))); }
 }
 async function stageLog(t, p) {
   const log = await q(sb.from('project_stage_log').select('*').eq('project_id', p.id).order('at', { ascending: false }));

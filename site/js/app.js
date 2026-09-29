@@ -6,7 +6,7 @@ const app = $('#app');
 const NAV = [
   ['today', 'يومي', 'sun'], ['dashboard', 'لوحة المؤشرات', 'dash'], ['projects', 'المشاريع', 'folder'],
   ['sec', 'المتابعة'],
-  ['tasks', 'المهام', 'check'], ['requests', 'الطلبات', 'inbox'], ['treports', 'التقارير الفنية والمحاضر', 'file'],
+  ['tasks', 'المهام', 'check'], ['requests', 'الطلبات', 'inbox'], ['challenges', 'التحديات والمخاطر', 'alert'], ['treports', 'التقارير الفنية والمحاضر', 'file'],
   ['sec', 'المستندات والمالية'],
   ['submittals', 'الاعتمادات', 'stamp'], ['documents', 'المستندات الرسمية', 'doc'], ['drawings', 'المخططات', 'draw'], ['payments', 'المستخلصات', 'coins'],
   ['sec', 'النظام'],
@@ -107,6 +107,7 @@ async function route() {
     else if (parts[0] === 'project') { await ensureRef(); const { mountProject } = await import('./projects.js'); await mountProject(m, parts[1], parts[2] || 'overview', parts[3]); }
     else if (parts[0] === 'tasks') { const { mountTasks } = await import('./tasks.js'); await mountTasks(m, params); }
     else if (parts[0] === 'requests') { const { mountRequests } = await import('./tasks.js'); await mountRequests(m, params); }
+    else if (parts[0] === 'challenges') { const { mountChallenges } = await import('./challenges.js'); await mountChallenges(m, params); }
     else if (parts[0] === 'payments') { const { mountPayments } = await import('./payments.js'); await mountPayments(m, params); }
     else if (parts[0] === 'treports') { const { mountTReports } = await import('./treports.js'); await mountTReports(m, params); }
     else if (parts[0] === 'treport') { const t = await import('./treports.js'); if (parts[1] === 'new') await t.mountTReportEditor(m, null, params); else if (parts[2] === 'edit') await t.mountTReportEditor(m, parts[1], params); else await t.mountTReport(m, parts[1]); }

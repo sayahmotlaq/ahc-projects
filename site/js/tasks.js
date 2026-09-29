@@ -38,7 +38,7 @@ export async function taskForm(t, project, done, preset = null) {
   await modal(html, { title: t ? (admin ? 'تعديل المهمة' : 'تحديث حالة المهمة') : 'مهمة جديدة', wide: admin, onOpen: (w, close) => {
     $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target);
       try {
-        if (admin) { const row = { project_id: project.id, title: f.title.trim(), details: f.details.trim(), assignee_id: f.assignee_id || null, assignee_name: f.assignee_name.trim(), priority: f.priority, due_date: f.due_date || null }; if (preset?.report_id) row.report_id = preset.report_id; if (t) { row.status = f.status; row.progress_note = f.progress_note; await q(sb.from('tasks').update(row).eq('id', t.id)); } else await q(sb.from('tasks').insert({ ...row, created_by: me })); }
+        if (admin) { const row = { project_id: project.id, title: f.title.trim(), details: f.details.trim(), assignee_id: f.assignee_id || null, assignee_name: f.assignee_name.trim(), priority: f.priority, due_date: f.due_date || null }; if (preset?.report_id) row.report_id = preset.report_id; if (preset?.challenge_id) row.challenge_id = preset.challenge_id; if (t) { row.status = f.status; row.progress_note = f.progress_note; await q(sb.from('tasks').update(row).eq('id', t.id)); } else await q(sb.from('tasks').insert({ ...row, status: 'open', created_by: me })); }
         else await q(sb.from('tasks').update({ status: f.status, progress_note: f.progress_note }).eq('id', t.id));
         toast('تم الحفظ'); close(); done();
       } catch (er) { err(er); } };
