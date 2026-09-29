@@ -10,7 +10,7 @@ const NAV = [
   ['sec', 'المستندات والمالية'],
   ['submittals', 'الاعتمادات', 'stamp'], ['documents', 'المستندات الرسمية', 'doc'], ['drawings', 'المخططات', 'draw'], ['payments', 'المستخلصات', 'coins'],
   ['sec', 'النظام'],
-  ['report', 'التقارير', 'chart'], ['ref', 'المرجع الفني', 'book'], ['settings', 'الإعدادات والإشعارات', 'bell'], ['admin', 'الإدارة', 'cog', 'admin']];
+  ['report', 'التقارير', 'chart'], ['performance', 'الأداء والإنجازات', 'users', 'admin'], ['me', 'إنجازاتي', 'users', 'engineer'], ['ref', 'المرجع الفني', 'book'], ['settings', 'الإعدادات والإشعارات', 'bell'], ['admin', 'الإدارة', 'cog', 'admin']];
 const ALIAS = { treport: 'treports', project: 'projects' };
 const BOTTOM = [['dashboard', 'المؤشرات', 'dash'], ['projects', 'المشاريع', 'folder'], ['tasks', 'المهام', 'check'], ['treports', 'التقارير', 'file'], ['more', 'المزيد', 'menu']];
 
@@ -110,6 +110,8 @@ async function route() {
     else if (parts[0] === 'treport') { const t = await import('./treports.js'); if (parts[1] === 'new') await t.mountTReportEditor(m, null, params); else if (parts[2] === 'edit') await t.mountTReportEditor(m, parts[1], params); else await t.mountTReport(m, parts[1]); }
     else if (parts[0] === 'documents') { const { mountDocsAll } = await import('./docs.js'); await mountDocsAll(m, params); }
     else if (parts[0] === 'drawings') { const { mountDrawingsAll } = await import('./docs.js'); await mountDrawingsAll(m, params); }
+    else if (parts[0] === 'performance') { const pf = await import('./perf.js'); if (parts[1]) await pf.mountPerson(m, parts[1], params); else await pf.mountPerformance(m, params); }
+    else if (parts[0] === 'me') { const { mountMyWork } = await import('./perf.js'); await mountMyWork(m, params); }
     else if (parts[0] === 'settings') { const { mountSettings } = await import('./notif.js'); await mountSettings(m); }
     else if (parts[0] === 'submittals') { const { mountSubmittals } = await import('./docs.js'); await mountSubmittals(m, params); }
     else if (parts[0] === 'report') { const { mountReport } = await import('./report.js'); await mountReport(m, parts[1] || 'general', params); }
