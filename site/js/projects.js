@@ -1,6 +1,7 @@
 // ===== المشاريع: لوحة المؤشرات، القائمة، بطاقة المشروع =====
-import { sb, REF, STAGES, stageOf, PROJECT_TYPES, UPDATE_KINDS, canEdit, isAdmin, role, q, session, today } from './api.js';
+import { sb, REF, STAGES, stageOf, PROJECT_TYPES, UPDATE_KINDS, canEdit, isAdmin, role, q, session, today, SETTINGS } from './api.js';
 import { $, $$, esc, fmt, fmt0, money, dateAr, toast, err, modal, confirm, field, inp, sel, formData, ico, money_inp } from './ui.js';
+import { exportTable, xbtn } from './xlsx.js';
 import { mountBoq, calc, BOQ_STATUS } from './boq.js';
 import { projectTasks, projectRequests } from './tasks.js';
 import { projectPayments } from './payments.js';
@@ -101,7 +102,7 @@ export async function mountDashboard(root) {
 const NOT_STARTED = ['request', 'study', 'approval', 'tender', 'award'];
 export const groupOf = p => p.category === 'شراكة مجتمعية' ? 'partner' : (NOT_STARTED.includes(p.stage) ? 'study' : 'gov');
 const GROUPS = [['gov', 'المشاريع الحكومية'], ['partner', 'الشراكة المجتمعية'], ['study', 'تحت الدراسة (الطلبات الجديدة)'], ['all', 'الكل']];
-export const STALE_DAYS = 14;
+export const STALE_DAYS = Number(SETTINGS.stale_days) || 14;
 export const FINISHED = ['handover', 'warranty', 'closed', 'cancelled'];
 // متأخر/متعثر فقط أثناء التنفيذ — بعد الاستلام الابتدائي يُعتبر المشروع منتهياً
 export const isLate = p => p.stage === 'execution' && !!(p.status_note || (p.end_date && p.end_date < today()));
@@ -112,7 +113,7 @@ const daysAgo = d => d ? Math.floor((Date.now() - new Date(d)) / 864e5) : null;
 export async function mountProjects(root, params) {
   const edit = canEdit();
   const g0 = params.get('g') || (params.get('cat') === 'شراكة مجتمعية' ? 'partner' : params.get('cat') ? 'gov' : 'gov');
-  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">المشاريع</h1><span style="flex:1"></span>${edit ? '<button class="btn primary" id="pNew">＋ مشروع جديد</button>' : ''}</div>
+  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">المشاريع</h1><span style="flex:1"></span>${xbtn()}${edit ? '<button class="btn primary" id="pNew">＋ مشروع جديد</button>' : ''}</div>
     <div class="tabs" id="gtabs">${GROUPS.map(([k, t]) => `<a href="#/projects?g=${k}" class="${g0 === k ? 'on' : ''}" data-g="${k}">${t} <span class="cnt" data-cnt="${k}"></span></a>`).join('')}</div>
     <div class="filters"><input id="fq" placeholder="بحث بالاسم أو الرقم أو المنشأة أو المقاول…"><select id="fStage"><option value="">كل المراحل</option>${STAGES.map(s => `<option value="${s.key}" ${params.get('stage') === s.key ? 'selected' : ''}>${esc(s.ar)}</option>`).join('')}</select><select id="fEng"><option value="">كل مديري المشاريع</option></select><select id="fPr"><option value="">كل الأولويات</option><option value="urgent">عاجلة</option><option value="high">مهمة</option><option value="normal">عادية</option></select><select id="fFlag"><option value="">بدون تصفية إضافية</option><option value="late">المتأخرة / المتعثرة</option><option value="stale">بلا تحديث منذ ${STALE_DAYS} يوماً</option></select><select id="fSort"><option value="activity">الترتيب: آخر نشاط</option><option value="name">الاسم</option><option value="stage">المرحلة</option><option value="value_desc">القيمة (الأعلى)</option><option value="progress">الإنجاز</option><option value="end">تاريخ الانتهاء</option><option value="stale">الأقدم تحديثاً</option></select><label class="chk"><input type="checkbox" id="fArch"> المؤرشفة</label></div>
     <div id="plist"><p class="muted">جارٍ التحميل…</p></div>`;
@@ -127,11 +128,12 @@ export async function mountProjects(root, params) {
     let rows = all.filter(p => (arch || !p.archived) && (g === 'all' || groupOf(p) === g) && (!st || p.stage === st) && (!en || p._eng === en) && (!pr || p.priority === pr) && (fl !== 'late' || p._late) && (fl !== 'stale' || p._stale) && (!qs || [p.name, p.ref, p.facility, p.contractor, p.beneficiary].join(' ').toLowerCase().includes(qs)));
     const si = k => STAGES.findIndex(s => s.key === k);
     const cmp = { activity: (a, b) => (b._act || '').localeCompare(a._act || ''), name: (a, b) => a.name.localeCompare(b.name, 'ar'), stage: (a, b) => si(a.stage) - si(b.stage) || a.name.localeCompare(b.name, 'ar'), value_desc: (a, b) => Number(b.contract_value || b.budget || 0) - Number(a.contract_value || a.budget || 0), progress: (a, b) => Number(b.progress_actual || 0) - Number(a.progress_actual || 0), end: (a, b) => (a.end_date || '9999').localeCompare(b.end_date || '9999'), stale: (a, b) => (a._act || '').localeCompare(b._act || '') }[so];
-    rows.sort(cmp);
+    rows.sort(cmp); root._rows = rows;
     const study = g === 'study';
     $('#plist').innerHTML = rows.length ? `<div class="pcard" style="padding:0;overflow:auto"><table class="lst"><thead><tr><th>م</th><th>المشروع</th>${study ? '<th>الأولوية</th><th>البرنامج المالي</th>' : '<th>الفئة</th>'}<th>المرحلة</th><th>مدير المشروع</th><th class="c">${study ? 'الميزانية التقديرية' : 'قيمة العقد'} (ر.س)</th>${study ? '<th>الطرح / الترسية</th>' : '<th class="c">الإنجاز</th><th>الانتهاء</th>'}<th>آخر نشاط</th></tr></thead><tbody>${rows.map((p, i) => `<tr data-open="${p.id}" class="${p.archived ? 'off' : ''}"><td class="c">${i + 1}</td><td><b>${esc(p.name)}</b>${p._stale ? ' <span class="badge ovr" title="بلا تحديث منذ أسبوعين">⏳ بلا تحديث</span>' : ''}<br><span class="muted">${esc(p.ref || '')} ${esc(p.facility || p.beneficiary || '')}</span></td>${study ? `<td>${p.priority === 'urgent' ? '<span class="badge bad">عاجلة</span>' : p.priority === 'high' ? '<span class="badge ovr">مهمة</span>' : 'عادية'}</td><td>${esc(p.funding || '—')}</td>` : `<td>${esc(p.category || '—')}</td>`}<td>${stageBadge(p.stage)}${p.status_note && p.stage === 'execution' ? ` <span class="badge bad">${esc(p.status_note)}</span>` : ''}</td><td>${esc(p._eng)}</td><td class="c n">${money(study ? p.budget : (p.contract_value || p.budget))}</td>${study ? `<td>${dateAr(p.tender_date)} / ${dateAr(p.award_date)}</td>` : `<td class="c">${p.stage === 'execution' ? `<div class="bar"><i style="width:${p.progress_actual || 0}%"></i></div>${p.progress_actual || 0}%` : '—'}</td><td class="${p._late ? 'bad' : ''}">${dateAr(p.end_date)}</td>`}<td class="${p._stale ? 'bad' : 'muted'}">${daysAgo(p._act) === 0 ? 'اليوم' : 'منذ ' + daysAgo(p._act) + ' يوم'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty-boq">لا توجد مشاريع مطابقة</div>';
     $$('[data-open]', root).forEach(tr => tr.onclick = () => location.hash = '#/project/' + tr.getAttribute('data-open'));
   }
+  $('#xl').onclick = () => exportTable('المشاريع - ' + today(), 'المشاريع', [{ h: 'المشروع', k: 'name', w: 44 }, { h: 'الرقم', k: 'ref', w: 14 }, { h: 'الفئة', k: 'category', w: 14 }, { h: 'النوع', k: 'type', w: 14 }, { h: 'المرحلة', k: p => stageOf(p.stage).ar, w: 14 }, { h: 'مدير المشروع', k: '_eng', w: 18 }, { h: 'المنشأة', k: 'facility', w: 24 }, { h: 'المقاول', k: 'contractor', w: 22 }, { h: 'الميزانية التقديرية', k: 'budget', t: 'money', w: 16 }, { h: 'قيمة العقد', k: 'contract_value', t: 'money', w: 16 }, { h: 'المصروف', k: 'paid_amount', t: 'money', w: 16 }, { h: 'الإنجاز المخطط %', k: 'progress_planned', t: 'int', w: 12 }, { h: 'الإنجاز الفعلي %', k: 'progress_actual', t: 'int', w: 12 }, { h: 'المباشرة', k: 'start_date', t: 'date', w: 12 }, { h: 'الانتهاء', k: 'end_date', t: 'date', w: 12 }, { h: 'الحالة', k: p => p._late ? (p.status_note || 'متأخر') : p._stale ? 'بلا تحديث' : '', w: 12 }], root._rows || [], { title: 'قائمة المشاريع', subtitle: 'تجمع الأحساء الصحي — إدارة الخدمات الفنية / قسم المشاريع · ' + today() });
   if (params.get('flag')) $('#fFlag').value = params.get('flag');
   ['fq', 'fStage', 'fEng', 'fPr', 'fFlag', 'fSort', 'fArch'].forEach(id => $('#' + id).oninput = render);
   if (edit) $('#pNew').onclick = () => editProject(null, id => location.hash = '#/project/' + id);

@@ -1,6 +1,7 @@
 // ===== المستخلصات المالية =====
 import { sb, canEdit, isAdmin, role, q, session, today } from './api.js';
 import { $, $$, esc, money, fmt, dateAr, toast, err, modal, confirm, field, inp, sel, formData, money_inp } from './ui.js';
+import { exportTable, xbtn } from './xlsx.js';
 
 export const P_STATUS = { draft: 'مسودة', submitted: 'مقدَّم', review: 'قيد المراجعة', approved: 'معتمد', finance: 'محال للمالية', paid: 'مصروف', rejected: 'مرفوض' };
 export const P_KIND = { advance: 'دفعة مقدمة', interim: 'مستخلص جارٍ', final: 'مستخلص ختامي', retention_release: 'إفراج عن الضمان' };
@@ -149,7 +150,7 @@ export async function projectPayments(t, p) {
 
 // ---------- الصفحة العامة
 export async function mountPayments(root, params) {
-  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">المستخلصات المالية</h1></div>
+  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">المستخلصات المالية</h1><span style="flex:1"></span>${xbtn()}</div>
     <div class="filters"><input id="fq" placeholder="بحث باسم المشروع أو رقم الفاتورة…"><select id="fSt"><option value="">قيد الإجراء (مقدَّم → لدى المالية)</option><option value="all">الكل</option>${Object.entries(P_STATUS).map(([k, v]) => `<option value="${k}" ${params.get('st') === k ? 'selected' : ''}>${v}</option>`).join('')}</select><select id="fK"><option value="">كل الأنواع</option>${Object.entries(P_KIND).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div><div id="kp"></div><div id="pl"><p class="muted">…</p></div>`;
   const all = await q(sb.from('payments').select('*, projects(name,contract_value)').order('id', { ascending: false }));
   const sum = arr => arr.reduce((a, r) => a + Number(r.net_amount || 0), 0);
@@ -158,8 +159,9 @@ export async function mountPayments(root, params) {
   $('#kp').innerHTML = `<div class="kpis"><a class="kpi ${pend.length ? 'bad' : ''}" href="#/payments?st=submitted"><b>${pend.length}</b><span>قيد الاعتماد · ${money(Math.round(sum(pend)))} ر.س</span></a><a class="kpi ${fin.length ? 'bad' : ''}" href="#/payments?st=finance"><b>${fin.length}</b><span>لدى المالية · ${money(Math.round(sum(fin)))} ر.س</span></a><div class="kpi"><b>${money(Math.round(sum(thisYear)))}</b><span>مصروف هذا العام (${thisYear.length} مستخلص)</span></div><div class="kpi"><b>${money(Math.round(sum(paid)))}</b><span>إجمالي المصروف عبر المستخلصات</span></div></div>`;
   const render = () => { const qs = $('#fq').value.toLowerCase(), st = $('#fSt').value, k = $('#fK').value;
     const rows = all.filter(r => (st === 'all' || (st ? r.status === st : [...PENDING, 'finance'].includes(r.status))) && (!k || r.kind === k) && (!qs || ((r.projects?.name || '') + ' ' + (r.contractor_invoice_no || '') + ' ' + (r.payment_order_no || '')).toLowerCase().includes(qs)));
-    $('#pl').innerHTML = rows.length ? `<div class="pcard" style="padding:0;overflow:auto">${payRows(rows, { project: true, totals: true })}</div>` : '<div class="empty-boq">لا توجد مستخلصات مطابقة</div>';
+    root._rows = rows; $('#pl').innerHTML = rows.length ? `<div class="pcard" style="padding:0;overflow:auto">${payRows(rows, { project: true, totals: true })}</div>` : '<div class="empty-boq">لا توجد مستخلصات مطابقة</div>';
     $$('[data-p]', root).forEach(b => b.onclick = async () => { const r = all.find(x => x.id === +b.getAttribute('data-p')); const proj = await q(sb.from('projects').select('*').eq('id', r.project_id).single()); const ex = all.filter(x => x.project_id === r.project_id); payDetail(r, proj, ex, () => mountPayments(root, params)); }); };
   if (params.get('st')) $('#fSt').value = params.get('st');
+  $('#xl').onclick = () => exportTable('المستخلصات - ' + today(), 'المستخلصات', [{ h: 'المشروع', k: r => r.projects?.name || '', w: 40 }, { h: 'رقم', k: 'no', t: 'int', w: 8 }, { h: 'النوع', k: r => P_KIND[r.kind], w: 16 }, { h: 'من', k: 'period_from', t: 'date', w: 12 }, { h: 'إلى', k: 'period_to', t: 'date', w: 12 }, { h: 'الأعمال التراكمية', k: 'cumulative_work', t: 'money', w: 16 }, { h: 'قيمة الأعمال', k: 'work_amount', t: 'money', w: 16 }, { h: 'الضريبة', k: 'vat_amount', t: 'money', w: 14 }, { h: 'حجز الضمان', k: 'retention_amount', t: 'money', w: 14 }, { h: 'استرداد المقدمة', k: 'advance_recovery', t: 'money', w: 14 }, { h: 'غرامات', k: 'penalty', t: 'money', w: 12 }, { h: 'خصومات أخرى', k: 'other_deductions', t: 'money', w: 12 }, { h: 'الصافي', k: 'net_amount', t: 'money', w: 16 }, { h: 'الحالة', k: r => P_STATUS[r.status], w: 16 }, { h: 'تاريخ التقديم', k: 'submitted_on', t: 'date', w: 12 }, { h: 'تاريخ الصرف', k: 'paid_on', t: 'date', w: 12 }, { h: 'أمر الدفع', k: 'payment_order_no', w: 14 }, { h: 'فاتورة المقاول', k: 'contractor_invoice_no', w: 14 }], root._rows || [], { title: 'المستخلصات المالية', subtitle: today() });
   ['fq', 'fSt', 'fK'].forEach(id => $('#' + id).oninput = render); render();
 }

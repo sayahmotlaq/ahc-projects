@@ -25,6 +25,7 @@ export const UPDATE_KINDS = { note: 'ملاحظة', visit: 'زيارة ميدا�
 
 // ---------- الجلسة
 export const session = { user: null, profile: null };
+export const SETTINGS = { org: { name: 'تجمع الأحساء الصحي', dept: 'إدارة الخدمات الفنية / قسم المشاريع' }, stale_days: 14, submittal_sla_days: 7, warranty_alert_days: 60, doc_expiry_alert_days: 30, perf_leaderboard: false };
 export async function loadSession() {
   const { data } = await sb.auth.getSession();
   session.user = data.session?.user || null;
@@ -32,6 +33,7 @@ export async function loadSession() {
   if (session.user) {
     const { data: p } = await sb.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
     session.profile = p;
+    try { const { data: st } = await sb.from('settings').select('key,value').in('key', ['org', 'stale_days', 'submittal_sla_days', 'warranty_alert_days', 'doc_expiry_alert_days', 'perf_leaderboard']); (st || []).forEach(r => { if (r.value !== null && r.value !== undefined) SETTINGS[r.key] = r.key === 'org' ? { ...SETTINGS.org, ...r.value } : r.value; }); } catch (e) { }
   }
   return session;
 }

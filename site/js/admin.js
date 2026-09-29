@@ -38,9 +38,16 @@ async function settings(t) {
   const rows = await q(sb.from('settings').select('*'));
   const get = k => rows.find(r => r.key === k)?.value;
   const org = get('org') || {}, admins = get('admin_emails') || [], rv = get('ref_version') || {};
-  t.innerHTML = `<div class="pcard"><h2><span class="ic"></span>إعدادات المنصة</h2><form id="f" class="pgrid">${field('اسم الجهة', inp('name', org.name || ''))}${field('الإدارة / القسم', inp('dept', org.dept || ''))}${field('إيميلات تصبح مدير نظام تلقائياً عند التسجيل (مفصولة بفواصل)', inp('admins', admins.join(', ')), 'wide')}<div class="btnrow end wide"><button class="btn primary">حفظ</button></div></form>
+  t.innerHTML = `<div class="pcard"><h2><span class="ic"></span>إعدادات المنصة</h2><form id="f" class="pgrid">${field('اسم الجهة', inp('name', org.name || ''))}${field('الإدارة / القسم', inp('dept', org.dept || ''))}${field('إيميلات تصبح مدير نظام تلقائياً عند التسجيل (مفصولة بفواصل)', inp('admins', admins.join(', ')), 'wide')}
+    <div class="wide"><h3 class="sub">قواعد المتابعة</h3></div>
+    ${field('مدة الرد على الاعتمادات (أيام)', inp('sla', get('submittal_sla_days') ?? 7, 'type="number" min="1" max="60"'))}
+    ${field('عتبة «بلا تحديث» (أيام)', inp('stale', get('stale_days') ?? 14, 'type="number" min="3" max="90"'))}
+    ${field('تنبيه انتهاء الضمان والتأمين قبل (أيام)', inp('docexp', get('doc_expiry_alert_days') ?? 30, 'type="number" min="7" max="180"'))}
+    ${field('تنبيه انتهاء فترة ضمان المشروع قبل (أيام)', inp('warr', get('warranty_alert_days') ?? 60, 'type="number" min="7" max="365"'))}
+    ${field('لوحة الشرف للمهندسين', sel('lb', [['false', 'غير مفعّلة (كل مهندس يرى نفسه ومتوسط الفريق)'], ['true', 'مفعّلة (يظهر ترتيب المهندس بين زملائه)']], String(get('perf_leaderboard') === true)), 'wide')}
+    <div class="btnrow end wide"><button class="btn primary">حفظ</button></div></form>
     <h3 class="sub">المرجع الفني</h3><p class="muted">إصدار البيانات: ${esc(JSON.stringify(rv))}</p><div class="btnrow"><button class="btn" id="clearCache">إعادة تحميل المرجع من الخادم</button></div></div>`;
-  $('#f', t).onsubmit = async e => { e.preventDefault(); const f = formData(e.target); try { await q(sb.from('settings').upsert([{ key: 'org', value: { name: f.name, dept: f.dept } }, { key: 'admin_emails', value: f.admins.split(/[,،]/).map(x => x.trim().toLowerCase()).filter(Boolean) }])); toast('تم الحفظ'); } catch (er) { err(er); } };
+  $('#f', t).onsubmit = async e => { e.preventDefault(); const f = formData(e.target); try { await q(sb.from('settings').upsert([{ key: 'org', value: { name: f.name, dept: f.dept } }, { key: 'admin_emails', value: f.admins.split(/[,،]/).map(x => x.trim().toLowerCase()).filter(Boolean) }, { key: 'submittal_sla_days', value: Number(f.sla) || 7 }, { key: 'stale_days', value: Number(f.stale) || 14 }, { key: 'doc_expiry_alert_days', value: Number(f.docexp) || 30 }, { key: 'warranty_alert_days', value: Number(f.warr) || 60 }, { key: 'perf_leaderboard', value: f.lb === 'true' }])); toast('تم الحفظ — تُطبّق الإعدادات عند إعادة تحميل الصفحة'); } catch (er) { err(er); } };
   $('#clearCache').onclick = () => { invalidateRef(); location.reload(); };
 }
 

@@ -1,6 +1,7 @@
 // ===== المهام (من الإدارة) والطلبات (من المهندسين) =====
 import { sb, canEdit, isAdmin, q, session, today } from './api.js';
 import { $, $$, esc, dateAr, toast, err, modal, confirm, field, inp, sel, formData } from './ui.js';
+import { exportTable, xbtn } from './xlsx.js';
 
 export const T_STATUS = { open: 'مفتوحة', in_progress: 'قيد التنفيذ', done: 'منجزة', cancelled: 'ملغاة' };
 export const R_STATUS = { new: 'جديد', in_review: 'قيد المراجعة', approved: 'معتمد', rejected: 'مرفوض', done: 'منفذ' };
@@ -101,13 +102,14 @@ export async function projectRequests(t, p) {
 export async function mountTasks(root, params) {
   await loadProfiles();
   const me = session.user.id;
-  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">المهام</h1></div>
+  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">المهام</h1><span style="flex:1"></span>${xbtn()}</div>
     <div class="filters"><input id="fq" placeholder="بحث…"><select id="fSt"><option value="">المفتوحة وقيد التنفيذ</option><option value="all">الكل</option>${Object.entries(T_STATUS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select><select id="fAs"><option value="">كل المكلفين</option>${!isAdmin() ? '' : ''}${profiles.filter(p => ['admin', 'engineer'].includes(p.role)).map(p => `<option value="${p.id}" ${params.get('me') && p.id === me ? 'selected' : ''}>${esc(p.full_name)}</option>`).join('')}</select><label class="chk"><input type="checkbox" id="fLate"> المتأخرة فقط</label></div><div id="tl"><p class="muted">…</p></div>`;
   const all = await q(sb.from('tasks').select('*, projects(name)').order('due_date', { ascending: true, nullsFirst: false }).order('id', { ascending: false }));
   const render = () => { const qs = $('#fq').value.toLowerCase(), st = $('#fSt').value, as = $('#fAs').value, late = $('#fLate').checked;
     const rows = all.filter(t => (st === 'all' || (st ? t.status === st : ['open', 'in_progress'].includes(t.status))) && (!as || t.assignee_id === as) && (!late || isLate(t, ['done', 'cancelled'])) && (!qs || (t.title + ' ' + (t.details || '') + ' ' + (t.projects?.name || '')).toLowerCase().includes(qs)));
-    $('#tl').innerHTML = rows.length ? `<div class="pcard">${taskRows(rows, { project: true })}</div>` : '<div class="empty-boq">لا توجد مهام مطابقة</div>';
+    root._rows = rows; $('#tl').innerHTML = rows.length ? `<div class="pcard">${taskRows(rows, { project: true })}</div>` : '<div class="empty-boq">لا توجد مهام مطابقة</div>';
     $$('[data-t]', root).forEach(b => b.onclick = () => { const t = all.find(x => x.id === +b.getAttribute('data-t')); taskForm(t, { id: t.project_id }, () => mountTasks(root, params)); }); };
+  $('#xl').onclick = () => exportTable('المهام - ' + today(), 'المهام', [{ h: 'المشروع', k: t => t.projects?.name || '', w: 40 }, { h: 'المهمة', k: 'title', w: 40 }, { h: 'التفاصيل', k: 'details', w: 40 }, { h: 'المكلّف', k: t => pname(t.assignee_id, t.assignee_name), w: 18 }, { h: 'الأولوية', k: t => PRIO[t.priority] || '', w: 10 }, { h: 'الموعد', k: 'due_date', t: 'date', w: 12 }, { h: 'الحالة', k: t => T_STATUS[t.status] || t.status, w: 12 }, { h: 'ملاحظة الإنجاز', k: 'progress_note', w: 30 }], root._rows || [], { title: 'قائمة المهام', subtitle: today() });
   ['fq', 'fSt', 'fAs', 'fLate'].forEach(id => $('#' + id).oninput = render); render();
 }
 export async function mountRequests(root, params) {

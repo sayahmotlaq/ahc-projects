@@ -1,0 +1,46 @@
+name: Weekly backup
+on:
+  schedule:
+    - cron: '0 2 * * 5'
+  workflow_dispatch:
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      DB_URL: ${{ secrets.DB_URL }}
+      BACKUP_PASS: ${{ secrets.BACKUP_PASS }}
+      BACKUP_TOKEN: ${{ secrets.BACKUP_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install postgres client
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: Resolve database connection
+        id: db
+        run: |
+          REF=$(echo "$SUPABASE_URL" | sed -E 's#https://([a-z0-9]+)\.supabase\.co.*#\1#')
+          if [ -n "$DB_URL" ]; then CANDS="$DB_URL"; else CANDS=""; for host in aws-0-eu-central-1 aws-1-eu-central-1 aws-0-eu-west-1 aws-1-eu-west-1 aws-0-us-east-1 aws-1-us-east-1; do CANDS="$CANDS postgresql://postgres.$REF:PASS@$host.pooler.supabase.com:5432/postgres"; done; fi
+          for c in $CANDS; do url=$(python3 -c "import os,sys,urllib.parse; print(sys.argv[1].replace('PASS', urllib.parse.quote(os.environ['DB_PASSWORD'], safe='')))" "$c"); if PGCONNECT_TIMEOUT=8 psql "$url" -c 'select 1' >/dev/null 2>&1; then echo "url=$url" >> "$GITHUB_OUTPUT"; echo "connected via ${c#*@}"; exit 0; fi; done
+          echo "could not connect"; exit 1
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Dump and export
+        env:
+          DB_URL_RESOLVED: ${{ steps.db.outputs.url }}
+        run: |
+          D=$(date -u +%Y-%m-%d); mkdir -p out
+          pg_dump "$DB_URL_RESOLVED" -Fc --no-owner --no-privileges --schema=public --schema=private -f "out/ahc-$D.dump"
+          openssl enc -aes-256-cbc -pbkdf2 -salt -in "out/ahc-$D.dump" -out "out/ahc-$D.dump.enc" -pass env:BACKUP_PASS && rm "out/ahc-$D.dump"
+          npm install --silent --no-audit --no-fund pg exceljs
+          node scripts/backup_xlsx.mjs "out/ahc-$D.xlsx"
+          ls -la out
+      - name: Push to private backups repo
+        run: |
+          D=$(date -u +%Y-%m-%d)
+          git clone -q "https://x-access-token:${BACKUP_TOKEN}@github.com/sayahmotlaq/ahc-backups.git" bk
+          mkdir -p bk/weekly && cp out/* bk/weekly/
+          cd bk && ls weekly/*.xlsx 2>/dev/null | sort | head -n -12 | xargs -r git rm -q; ls weekly/*.enc 2>/dev/null | sort | head -n -12 | xargs -r git rm -q
+          git config user.name backup-bot; git config user.email bot@users.noreply.github.com
+          git add -A && git commit -qm "backup $D" && git push -q origin HEAD
+          echo "backup $D pushed"
