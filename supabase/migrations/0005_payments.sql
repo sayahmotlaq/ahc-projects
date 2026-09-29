@@ -1,6 +1,6 @@
 -- المستخلصات المالية + دور المالية
 alter table public.profiles drop constraint if exists profiles_role_check;
-alter table public.profiles add constraint profiles_role_check check (role in ('admin','engineer','viewer','finance','pending','disabled'));
+alter table public.profiles add constraint profiles_role_check check (role in ('admin','engineer','viewer','finance','clerk','pending','disabled'));
 create or replace function public.can_read() returns boolean
 language sql stable as $$ select public.my_role() in ('admin','engineer','viewer','finance') $$;
 create or replace function public.is_finance() returns boolean
