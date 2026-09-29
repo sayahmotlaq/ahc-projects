@@ -1,7 +1,7 @@
 // ===== التقارير: التقرير التنفيذي العام + التقرير المخصص =====
 import { sb, STAGES, stageOf, q, session, today } from './api.js';
 import { $, $$, esc, fmt, fmt0, money, dateAr, toast, err, ico } from './ui.js';
-import { groupOf, isStale, loadActivity, STALE_DAYS } from './projects.js';
+import { groupOf, isStale, isLate, loadActivity, STALE_DAYS } from './projects.js';
 import { P_STATUS, P_KIND } from './payments.js';
 
 const R_KIND = { approval: 'اعتماد', review: 'مراجعة', decision: 'قرار', support: 'دعم', other: 'أخرى' };
@@ -77,7 +77,7 @@ function generalReport(root, params) {
     const { projects, act, pn } = D; const inP = periodFn(from, to);
     const active = projects.filter(p => !['closed', 'cancelled'].includes(p.stage));
     const exec = projects.filter(p => p.stage === 'execution').sort((a, b) => Number(b.contract_value || 0) - Number(a.contract_value || 0));
-    const late = active.filter(p => p.status_note || (p.end_date && p.end_date < today() && p.stage === 'execution'));
+    const late = active.filter(isLate);
     const stale = active.filter(p => isStale(p, act));
     const closed = projects.filter(p => p.stage === 'closed');
     const totalV = active.reduce((a, p) => a + Number(p.contract_value || p.budget || 0), 0);
@@ -204,7 +204,7 @@ function customReport(root, params) {
     if (!S.length) blocks.push('<div class="rcard"><p class="muted">لم يتم اختيار أي مشروع.</p></div>');
     const active = S.filter(p => !['closed', 'cancelled'].includes(p.stage));
     const exec = S.filter(p => p.stage === 'execution');
-    const late = active.filter(p => p.status_note || (p.end_date && p.end_date < today() && p.stage === 'execution'));
+    const late = active.filter(isLate);
     const chsAll = D.chs.filter(c => ids.has(c.project_id) && inP(c.detected_on || c.created_at) || (ids.has(c.project_id) && !st.from && !st.to));
     const chs = st.all ? chsAll : chsAll.filter(c => c.status !== 'مغلق');
     const tasksAll = D.tasks.filter(t => ids.has(t.project_id) && (inP(t.created_at) || inP(t.done_at) || (!st.from && !st.to)));
