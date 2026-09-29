@@ -4,7 +4,7 @@ import { $, $$, esc, toast, err, modal, field, inp, formData, ico } from './ui.j
 
 const app = $('#app');
 const NAV = [
-  ['dashboard', 'لوحة المؤشرات', 'dash'], ['projects', 'المشاريع', 'folder'],
+  ['today', 'يومي', 'sun'], ['dashboard', 'لوحة المؤشرات', 'dash'], ['projects', 'المشاريع', 'folder'],
   ['sec', 'المتابعة'],
   ['tasks', 'المهام', 'check'], ['requests', 'الطلبات', 'inbox'], ['treports', 'التقارير الفنية والمحاضر', 'file'],
   ['sec', 'المستندات والمالية'],
@@ -12,7 +12,7 @@ const NAV = [
   ['sec', 'النظام'],
   ['report', 'التقارير', 'chart'], ['performance', 'الأداء والإنجازات', 'users', 'admin'], ['me', 'إنجازاتي', 'users', ['engineer', 'clerk']], ['ref', 'المرجع الفني', 'book'], ['settings', 'الإعدادات والإشعارات', 'bell'], ['admin', 'الإدارة', 'cog', 'admin']];
 const ALIAS = { treport: 'treports', project: 'projects' };
-const BOTTOM = [['dashboard', 'المؤشرات', 'dash'], ['projects', 'المشاريع', 'folder'], ['tasks', 'المهام', 'check'], ['treports', 'التقارير', 'file'], ['more', 'المزيد', 'menu']];
+const BOTTOM = [['today', 'يومي', 'sun'], ['dashboard', 'المؤشرات', 'dash'], ['projects', 'المشاريع', 'folder'], ['tasks', 'المهام', 'check'], ['more', 'المزيد', 'menu']];
 
 let projIndex = null;
 function shell(inner) {
@@ -22,7 +22,7 @@ function shell(inner) {
   const links = (cls) => navItems.map(n => n[0] === 'sec' ? `<div class="sec">${n[1]}</div>` : `<a href="#/${n[0]}" data-nav="${n[0]}" class="${cls}">${ico(n[2])}<span>${n[1]}</span><span class="cnt" data-cnt="${n[0]}"></span></a>`).join('');
   const mini = (() => { try { return localStorage.getItem('ahc_mini') === '1'; } catch (e) { return false; } })();
   app.innerHTML = `<div class="app2 ${mini ? 'mini' : ''}" id="app2">
-    <aside class="side"><a class="brand" href="#/dashboard"><img src="assets/logo.png" alt=""><div><b>منصة إدارة المشاريع</b><small>تجمع الأحساء الصحي</small></div></a>
+    <aside class="side"><a class="brand" href="#/today"><img src="assets/logo.png" alt=""><div><b>منصة إدارة المشاريع</b><small>تجمع الأحساء الصحي</small></div></a>
       <nav class="snav">${links('')}</nav>
       <button class="fold" id="fold" title="طيّ القائمة">${ico('fold')}</button></aside>
     <div class="mainwrap">
@@ -96,12 +96,13 @@ async function ensureRef() { if (REF.loaded) return; if (!refLoading) refLoading
 async function route() {
   if (!session.user) return authScreen('login');
   if (!canRead()) return pendingScreen();
-  const h = location.hash.replace(/^#\/?/, '') || 'dashboard';
+  const h = location.hash.replace(/^#\/?/, '') || 'today';
   const [path, query] = h.split('?'); const params = new URLSearchParams(query || '');
   const parts = path.split('/'); const main = $('#main'); if (!main) shell('');
   const m = $('#main'); setNav(parts[0]);
   try {
-    if (parts[0] === 'dashboard') { const { mountDashboard } = await import('./projects.js'); await mountDashboard(m); }
+    if (parts[0] === 'today') { const { mountToday } = await import('./today.js'); await mountToday(m); }
+    else if (parts[0] === 'dashboard') { const { mountDashboard } = await import('./projects.js'); await mountDashboard(m); }
     else if (parts[0] === 'projects') { const { mountProjects } = await import('./projects.js'); await mountProjects(m, params); }
     else if (parts[0] === 'project') { await ensureRef(); const { mountProject } = await import('./projects.js'); await mountProject(m, parts[1], parts[2] || 'overview', parts[3]); }
     else if (parts[0] === 'tasks') { const { mountTasks } = await import('./tasks.js'); await mountTasks(m, params); }
@@ -118,7 +119,7 @@ async function route() {
     else if (parts[0] === 'report') { const { mountReport } = await import('./report.js'); await mountReport(m, parts[1] || 'general', params); }
     else if (parts[0] === 'ref') { await ensureRef(); const { mountRef } = await import('./ref.js'); const code = parts[1] ? parts[1].replace(/-/g, ' ') : null; if (!m.querySelector('.refwrap')) mountRef(m, code); else if (code) { const { go } = await import('./ref.js'); go(code); } }
     else if (parts[0] === 'admin') { if (!isAdmin()) return location.hash = '#/dashboard'; const { mountAdmin } = await import('./admin.js'); await mountAdmin(m, parts[1] || 'users'); }
-    else location.hash = '#/dashboard';
+    else location.hash = '#/today';
   } catch (e) { err(e); m.innerHTML = `<div class="empty-boq">تعذّر التحميل: ${esc(e.message || e)}</div>`; }
 }
 window.addEventListener('hashchange', route);

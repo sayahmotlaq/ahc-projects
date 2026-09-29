@@ -14,8 +14,7 @@ const pname = (id, fallback) => profiles.find(p => p.id === id)?.full_name || fa
 const stageBadge = k => { const s = stageOf(k); return `<span class="stage" style="background:${s.color}">${esc(s.ar)}</span>`; };
 
 // ---------- لوحة المؤشرات
-export async function mountDashboard(root) {
-  root.innerHTML = '<div class="loading"><div class="spin"></div>جارٍ التحميل…</div>';
+export async function loadDashData() {
   const me = session.user.id; const admin = isAdmin(); const fin = role() === 'finance';
   const [projects] = await Promise.all([q(sb.from('projects').select('id,name,ref,facility,stage,priority,budget,contract_value,paid_amount,progress_actual,progress_planned,end_date,updated_at,engineer_id,engineer_name,status_note,category').eq('archived', false)), loadProfiles()]);
   const [chs, tasks, reqs, act, pays, subs, docsExp, trs, ups] = await Promise.all([
@@ -62,6 +61,12 @@ export async function mountDashboard(root) {
   }
   expiring.forEach(d => push('a', 'doc', `${d.category === 'bank_guarantee' ? 'ضمان بنكي' : 'وثيقة تأمين'} ${d.expiry_date < today() ? 'منتهية' : 'تنتهي ' + dateAr(d.expiry_date)}`, `${d.projects?.name || ''} · ${d.title}`, `#/project/${d.project_id}/docs`, d.expiry_date, 'عرض', d.expiry_date < today()));
   if (stale.length) push('d', 'clock', `${stale.length} مشاريع بلا أي تحديث منذ ${STALE_DAYS} يوماً`, stale.slice(0, 3).map(p => p.name).join(' · ') + (stale.length > 3 ? ' …' : ''), '#/projects?flag=stale', null, 'عرض');
+  return { me, admin, fin, projects, chs, tasks, reqs, act, pays, subs, docsExp, trs, ups, active, exec, late, stale, totalV, paid, avgA, avgP, expiring, lateTasks, subsLate, payPend, payFin, inbox, ago };
+}
+export async function mountDashboard(root) {
+  root.innerHTML = '<div class="loading"><div class="spin"></div>جارٍ التحميل…</div>';
+  const D = await loadDashData();
+  const { me, admin, fin, projects, chs, tasks, reqs, act, pays, subs, trs, ups, active, exec, late, stale, totalV, paid, avgA, avgP, expiring, lateTasks, subsLate, payPend, payFin, inbox, ago } = D;
   const byStage = STAGES.map(s => ({ ...s, n: projects.filter(p => p.stage === s.key).length })).filter(s => s.n);
   const groupsD = [['طلب ودراسة', ['request', 'study', 'approval'], '#8A8A8A'], ['تصميم وطرح', ['design', 'tender', 'award'], '#A98736'], ['تنفيذ', ['execution'], '#27A8DF'], ['استلام وضمان', ['handover', 'warranty'], '#2E8B57'], ['مقفل / موقوف', ['closed', 'onhold', 'cancelled'], '#123B5C']].map(([t, ks, c]) => ({ t, c, n: projects.filter(p => ks.includes(p.stage)).length }));
   let off = 25; const tot = projects.length || 1; const arcs = groupsD.filter(g => g.n).map(g => { const len = g.n / tot * 100; const h = `<circle cx="21" cy="21" r="15.9" fill="none" stroke="${g.c}" stroke-width="5" stroke-dasharray="${len} ${100 - len}" stroke-dashoffset="${off}"/>`; off -= len; return h; }).join('');

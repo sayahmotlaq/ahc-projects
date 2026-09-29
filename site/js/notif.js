@@ -3,7 +3,7 @@ import { sb, q, session } from './api.js';
 import { $, $$, esc, dateAr, toast, err, ico } from './ui.js';
 
 export const N_KINDS = { task: 'المهام', request: 'الطلبات', treport: 'التقارير الفنية', comment: 'التعليقات', payment: 'المستخلصات', submittal: 'الاعتمادات', challenge: 'التحديات العالية', stage: 'تغيير المراحل', stale: 'مشاريع بلا تحديث' };
-const ICON = { task: '✅', request: '📨', treport: '📋', comment: '💬', payment: '💰', submittal: '📐', challenge: '⚠️', stage: '🚩', stale: '⏳', info: 'ℹ️' };
+const ICON = { digest: '☀️', task: '✅', request: '📨', treport: '📋', comment: '💬', payment: '💰', submittal: '📐', challenge: '⚠️', stage: '🚩', stale: '⏳', info: 'ℹ️' };
 let cache = [], unread = 0, timer = null, open = false;
 const ago = d => { const m = Math.floor((Date.now() - new Date(d)) / 60000); return m < 1 ? 'الآن' : m < 60 ? `منذ ${m} د` : m < 1440 ? `منذ ${Math.floor(m / 60)} س` : dateAr(d); };
 
@@ -69,11 +69,12 @@ export async function mountSettings(root) {
     </div>
     <div class="pcard"><h2><span class="ic"></span>ما الذي يصلني على الجهاز؟</h2><p class="muted small">كل الإشعارات تظهر دائماً في الجرس داخل المنصة؛ هنا تختار ما يُدفع منها إلى جوالك.</p>
       <label class="chk" style="margin-bottom:8px"><input type="checkbox" id="pushAll" ${prefs.push === false ? '' : 'checked'}> إرسال الإشعارات إلى أجهزتي</label>
+      <label class="chk" style="margin-bottom:8px"><input type="checkbox" id="digest" ${prefs.digest === false ? '' : 'checked'}> ملخص الصباح (7:45) وختام اليوم (3:30) أيام العمل</label>
       <div class="chips">${Object.entries(N_KINDS).map(([k, v]) => `<label class="chip"><input type="checkbox" data-k="${k}" ${kinds[k] === false ? '' : 'checked'}> ${v}</label>`).join('')}</div>
       <div class="btnrow end" style="margin-top:10px"><button class="btn primary" id="savePrefs">حفظ التفضيلات</button></div></div></div>`;
   const on = $('#pOn'); if (on) on.onclick = async () => { on.disabled = true; try { await enablePush(); toast('تم تفعيل الإشعارات على هذا الجهاز'); mountSettings(root); } catch (e) { err(e); on.disabled = false; } };
   const off = $('#pOff'); if (off) off.onclick = async () => { try { await disablePush(); toast('أُوقفت الإشعارات على هذا الجهاز'); mountSettings(root); } catch (e) { err(e); } };
   const t = $('#pTest'); if (t) t.onclick = async () => { try { const reg = await navigator.serviceWorker.ready; await reg.showNotification('منصة إدارة المشاريع', { body: 'هذا إشعار تجريبي — الإشعارات تعمل على هذا الجهاز ✅', icon: 'assets/logo.png', dir: 'rtl', lang: 'ar' }); } catch (e) { err(e); } };
-  $('#savePrefs').onclick = async () => { const k = {}; $$('[data-k]').forEach(i => k[i.getAttribute('data-k')] = i.checked); try { await q(sb.from('profiles').update({ notify_prefs: { push: $('#pushAll').checked, kinds: k } }).eq('id', session.user.id)); toast('تم حفظ التفضيلات'); } catch (e) { err(e); } };
+  $('#savePrefs').onclick = async () => { const k = {}; $$('[data-k]').forEach(i => k[i.getAttribute('data-k')] = i.checked); try { await q(sb.from('profiles').update({ notify_prefs: { push: $('#pushAll').checked, digest: $('#digest').checked, kinds: k } }).eq('id', session.user.id)); toast('تم حفظ التفضيلات'); } catch (e) { err(e); } };
 }
 const devName = ua => /iphone/i.test(ua) ? 'آيفون' : /ipad/i.test(ua) ? 'آيباد' : /android/i.test(ua) ? 'أندرويد' : /macintosh/i.test(ua) ? 'ماك' : /windows/i.test(ua) ? 'ويندوز' : 'جهاز';
