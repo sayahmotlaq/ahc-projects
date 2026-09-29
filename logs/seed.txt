@@ -1,0 +1,81 @@
+run 36587424208 Tue Sep 29 15:06:18 UTC 2026
+DROP TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+DROP TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+DROP TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+DROP TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+DROP TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+DROP TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+DROP TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+DO
+CREATE FUNCTION
+DROP TRIGGER
+CREATE TRIGGER
+ALTER TABLE
+ALTER TABLE
+CREATE VIEW
+GRANT
+INSERT 0 0
+DROP POLICY
+DROP POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE FUNCTION
+CREATE FUNCTION
+psql:supabase/migrations/0011_project_ownership.sql:29: NOTICE:  LINK_DONE: 0 projects linked
+DO
+CREATE FUNCTION
+UPDATE 0
+UPDATE 0
+ALTER TABLE
+ALTER TABLE
+CREATE FUNCTION
+CREATE FUNCTION
+DROP POLICY
+DROP POLICY
+CREATE POLICY
+CREATE POLICY
+psql:supabase/migrations/0013_clerk_role.sql:13: NOTICE:  STORAGE_OK clerk
+DO
+ALTER TABLE
+CREATE FUNCTION
+divisions: 24 in file, 24 in db, 0 to write, 0 protected
+divisions: upserted 0
+sections: 551 in file, 551 in db, 0 to write, 0 protected
+sections: upserted 0
+items: 1802 in file, 1802 in db, 0 to write, 0 protected
+items: upserted 0
+variants: 12352 in file, 12352 in db, 0 to write, 0 protected
+variants: upserted 0
+ref_version 204 done
+node:internal/deps/undici/undici:14976
+      Error.captureStackTrace(err);
+            ^
+
+TypeError: fetch failed
+    at node:internal/deps/undici/undici:14976:13
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async api (file:///home/runner/work/ahc-projects/ahc-projects/scripts/import_projects.mjs:8:51)
+    at async file:///home/runner/work/ahc-projects/ahc-projects/scripts/import_projects.mjs:9:14 {
+  [cause]: Error: read ECONNRESET
+      at TLSWrap.onStreamRead (node:internal/stream_base_commons:218:20) {
+    errno: -104,
+    code: 'ECONNRESET',
+    syscall: 'read'
+  }
+}
+
+Node.js v20.20.2
