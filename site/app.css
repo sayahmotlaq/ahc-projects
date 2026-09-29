@@ -584,7 +584,7 @@ table.lst tfoot td{font-weight:700;background:var(--surface2)}
 .guide .steps{display:grid;gap:10px}
 .guide .step{display:flex;gap:12px;align-items:flex-start}
 .guide .step>i{flex:none;width:30px;height:30px;border-radius:50%;background:var(--navy);color:#fff;font-style:normal;font-weight:800;display:grid;place-items:center;font-size:14px}
-.guide .step b{display:block;margin-bottom:2px}
+.guide .step>div>b{display:block;margin-bottom:2px}
 .guide .step p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.75}
 .scurve text{font-family:inherit}
 table.gantt th{position:relative}
