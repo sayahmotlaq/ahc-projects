@@ -676,3 +676,39 @@ h2.m0,h3.m0,p.m0,.toolbar h2.m0{margin:0}
 .hb-legend{display:flex;gap:14px;margin-top:10px;font-size:11.5px;color:var(--muted)}
 .hb-legend i{display:inline-block;width:14px;height:8px;border-radius:4px;vertical-align:middle;margin-left:4px}
 .hb-legend .hb-paid{background:var(--lblue)}.hb-legend .hb-prog{width:2px;height:12px;background:var(--navy)}
+
+/* ===== الجوال: الجداول بطاقات، والنماذج صفحات كاملة ===== */
+@media (max-width:720px){
+  table.lst.cards,table.lst.cards tbody{display:block}
+  table.lst.cards thead{display:none}
+  table.lst.cards tbody{display:grid;gap:8px;padding:2px 0}
+  table.lst.cards tr{display:grid;grid-template-columns:1fr 1fr;gap:3px 12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;box-shadow:0 1px 2px rgba(18,59,92,.04)}
+  table.lst.cards tr[data-open]:active{background:var(--surface2)}
+  table.lst.cards td{display:flex;flex-direction:column;gap:1px;padding:3px 0!important;border:0!important;font-size:12.5px;min-width:0;text-align:right!important;direction:rtl}
+  table.lst.cards td::before{content:attr(data-l);font-size:10.5px;color:var(--muted);font-weight:700;line-height:1.3}
+  table.lst.cards td.m-title{grid-column:1/-1;font-size:14px;line-height:1.5;padding-bottom:5px!important;border-bottom:1px solid var(--line2)!important;margin-bottom:3px}
+  table.lst.cards td.m-title::before{display:none}
+  table.lst.cards td.m-title{order:-2} table.lst.cards td.m-sub{order:-1;grid-column:1/-1;font-size:12px;margin-top:-4px;padding-bottom:6px!important} table.lst.cards td.m-sub::before{display:none}
+  table.lst.cards td{align-items:flex-start} table.lst.cards td.m-title,table.lst.cards td.m-sub{display:block}
+  table.lst.cards td.mh,table.lst.cards td.m-empty{display:none}
+  table.lst.cards td.m-act{grid-column:1/-1;flex-direction:row;flex-wrap:wrap;justify-content:flex-start;gap:6px;padding-top:8px!important;border-top:1px solid var(--line2)!important;margin-top:3px}
+  table.lst.cards td.m-act::before{display:none}
+  table.lst.cards td .bar{margin-top:3px}
+  table.lst.cards td.n{direction:rtl}
+  table.lst.cards tr.off{opacity:.55}
+  .pcard.flat{padding:10px!important;background:transparent;border:0;box-shadow:none}
+  .pcard.flat table.lst.cards tbody{padding:0}
+  /* النماذج: صفحة كاملة تنزلق من الأسفل مع أزرار ثابتة في القاع */
+  .mwrap{padding:0;align-items:flex-end}
+  .modal{max-width:none;border-radius:18px 18px 0 0;max-height:96dvh;display:flex;flex-direction:column;overflow:hidden;animation:up .26s cubic-bezier(.2,.8,.2,1)}
+  .modal.wide,.modal:has(form#f){height:96dvh}
+  .mhead{flex:none;padding:12px 16px}
+  .mbody{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;padding:14px 16px calc(14px + env(safe-area-inset-bottom,0px))}
+  .pgrid{grid-template-columns:1fr;gap:9px}
+  .fld input,.fld select,.fld textarea{font-size:16px;padding:9px 10px}
+  .mbody form .btnrow.end{position:sticky;bottom:calc(-14px - env(safe-area-inset-bottom,0px));background:#fff;margin:6px -16px 0;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line2);z-index:2;flex-wrap:wrap}
+  .mbody form .btnrow.end .btn{flex:1 1 auto;justify-content:center;text-align:center;padding:10px 12px}
+  .mbody form .btnrow.end .btn.danger{flex:0 0 auto}
+  .filters{gap:6px} .filters select{flex:1 1 45%;min-width:0} .filters .chk{font-size:12px}
+  .toolbar{flex-wrap:wrap;gap:8px} .toolbar .btn{padding:7px 11px;font-size:13px}
+}

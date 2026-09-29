@@ -21,7 +21,7 @@ function countUp(b) {
   const raw = tn.textContent; const m = raw.match(/^(\s*[+−-]?)([\d,]+(?:\.\d+)?)(.*)$/); if (!m) return;
   const target = Number(m[2].replace(/,/g, '')); if (!isFinite(target) || target === 0) return;
   const dec = (m[2].split('.')[1] || '').length; const grouped = m[2].includes(','); const t0 = performance.now(); const dur = 650;
-  const step = now => { const k = Math.min(1, (now - t0) / dur); const e = 1 - Math.pow(1 - k, 3); const v = target * e; const s = dec ? v.toFixed(dec) : (grouped ? Math.round(v).toLocaleString('en') : String(Math.round(v))); tn.textContent = m[1] + s + m[3]; if (k < 1) requestAnimationFrame(step); else tn.textContent = raw; };
+  const step = now => { const k = Math.min(1, (now - t0) / dur); const e = 1 - Math.pow(1 - k, 3); const v = target * e; const s = grouped ? v.toLocaleString('en', { minimumFractionDigits: dec, maximumFractionDigits: dec }) : dec ? v.toFixed(dec) : String(Math.round(v)); tn.textContent = m[1] + s + m[3]; if (k < 1) requestAnimationFrame(step); else tn.textContent = raw; };
   requestAnimationFrame(step);
 }
 // رسم الأشرطة من الصفر إلى قيمتها
@@ -42,10 +42,26 @@ function emptyStates(root) {
   qa(root, '.empty-boq:not(.fx-empty)').forEach(el => { el.classList.add('fx-empty'); const txt = el.innerHTML; el.innerHTML = `${EMPTY_SVG}<div>${txt}</div>`; });
 }
 
+// تحويل الجداول إلى بطاقات على الجوال: يوسم الخلايا بعناوين أعمدتها (التنسيق يفعل الباقي تحت 720px)
+const SKIP_H = ['م', '#', ''];
+function cardify(root) {
+  qa(root, 'table.lst:not(.gantt):not(.nocard):not(.cards)').forEach(tb => {
+    if (tb.closest('.rep, .rpage, .print')) return;
+    const ths = [...(tb.tHead?.rows[0]?.cells || [])].map(th => th.textContent.trim()); if (!ths.length) return;
+    let ti = ths.findIndex(h => !SKIP_H.includes(h)); if (ti < 0) ti = 0; let si = -1; if (ths[ti] === 'المشروع' && ths.length > ti + 1 && !SKIP_H.includes(ths[ti + 1])) { si = ti; ti += 1; }
+    tb.classList.add('cards');
+    [...tb.tBodies].forEach(tbody => [...tbody.rows].forEach(tr => [...tr.cells].forEach((td, i) => {
+      const h = ths[i] ?? ''; if (!td.hasAttribute('data-l')) td.setAttribute('data-l', h);
+      if (i === ti) td.classList.add('m-title'); else if (i === si) td.classList.add('m-sub'); else if (h === 'م' || h === '#') td.classList.add('mh'); else if (h === '') td.classList.add(td.querySelector('button,a,input') ? 'm-act' : 'm-empty');
+      else if (!td.textContent.trim() && !td.querySelector('svg,img,input,.bar,.badge')) td.classList.add('m-empty');
+    })));
+  });
+}
+
 // نقطة الدخول: تُستدعى على كل جزء يُضاف للصفحة
 export function enhance(root) {
   if (!root || root.nodeType !== 1) return;
-  emptyStates(root);
+  emptyStates(root); cardify(root);
   if (reduced()) return;
   const fresh = Date.now() - routeAt < 2500;
   if (fresh) qa(root, '.kpi b').forEach(countUp);
