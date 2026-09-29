@@ -4,9 +4,10 @@ const url = process.env.DB_URL_RESOLVED; if (!url) { console.error('no db url');
 const client = new pg.Client({ connectionString: url, ssl: { rejectUnauthorized: false } }); await client.connect();
 const TABLES = ['projects', 'project_stage_log', 'project_updates', 'challenges', 'tasks', 'requests', 'request_replies', 'payments', 'payment_log', 'submittals', 'submittal_files', 'documents', 'drawings', 'drawing_revisions', 'tech_reports', 'report_photos', 'report_comments', 'boqs', 'boq_lines', 'profiles', 'settings', 'variants', 'items', 'sections', 'divisions'];
 const wb = new ExcelJS.Workbook(); wb.creator = 'AHC Projects backup';
-let total = 0;
+let total = 0; const dump = {};
 for (const t of TABLES) {
   let rows; try { rows = (await client.query(`select * from public.${t} order by 1`)).rows; } catch (e) { console.log('skip', t, e.message); continue; }
+  dump[t] = rows;
   const ws = wb.addWorksheet(t.slice(0, 31), { views: [{ rightToLeft: true, state: 'frozen', ySplit: 1 }] });
   const cols = rows.length ? Object.keys(rows[0]) : ['(empty)'];
   ws.addRow(cols).font = { bold: true };
@@ -14,4 +15,4 @@ for (const t of TABLES) {
   cols.forEach((c, i) => ws.getColumn(i + 1).width = Math.min(50, Math.max(12, c.length + 4)));
   total += rows.length; console.log(t, rows.length);
 }
-await wb.xlsx.writeFile(process.argv[2] || 'backup.xlsx'); await client.end(); console.log('rows total', total);
+await wb.xlsx.writeFile(process.argv[2] || 'backup.xlsx'); if (process.argv[3]) (await import('fs')).writeFileSync(process.argv[3], JSON.stringify({ exported_at: new Date().toISOString(), tables: dump })); await client.end(); console.log('rows total', total);
