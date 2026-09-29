@@ -1,6 +1,6 @@
 // ===== المستخلصات المالية =====
 import { sb, canEdit, isAdmin, role, q, session, today } from './api.js';
-import { $, $$, esc, money, fmt, dateAr, toast, err, modal, confirm, field, inp, sel, formData } from './ui.js';
+import { $, $$, esc, money, fmt, dateAr, toast, err, modal, confirm, field, inp, sel, formData, money_inp } from './ui.js';
 
 export const P_STATUS = { draft: 'مسودة', submitted: 'مقدَّم', review: 'قيد المراجعة', approved: 'معتمد', finance: 'محال للمالية', paid: 'مصروف', rejected: 'مرفوض' };
 export const P_KIND = { advance: 'دفعة مقدمة', interim: 'مستخلص جارٍ', final: 'مستخلص ختامي', retention_release: 'إفراج عن الضمان' };
@@ -75,13 +75,13 @@ async function payForm(pm, project, existing, done) {
     ${field('رقم فاتورة المقاول', inp('contractor_invoice_no', v.contractor_invoice_no || '', dis))}
     ${field('الفترة من', inp('period_from', v.period_from || '', `type="date" ${dis}`))}
     ${field('الفترة إلى', inp('period_to', v.period_to || '', `type="date" ${dis}`))}
-    ${field('الأعمال المنفذة تراكمياً حتى نهاية الفترة (ر.س)', inp('cumulative_work', v.cumulative_work ?? 0, `type="number" min="0" step="0.01" ${dis}`))}
-    ${field('قيمة أعمال هذا المستخلص (ر.س) *', inp('work_amount', v.work_amount ?? 0, `type="number" min="0" step="0.01" required ${dis}`))}
+    ${field('الأعمال المنفذة تراكمياً حتى نهاية الفترة (ر.س)', money_inp('cumulative_work', v.cumulative_work ?? 0, dis))}
+    ${field('قيمة أعمال هذا المستخلص (ر.س) *', money_inp('work_amount', v.work_amount ?? 0, `required ${dis}`))}
     ${field('نسبة حجز الضمان %', inp('retention_pct', v.retention_pct ?? 10, `type="number" min="0" max="100" step="0.5" ${dis}`))}
     ${field('ضريبة القيمة المضافة %', inp('vat_pct', v.vat_pct ?? 15, `type="number" min="0" max="100" step="0.5" ${dis}`))}
-    ${field('استرداد الدفعة المقدمة (ر.س)', inp('advance_recovery', v.advance_recovery ?? 0, `type="number" min="0" step="0.01" ${dis}`))}
-    ${field('غرامة تأخير (ر.س)', inp('penalty', v.penalty ?? 0, `type="number" min="0" step="0.01" ${dis}`))}
-    ${field('خصومات أخرى (ر.س)', inp('other_deductions', v.other_deductions ?? 0, `type="number" min="0" step="0.01" ${dis}`))}
+    ${field('استرداد الدفعة المقدمة (ر.س)', money_inp('advance_recovery', v.advance_recovery ?? 0, dis))}
+    ${field('غرامة تأخير (ر.س)', money_inp('penalty', v.penalty ?? 0, dis))}
+    ${field('خصومات أخرى (ر.س)', money_inp('other_deductions', v.other_deductions ?? 0, dis))}
     ${field('ملاحظات', `<textarea name="notes" rows="2" ${dis}>${esc(v.notes || '')}</textarea>`, 'wide')}
     <div class="wide paycalc" id="pc"></div>
     <div class="btnrow end wide">${pm && (isAdmin() || (canEdit() && pm.status === 'draft')) ? '<button type="button" class="btn danger" data-del>حذف</button>' : ''}<span style="flex:1"></span><button type="button" class="btn" data-x>${editable ? 'إلغاء' : 'إغلاق'}</button>${editable ? '<button class="btn primary">حفظ</button>' : ''}</div></form>`;

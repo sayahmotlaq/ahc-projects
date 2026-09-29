@@ -33,7 +33,13 @@ export async function confirm(msg, ok = 'تأكيد', danger = false) {
 export function field(label, inner, cls = '') { return `<label class="fld ${cls}"><span>${esc(label)}</span>${inner}</label>`; }
 export const inp = (name, val = '', attrs = '') => `<input name="${name}" value="${esc(val)}" ${attrs}>`;
 export const sel = (name, opts, val, attrs = '') => `<select name="${name}" ${attrs}>${opts.map(o => { const [v, t] = Array.isArray(o) ? o : [o, o]; return `<option value="${esc(v)}" ${String(v) === String(val) ? 'selected' : ''}>${esc(t)}</option>`; }).join('')}</select>`;
-export function formData(form) { const o = {}; new FormData(form).forEach((v, k) => o[k] = v); return o; }
+// حقول المبالغ: تقبل الفواصل والأرقام العربية والكسور، وتُنسَّق تلقائياً
+export const parseMoney = v => { if (v === null || v === undefined) return ''; let t = String(v).trim().replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/٫/g, '.').replace(/[,٬\s]/g, '').replace(/[^\d.\-]/g, ''); return t === '' || t === '-' || t === '.' ? '' : t; };
+export const fmtMoney = v => { const t = parseMoney(v); if (t === '') return ''; const n = Number(t); if (!isFinite(n)) return ''; return n.toLocaleString('en', { minimumFractionDigits: 0, maximumFractionDigits: 2 }); };
+export const money_inp = (name, val = '', attrs = '') => `<input name="${name}" class="money" inputmode="decimal" dir="ltr" autocomplete="off" value="${esc(fmtMoney(val))}" ${attrs}>`;
+document.addEventListener('focusin', e => { const i = e.target; if (i.classList?.contains('money')) { i.value = parseMoney(i.value); i.select?.(); } });
+document.addEventListener('focusout', e => { const i = e.target; if (i.classList?.contains('money')) i.value = fmtMoney(i.value); });
+export function formData(form) { const o = {}; new FormData(form).forEach((v, k) => o[k] = v); form.querySelectorAll?.('input.money').forEach(i => { if (i.name) o[i.name] = parseMoney(i.value); }); return o; }
 export function download(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 800); }
 export function debounce(fn, ms = 250) { let h; return (...a) => { clearTimeout(h); h = setTimeout(() => fn(...a), ms); }; }
 

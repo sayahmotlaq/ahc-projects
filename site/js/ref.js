@@ -1,6 +1,6 @@
 // ===== المرجع الفني: تصفح + بحث + تحرير (للأدمن) =====
 import { sb, REF, isAdmin, itemDetail, invalidateRef, q, session } from './api.js';
-import { $, $$, esc, norm, money, idOf, list, toast, err, modal, confirm, field, inp, sel, formData } from './ui.js';
+import { $, $$, esc, norm, money, idOf, list, toast, err, modal, confirm, field, inp, sel, formData, money_inp } from './ui.js';
 
 let treeBuilt = false; let current = null;
 const UNITS = ['عدد', 'م', 'م²', 'م³', 'كجم', 'طن', 'نقطة', 'مجموعة', 'مقطوعية', 'شهر', 'يوم', 'لتر', 'ساعة', '—'];
@@ -209,7 +209,7 @@ async function editVariant(v, it) {
     ${field('المسمى العربي *', inp('ar', v?.ar || '', 'required'), 'wide')}
     ${field('المسمى الإنجليزي', inp('en', v?.en || ''), 'wide')}
     ${field('المواصفة المميِّزة', inp('spec', v?.spec || ''), 'wide')}
-    ${field('سعر الوحدة الاسترشادي (ر.س) *', inp('price', v?.price ?? 0, 'type="number" min="0" step="0.01" required'))}
+    ${field('سعر الوحدة الاسترشادي (ر.س) *', money_inp('price', v?.price ?? 0, 'required'))}
     ${field('نشط', sel('active', [['true', 'نعم'], ['false', 'موقوف']], String(v?.active !== false)))}
     ${isNew ? '' : field('ملاحظة تغيير السعر (اختياري)', inp('note', ''), 'wide')}
     <div class="btnrow end wide">${isNew ? '' : '<button type="button" class="btn danger" data-del>حذف الخيار</button>'}<span style="flex:1"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary" type="submit">حفظ</button></div></form>`;

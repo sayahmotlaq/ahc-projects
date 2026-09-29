@@ -1,6 +1,6 @@
 // ===== المستندات الرسمية + المخططات + الاعتمادات =====
 import { sb, REF, loadRef, canEdit, canDocs, isAdmin, q, session, today } from './api.js';
-import { $, $$, esc, norm, money, dateAr, toast, err, modal, confirm, field, inp, sel, formData, ico } from './ui.js';
+import { $, $$, esc, norm, money, dateAr, toast, err, modal, confirm, field, inp, sel, formData, ico, money_inp } from './ui.js';
 import { compress } from './treports.js';
 
 const BUCKET = 'project-files';
@@ -62,7 +62,7 @@ async function docForm(d, p, done) {
     ${field('التاريخ', inp('doc_date', v.doc_date || '', 'type="date"'))}
     ${field('الجهة (من / إلى)', inp('party', v.party || ''))}
     <div class="fx" data-for="bank_guarantee insurance">${field('تاريخ الانتهاء', inp('expiry_date', v.expiry_date || '', 'type="date"'))}</div>
-    <div class="fx" data-for="contract bank_guarantee change_order">${field('المبلغ (ر.س)', inp('amount', v.amount ?? '', 'type="number" step="0.01"'))}</div>
+    <div class="fx" data-for="contract bank_guarantee change_order">${field('المبلغ (ر.س)', money_inp('amount', v.amount ?? ''))}</div>
     <div class="fx" data-for="extension">${field('عدد الأيام', inp('days', v.days ?? '', 'type="number"'))}</div>
     <div class="fx" data-for="letter_in letter_out">${field('الرد مطلوب قبل', inp('reply_due', v.reply_due || '', 'type="date"'))}</div>
     <div class="fx" data-for="letter_in letter_out">${field('تاريخ الرد', inp('replied_on', v.replied_on || '', 'type="date"'))}</div>

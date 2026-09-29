@@ -573,3 +573,4 @@ table.lst tfoot td{font-weight:700;background:var(--surface2)}
 .today .hero.pm{background:linear-gradient(135deg,#FFF3DF,var(--surface))}
 .today .hero h1{margin:4px 0 6px;font-size:22px;font-weight:800;line-height:1.35} .today .hero p{margin:0;color:var(--muted);font-size:14px}
 .today .nitem{border-bottom:1px solid var(--line2);border-radius:8px} .today .nitem.new{background:var(--sky2)}
+.fld input.money{text-align:left;font-variant-numeric:tabular-nums;direction:ltr}
