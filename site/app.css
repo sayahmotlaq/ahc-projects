@@ -712,3 +712,4 @@ h2.m0,h3.m0,p.m0,.toolbar h2.m0{margin:0}
   .filters{gap:6px} .filters select{flex:1 1 45%;min-width:0} .filters .chk{font-size:12px}
   .toolbar{flex-wrap:wrap;gap:8px} .toolbar .btn{padding:7px 11px;font-size:13px}
 }
+.boqbox.hint{border-color:#E9D8A6;background:#FFFCF3}

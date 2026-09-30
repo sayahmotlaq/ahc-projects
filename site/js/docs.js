@@ -24,7 +24,9 @@ const pname = id => profiles.find(p => p.id === id)?.full_name || '—';
 async function uploadOne(file, prefix) {
   let blob = file, name = file.name;
   if (/^image\//.test(file.type) && file.size > 400 * 1024) { try { blob = await compress(file, 2000, 0.85); name = name.replace(/\.[^.]+$/, '') + '.jpg'; } catch (e) { } }
-  const path = `${prefix}/${Date.now()}_${Math.random().toString(36).slice(2, 7)}_${name.replace(/[^\w.\-؀-ۿ]/g, '_')}`;
+  // مفتاح التخزين يجب أن يكون ASCII فقط (أسماء الملفات العربية تُرفض من Supabase Storage بخطأ Invalid key) — الاسم الأصلي يُحفظ في السجل للعرض
+  const m = name.match(/\.([A-Za-z0-9]{1,6})$/); const ext = m ? m[1].toLowerCase() : ({ 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx' })[blob.type || file.type] || 'bin';
+  const path = `${prefix}/${Date.now()}_${Math.random().toString(36).slice(2, 7)}.${ext}`;
   const { error } = await sb.storage.from(BUCKET).upload(path, blob, { contentType: blob.type || file.type || 'application/octet-stream', upsert: false });
   if (error) throw new Error(error.message?.includes('exceeded') ? 'حجم الملف يتجاوز الحد المسموح (50 م.ب)' : error.message);
   return { path, file_name: name, file_size: blob.size };
