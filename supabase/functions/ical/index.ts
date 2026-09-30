@@ -22,15 +22,17 @@ const ymd = (d: string) => d.replace(/-/g, "");
 const nextDay = (d: string) => { const x = new Date(d + "T00:00:00Z"); x.setUTCDate(x.getUTCDate() + 1); return x.toISOString().slice(0, 10); };
 const stamp = () => new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
 
+const CORS = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET, OPTIONS", "access-control-allow-headers": "*" };
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
   const u = new URL(req.url);
   const t = (u.searchParams.get("t") ?? "").trim();
-  if (!/^[a-f0-9]{24,64}$/.test(t)) return new Response("not found", { status: 404 });
+  if (!/^[a-f0-9]{24,64}$/.test(t)) return new Response("not found", { status: 404, headers: CORS });
   const sb = createClient(SB_URL, SB_KEY);
   const { data, error } = await sb.rpc("cal_feed", { p_token: t });
-  if (error) return new Response("error", { status: 500 });
+  if (error) return new Response("error", { status: 500, headers: CORS });
   const rows = (data ?? []) as { uid: string; kind: string; title: string; descr: string; on_date: string; url: string; done: boolean; owner_name: string }[];
-  if (!rows.length && !(await sb.from("profiles").select("id").eq("cal_token", t).maybeSingle()).data) return new Response("not found", { status: 404 });
+  if (!rows.length && !(await sb.from("profiles").select("id").eq("cal_token", t).maybeSingle()).data) return new Response("not found", { status: 404, headers: CORS });
   const name = rows[0]?.owner_name ?? "";
   const L: string[] = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//AHC Projects//Calendar//AR", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
     `X-WR-CALNAME:${esc("مشاريع التجمع" + (name ? " — " + name : ""))}`, "X-WR-TIMEZONE:Asia/Riyadh", "REFRESH-INTERVAL;VALUE=DURATION:PT1H", "X-PUBLISHED-TTL:PT1H"];
@@ -45,5 +47,5 @@ Deno.serve(async (req) => {
   }
   L.push("END:VCALENDAR");
   const body = L.map(fold).join("\r\n") + "\r\n";
-  return new Response(body, { headers: { "content-type": "text/calendar; charset=utf-8", "cache-control": "private, max-age=900", "content-disposition": 'inline; filename="ahc-projects.ics"' } });
+  return new Response(body, { headers: { ...CORS, "content-type": "text/calendar; charset=utf-8", "cache-control": "private, max-age=900", "content-disposition": 'inline; filename="ahc-projects.ics"' } });
 });
