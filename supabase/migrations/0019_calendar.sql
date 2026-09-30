@@ -11,7 +11,7 @@ begin
   if auth.uid() is null then return null; end if;
   select cal_token into t from public.profiles where id = auth.uid();
   if t is null or p_reset then
-    t := encode(gen_random_bytes(18), 'hex');
+    t := md5(random()::text || clock_timestamp()::text || auth.uid()::text) || substr(md5(clock_timestamp()::text || random()::text), 1, 8);
     update public.profiles set cal_token = t where id = auth.uid();
   end if;
   return t;
