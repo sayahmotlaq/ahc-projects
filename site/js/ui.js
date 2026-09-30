@@ -69,3 +69,19 @@ export const ICONS = {
   print: '<path d="M6 9V3h12v6M6 18H4V9h16v9h-2M6 14h12v7H6z"/>', edit: '<path d="M4 20h4l11-11-4-4L4 16z"/>', alert: '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/>', clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
 };
 export const ico = (n, cls = '') => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n] || ''}</svg>`;
+
+// ---------- «أضف إلى التقويم» لحدث واحد (Google أو ملف .ics لتقويم آيفون/Outlook)
+export const calBtn = (ev, cls = 'btn sm') => `<button type="button" class="${cls}" data-cal="${esc(JSON.stringify(ev))}">${ico('clock')} أضف إلى التقويم</button>`;
+export function bindCal(root = document) {
+  $$('[data-cal]', root).forEach(b => { if (b._cal) return; b._cal = true; b.onclick = e => { e.preventDefault(); e.stopPropagation(); const ev = JSON.parse(b.getAttribute('data-cal')); calMenu(ev); }; });
+}
+function calMenu(ev) {
+  const d = (ev.date || '').replace(/-/g, ''); if (!d) return toast('لا يوجد تاريخ لهذا البند', 'bad');
+  const nx = new Date(ev.date); nx.setDate(nx.getDate() + 1); const d2 = nx.toISOString().slice(0, 10).replace(/-/g, '');
+  const link = ev.url ? location.origin + location.pathname + ev.url : '';
+  const details = (ev.desc ? ev.desc + '\n' : '') + link;
+  const g = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(ev.title)}&dates=${d}/${d2}&details=${encodeURIComponent(details)}`;
+  const e = s => String(s ?? '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+  const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//AHC Projects//AR', 'BEGIN:VEVENT', `UID:${ev.uid || 'x' + Date.now()}@ahc-projects`, `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z')}`, `DTSTART;VALUE=DATE:${d}`, `DTEND;VALUE=DATE:${d2}`, `SUMMARY:${e(ev.title)}`, `DESCRIPTION:${e(details)}`, link ? `URL:${link}` : '', 'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${e(ev.title)}`, 'TRIGGER:-PT15H', 'END:VALARM', 'END:VEVENT', 'END:VCALENDAR'].filter(Boolean).join('\r\n');
+  modal(`<p class="small muted m0">${esc(ev.title)} — ${dateAr(ev.date)}</p><div class="btnrow mt10" style="flex-direction:column;gap:8px"><button class="btn primary" id="calIcs">${ico('clock')} تقويم آيفون / Outlook (ملف تقويم)</button><a class="btn" target="_blank" rel="noopener" href="${g}">تقويم Google</a></div><p class="small muted mt10 m0">للاشتراك التلقائي في كل مواعيدك بلا إضافة يدوية: الإعدادات ← تقويمي.</p>`, { title: 'أضف إلى التقويم', onOpen: (w, close) => { $('#calIcs', w).onclick = () => { download(new Blob([ics], { type: 'text/calendar;charset=utf-8' }), 'event.ics'); close(); }; } });
+}

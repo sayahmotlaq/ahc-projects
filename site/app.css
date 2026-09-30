@@ -713,3 +713,5 @@ h2.m0,h3.m0,p.m0,.toolbar h2.m0{margin:0}
   .toolbar{flex-wrap:wrap;gap:8px} .toolbar .btn{padding:7px 11px;font-size:13px}
 }
 .boqbox.hint{border-color:#E9D8A6;background:#FFFCF3}
+.linkrow{display:flex;gap:6px;align-items:center}
+.linkrow input{flex:1;min-width:0;font-family:ui-monospace,Menlo,monospace;font-size:12px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--text)}

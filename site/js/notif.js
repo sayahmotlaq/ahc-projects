@@ -1,6 +1,6 @@
 // ===== مركز الإشعارات (الجرس) + إشعارات الجهاز (Web Push) =====
 import { sb, q, session } from './api.js';
-import { $, $$, esc, dateAr, toast, err, ico } from './ui.js';
+import { $, $$, esc, dateAr, toast, err, ico, confirm } from './ui.js';
 
 export const N_KINDS = { task: 'المهام', request: 'الطلبات', treport: 'التقارير الفنية', comment: 'التعليقات', payment: 'المستخلصات', submittal: 'الاعتمادات', challenge: 'التحديات العالية', stage: 'تغيير المراحل', stale: 'مشاريع بلا تحديث' };
 const ICON = { digest: '☀️', exec: '🏛️', milestone: '🚩', task: '✅', request: '📨', treport: '📋', comment: '💬', payment: '💰', submittal: '📐', challenge: '⚠️', stage: '🚩', stale: '⏳', info: 'ℹ️' };
@@ -71,7 +71,21 @@ export async function mountSettings(root) {
       <label class="mb8 chk" ><input type="checkbox" id="pushAll" ${prefs.push === false ? '' : 'checked'}> إرسال الإشعارات إلى أجهزتي</label>
       <label class="mb8 chk" ><input type="checkbox" id="digest" ${prefs.digest === false ? '' : 'checked'}> ملخص الصباح (7:45) وختام اليوم (3:30) أيام العمل</label>
       <div class="chips">${Object.entries(N_KINDS).map(([k, v]) => `<label class="chip"><input type="checkbox" data-k="${k}" ${kinds[k] === false ? '' : 'checked'}> ${v}</label>`).join('')}</div>
-      <div class="mt10 btnrow end" ><button class="btn primary" id="savePrefs">حفظ التفضيلات</button></div></div></div>`;
+      <div class="mt10 btnrow end" ><button class="btn primary" id="savePrefs">حفظ التفضيلات</button></div></div></div>
+    <div class="pcard"><h2><span class="ic"></span>تقويمي — اشتراك تلقائي في تقويم الجوال</h2>
+      <p class="muted small">أضف هذا الرابط مرة واحدة إلى تقويم جوالك أو Outlook، فتظهر عندك تلقائياً وتتحدث باستمرار: مهامك بمواعيدها، ومعالم المشاريع وتواريخها الرئيسية (المباشرة، الطرح، الترسية، الانتهاء، الاستلام، الضمان) لكل المشاريع، وتفاصيل مشاريعك (اعتمادات، ضمانات، تحديات، مستخلصات، اجتماعات). الأمور الشخصية تظهر لك وحدك.</p>
+      <div class="linkrow"><input id="calUrl" readonly dir="ltr" value="…"><button class="btn primary" id="calCopy">${ico('clip')} نسخ</button></div>
+      <div class="btnrow mt10"><a class="btn" id="calOpen" href="#">${ico('clock')} أضف إلى تقويم الجوال</a><button class="btn ghost" id="calReset">إعادة إنشاء الرابط</button></div>
+      <details class="mt10 small"><summary style="cursor:pointer;color:var(--navy);font-weight:700">كيف أضيفه؟</summary><div class="muted" style="line-height:1.9;margin-top:6px">
+        <b>آيفون:</b> اضغط «أضف إلى تقويم الجوال» ثم «اشتراك»، أو: الإعدادات ← التقويم ← الحسابات ← إضافة حساب ← أخرى ← إضافة تقويم مشترك، والصق الرابط.<br>
+        <b>Outlook (بريد الدوام):</b> التقويم ← إضافة تقويم ← الاشتراك من الويب، والصق الرابط.<br>
+        <b>تقويم Google:</b> من المتصفح: تقويمات أخرى ← «+» ← من عنوان URL، والصق الرابط.<br>
+        التحديث تلقائي كل ساعة تقريباً في آيفون وOutlook، وكل بضع ساعات في Google. الرابط خاص بك؛ لا تشاركه، وإن تسرّب اضغط «إعادة إنشاء الرابط».</div></details></div>`;
+  const calUrlOf = t => `${window.AHC_CONFIG.url}/functions/v1/ical?t=${t}`;
+  const setCal = t => { $('#calUrl').value = calUrlOf(t); $('#calOpen').href = calUrlOf(t).replace(/^https?:\/\//, 'webcal://'); };
+  try { const { data: tok } = await sb.rpc('my_cal_token'); if (tok) setCal(tok); } catch (e) { }
+  $('#calCopy').onclick = async () => { const u = $('#calUrl').value; try { await navigator.clipboard.writeText(u); toast('نُسخ رابط التقويم'); } catch (e) { $('#calUrl').select(); document.execCommand('copy'); toast('نُسخ رابط التقويم'); } };
+  $('#calReset').onclick = async () => { if (!await confirm('إعادة إنشاء الرابط تُبطل الرابط القديم في كل الأجهزة التي أضفته فيها. متابعة؟', 'إعادة الإنشاء', true)) return; const { data: tok } = await sb.rpc('my_cal_token', { p_reset: true }); setCal(tok); toast('أُنشئ رابط جديد'); };
   const on = $('#pOn'); if (on) on.onclick = async () => { on.disabled = true; try { await enablePush(); toast('تم تفعيل الإشعارات على هذا الجهاز'); mountSettings(root); } catch (e) { err(e); on.disabled = false; } };
   const off = $('#pOff'); if (off) off.onclick = async () => { try { await disablePush(); toast('أُوقفت الإشعارات على هذا الجهاز'); mountSettings(root); } catch (e) { err(e); } };
   const t = $('#pTest'); if (t) t.onclick = async () => { try { const reg = await navigator.serviceWorker.ready; await reg.showNotification('منصة إدارة المشاريع', { body: 'هذا إشعار تجريبي — الإشعارات تعمل على هذا الجهاز ✅', icon: 'assets/logo.png', dir: 'rtl', lang: 'ar' }); } catch (e) { err(e); } };

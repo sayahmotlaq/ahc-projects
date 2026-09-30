@@ -1,6 +1,6 @@
 // ===== المهام (من الإدارة) والطلبات (من المهندسين) =====
 import { sb, canEdit, isAdmin, q, session, today } from './api.js';
-import { $, $$, esc, dateAr, toast, err, modal, confirm, field, inp, sel, formData } from './ui.js';
+import { $, $$, esc, dateAr, toast, err, modal, confirm, field, inp, sel, formData, calBtn, bindCal } from './ui.js';
 import { exportTable, xbtn } from './xlsx.js';
 
 export const T_STATUS = { open: 'مفتوحة', in_progress: 'قيد التنفيذ', done: 'منجزة', cancelled: 'ملغاة' };
@@ -30,12 +30,13 @@ export async function taskForm(t, project, done, preset = null) {
       ${field('الموعد', inp('due_date', v.due_date || '', 'type="date"'))}
       ${t ? field('الحالة', sel('status', Object.entries(T_STATUS), t.status)) : ''}
       ${t ? field('ملاحظة الإنجاز', `<textarea name="progress_note" rows="2">${esc(t.progress_note || '')}</textarea>`, 'wide') : ''}
-      <div class="btnrow end wide">${t ? '<button type="button" class="btn danger" data-del>حذف</button>' : ''}<span class="sp"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">حفظ</button></div></form>`
+      <div class="btnrow end wide">${t ? '<button type="button" class="btn danger" data-del>حذف</button>' : ''}${t?.due_date ? calBtn({ uid: 'task-' + t.id, title: 'مهمة: ' + t.title, date: t.due_date, desc: project?.name || '', url: '#/project/' + t.project_id + '/tasks' }, 'btn') : ''}<span class="sp"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">حفظ</button></div></form>`
     : `<div class="mb10 pre" ><b>${esc(t.title)}</b><br><span class="muted">${esc(t.details || '')}</span></div><form id="f" class="pgrid">
       ${field('الحالة', sel('status', [['open', 'مفتوحة'], ['in_progress', 'قيد التنفيذ'], ['done', 'منجزة']], t.status))}
       ${field('ملاحظة الإنجاز', `<textarea name="progress_note" rows="3">${esc(t.progress_note || '')}</textarea>`, 'wide')}
-      <div class="btnrow end wide"><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">تحديث</button></div></form>`;
+      <div class="btnrow end wide">${t?.due_date ? calBtn({ uid: 'task-' + t.id, title: 'مهمة: ' + t.title, date: t.due_date, desc: project?.name || '', url: '#/project/' + t.project_id + '/tasks' }, 'btn') : ''}<span class="sp"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">تحديث</button></div></form>`;
   await modal(html, { title: t ? (admin ? 'تعديل المهمة' : 'تحديث حالة المهمة') : 'مهمة جديدة', wide: admin, onOpen: (w, close) => {
+    bindCal(w);
     $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target);
       try {
         if (admin) { const row = { project_id: project.id, title: f.title.trim(), details: f.details.trim(), assignee_id: f.assignee_id || null, assignee_name: f.assignee_name.trim(), priority: f.priority, due_date: f.due_date || null }; if (preset?.report_id) row.report_id = preset.report_id; if (preset?.challenge_id) row.challenge_id = preset.challenge_id; if (t) { row.status = f.status; row.progress_note = f.progress_note; await q(sb.from('tasks').update(row).eq('id', t.id)); } else await q(sb.from('tasks').insert({ ...row, status: 'open', created_by: me })); }
