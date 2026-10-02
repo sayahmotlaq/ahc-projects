@@ -2,14 +2,14 @@
 import { sb, REF, canEdit, q, session, itemDetail } from './api.js';
 import { $, $$, esc, norm, fmt, money, toast, err, confirm, modal, field, inp, sel, formData, debounce } from './ui.js';
 import { exportExcel } from './excel.js';
-import { loadLS, activeLS, LS_DEFAULT_NOTES } from './lumpsum.js';
+import { loadLS, activeLS, LS_DEFAULT_NOTES, UNITS } from './lumpsum.js';
 
 const STATUS = { draft: 'مسودة', approved: 'معتمد', tender: 'طرح', awarded: 'ترسية', final: 'ختامي' };
 let LOGO_B64 = null;
 async function logo() { if (LOGO_B64) return LOGO_B64; const b = await (await fetch('assets/logo.png')).blob(); LOGO_B64 = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result.split(',')[1]); fr.readAsDataURL(b); }); return LOGO_B64; }
 
 export const FREE_DIV = { code: '00', ar: 'بنود المقطوعية والبنود العامة', en: 'Lump-sum / General items' };
-export const UNITS = ['مقطوعية', 'عدد', 'م²', 'م.ط', 'م³', 'طن', 'كجم', 'لتر', 'مجموعة', 'نقطة', 'شهر', 'يوم', 'أخرى'];
+export { UNITS };
 export function calc(boq, lines) {
   const groups = {}; let subtotal = 0; let fn = 0;
   lines.forEach(ln => {
@@ -93,7 +93,7 @@ export async function mountBoq(root, boqId, project, onBack) {
   async function lsPicker() {
     const LS = activeLS(await loadLS()); const LS_BY_CODE = LS.byCode; const TPL = Object.fromEntries(LS.templates.map(t => [String(t.id), t]));
     const chips = LS.templates.map(t => `<button type="button" class="chip" data-tpl="${t.id}">${esc(t.name)}</button>`).join('');
-    const groups = LS.groups.map(g => `<div class="lsg"><div class="lsgh"><b>${esc(g.ar)}</b><button type="button" class="lnk" data-all>تحديد الكل</button></div>${g.items.map(i => `<label class="lsi" data-code="${i.code}"><input type="checkbox" name="c" value="${i.code}"><span class="cd">${i.code}</span><span class="lst"><b>${esc(i.title)}</b><small>${esc(i.descr)}</small></span></label>`).join('')}</div>`).join('');
+    const groups = LS.groups.map(g => `<div class="lsg"><div class="lsgh"><b>${esc(g.ar)}</b><button type="button" class="lnk" data-all>تحديد الكل</button></div>${g.items.map(i => `<label class="lsi" data-code="${i.code}"><input type="checkbox" name="c" value="${i.code}"><span class="cd">${i.code}</span><span class="lst"><b>${esc(i.title)}${i.unit && i.unit !== 'مقطوعية' ? ` <span class="muted small">(لكل ${esc(i.unit)} — تُدخل العدد بعد الإضافة)</span>` : ''}</b><small>${esc(i.descr)}</small></span></label>`).join('')}</div>`).join('');
     modal(`<form id="f" class="lspick"><div class="lstop"><input type="search" id="lsq" placeholder="بحث في البنود…" autocomplete="off"><div class="chips">${chips}${session?.profile?.role === 'admin' ? '<a class="chip" href="#/admin/lumpsum" title="تعديل القائمة والنطاقات">⚙ إدارة القائمة</a>' : ''}</div></div><div class="lsbody">${groups}</div><div class="lsfoot"><label class="chk"><input type="checkbox" name="lump" ${boq.pricing === 'lumpsum' || !lines.some(l => l.kind !== 'free') ? 'checked' : ''}> تسعير مقطوعية وإخفاء الأسعار (نسخة طرح)</label><label class="chk"><input type="checkbox" name="notes" ${boq.notes ? '' : 'checked'}> إضافة الملاحظات العامة المعيارية للطرح</label><div class="btnrow end"><span class="muted small" id="lsN">لم يُحدَّد شيء</span><span class="sp"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary" id="lsAdd" disabled>إضافة البنود</button></div></div></form>`, { title: 'بنود المقطوعية — اختر ما يلزم المشروع', wide: true, onOpen: (w, close) => {
       const adm = $('a.chip', w); if (adm) adm.onclick = () => setTimeout(close, 50);
       const boxes = $$('input[name=c]', w); const existing = new Set(lines.filter(l => l.kind === 'free').map(l => l.title));
@@ -104,7 +104,7 @@ export async function mountBoq(root, boqId, project, onBack) {
       $$('[data-all]', w).forEach(a => a.onclick = () => { const bs = $$('input[name=c]', a.closest('.lsg')).filter(b => b.closest('.lsi').style.display !== 'none'); const all = bs.every(b => b.checked); bs.forEach(b => b.checked = !all); count(); });
       $('#lsq', w).oninput = () => { const t = norm($('#lsq', w).value); $$('.lsi', w).forEach(el => { const i = LS_BY_CODE[el.getAttribute('data-code')]; el.style.display = !t || norm(i.title + ' ' + i.descr + ' ' + i.code).includes(t) ? '' : 'none'; }); $$('.lsg', w).forEach(g => g.style.display = $$('.lsi', g).some(e => e.style.display !== 'none') ? '' : 'none'); };
       $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target); const codes = boxes.filter(b => b.checked).map(b => b.value); if (!codes.length) return;
-        const rows = codes.map((c, i) => { const it = LS_BY_CODE[c]; return { boq_id: boq.id, kind: 'free', title: it.title, descr: it.descr, unit: 'مقطوعية', qty: 1, unit_price: null, sort: lines.length + i }; });
+        const rows = codes.map((c, i) => { const it = LS_BY_CODE[c]; return { boq_id: boq.id, kind: 'free', title: it.title, descr: it.descr, unit: it.unit || 'مقطوعية', qty: 1, unit_price: null, sort: lines.length + i }; });
         try { const ins = await q(sb.from('boq_lines').insert(rows).select()); lines.push(...ins); const up = {}; if (f.lump) Object.assign(up, { pricing: 'lumpsum', hide_prices: true }); if (f.notes && !boq.notes) up.notes = LS_DEFAULT_NOTES; if (Object.keys(up).length) { await q(sb.from('boqs').update(up).eq('id', boq.id)); Object.assign(boq, up); } close(); toast(`أُضيف ${ins.length} بنداً`); mountBoq(root, boqId, project, onBack); } catch (er) { err(er); } };
     } });
   }

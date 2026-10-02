@@ -1,9 +1,10 @@
 // ===== قائمة بنود المقطوعية (Lump-sum) ونطاقات العمل =====
 // المصدر الحي: جدولا ls_items و ls_templates في قاعدة البيانات (تُدار من الإدارة ← بنود المقطوعية). القائمة أدناه بذرة/احتياط فقط (0021_ls_catalog.sql).
 import { sb, q } from './api.js';
-import { $, $$, esc, norm, toast, err, confirm, modal, field, inp, formData } from './ui.js';
+import { $, $$, esc, norm, toast, err, confirm, modal, field, inp, sel, formData } from './ui.js';
 const G = (ar, items) => ({ ar, items });
-const I = (code, title, descr) => ({ code, title, descr });
+const I = (code, title, descr, unit = 'مقطوعية') => ({ code, title, descr, unit });
+export const UNITS = ['مقطوعية', 'غرفة', 'جناح', 'عدد', 'م²', 'م.ط', 'م³', 'طن', 'كجم', 'لتر', 'مجموعة', 'نقطة', 'شهر', 'يوم', 'أخرى'];
 
 const SEED_GROUPS = [
   G('أعمال عامة وتحضيرية', [
@@ -47,6 +48,13 @@ const SEED_GROUPS = [
     I('LS-29', 'التشجير والري', 'تنفيذ أعمال التشجير والمسطحات الخضراء وشبكة الري الآلي والتحكم في نطاق العمل حسب المخططات، شاملة التربة الزراعية والصيانة خلال فترة الضمان.'),
     I('LS-30', 'الإنارة الخارجية', 'توريد وتركيب أعمدة ووحدات الإنارة الخارجية (LED) وإنارة الواجهات والمداخل والتمديدات والتحكم الزمني حسب المخططات، مع إزالة القديم والاختبار.'),
   ]),
+  G('تطوير غرف التنويم', [
+    I('LS-35', 'تطوير غرفة تنويم — فئة مفرد (سرير واحد)', 'تطوير كامل لغرفة تنويم بسرير واحد يشمل: إزالة التشطيبات والتمديدات القائمة، الأرضيات (فينيل طبي / بورسلين) والوزرات، الأسقف، الدهانات الصحية، وحدة رأس السرير (Headwall) بمخارج الغازات الطبية والكهرباء والإنارة ونداء الممرضات، الباب وإكسسواراته، التمديدات الكهربائية والإنارة (عامة، فحص، ليلية)، التكييف والتهوية، تأهيل دورة المياه الملحقة كاملة وفق متطلبات ذوي الإعاقة، التيار الخفيف (نداء ممرضات، تلفاز، شبكة)، إنذار الحريق، النوافذ والستائر، الأثاث غير الطبي، والتنظيف والتسليم — حسب المخططات والمواصفات. السعر لكل غرفة.', 'غرفة'),
+    I('LS-36', 'تطوير غرفة تنويم — فئة مزدوج (سريران)', 'تطوير كامل لغرفة تنويم بسريرين يشمل: إزالة التشطيبات والتمديدات القائمة، الأرضيات والوزرات، الأسقف، الدهانات الصحية، وحدتا رأس سرير (Headwall) بمخارج الغازات الطبية والكهرباء والإنارة ونداء الممرضات لكل سرير، ستارة فاصلة بين السريرين بمسارها السقفي، الباب وإكسسواراته، التمديدات الكهربائية والإنارة، التكييف والتهوية، تأهيل دورة المياه الملحقة كاملة، التيار الخفيف (نداء ممرضات، تلفاز، شبكة)، إنذار الحريق، النوافذ والستائر، الأثاث غير الطبي، والتنظيف والتسليم — حسب المخططات والمواصفات. السعر لكل غرفة.', 'غرفة'),
+    I('LS-37', 'تطوير غرفة تنويم — فئة سويت (دمج غرفتين)', 'دمج غرفتي تنويم متجاورتين في غرفة واحدة بإزالة الحائط الفاصل مع تدعيم الفتحة إنشائياً حسب المخططات وتقرير المهندس الإنشائي، وتطويرها كاملة لتشمل منطقة السرير ومنطقة جلوس/استقبال للمرافقين: الأرضيات والوزرات، الأسقف والتفاصيل الجبسية، الدهانات والتكسيات، وحدة رأس السرير بمخارج الغازات الطبية والكهرباء ونداء الممرضات، إعادة تمديد الكهرباء والإنارة والتكييف والتهوية، تأهيل دورتي المياه أو دمجهما حسب المخططات، ركن تحضير (Pantry) حيث يلزم، التيار الخفيف وإنذار الحريق، الأبواب والنوافذ والستائر، الأثاث غير الطبي، والتنظيف والتسليم. السعر لكل سويت.', 'غرفة'),
+    I('LS-38', 'تطوير جناح تنويم — فئة رويال (جناح كامل)', 'تطوير كامل لجناح تنويم فئة رويال يشمل: غرفة السرير، صالة جلوس واستقبال، غرفة مرافق، دورتا مياه، ركن تحضير (Pantry)، ومدخل خاص حسب المخططات؛ بتشطيبات فاخرة (أرضيات وتكسيات وأسقف جبسية بإنارة مخفية)، وحدة رأس سرير بمخارج الغازات الطبية والكهرباء ونداء الممرضات، التمديدات الكهربائية والإنارة مع نظام تحكم بالإنارة والستائر، التكييف والتهوية، الأعمال الصحية كاملة، التيار الخفيف (نداء ممرضات، شاشات، شبكة، صوت)، إنذار الحريق، الأبواب والنوافذ والستائر، الأثاث غير الطبي والمفروشات، والتنظيف والتسليم. السعر لكل جناح.', 'جناح'),
+    I('LS-39', 'تطوير محطة التمريض والممرات المشتركة', 'تطوير محطة التمريض والممرات والمناطق المشتركة لجناح التنويم: كاونتر محطة التمريض والتأثيث الثابت، لوحة نداء الممرضات الرئيسية، الأرضيات والوزرات والواقيات ومساكات الممرات، الأسقف والإنارة، الدهانات، غرفة الأدوية والمستلزمات ومخزن الأغطية، أبواب الممرات وأبواب الحريق، التكييف والتيار الخفيف وإنذار الحريق في المناطق المشتركة، واللوحات الإرشادية — حسب المخططات والمواصفات.'),
+  ]),
   G('التشغيل والتسليم', [
     I('LS-31', 'الاختبار والتشغيل والموازنة', 'إجراء اختبارات التشغيل والموازنة لجميع الأنظمة (كهرباء، تكييف، صحية، إطفاء، تيار خفيف) بحضور ممثل الإدارة، ومعالجة الملاحظات، وتقديم تقارير الاختبار المعتمدة.'),
     I('LS-32', 'التنظيف النهائي والتسليم والوثائق', 'التنظيف النهائي الشامل وإزالة المخلفات وإصلاح ما تضرر من المناطق المجاورة، وتسليم المخططات كما نُفِّذ (As-built) وشهادات الضمان والكتيبات وقطع الغيار الاحتياطية، وتدريب فريق التشغيل.'),
@@ -60,6 +68,7 @@ const SEED_TEMPLATES = {
   'تأهيل عام (قسم / جناح)': ['LS-02', 'LS-03', 'LS-05', 'LS-06', 'LS-07', 'LS-08', 'LS-09', 'LS-10', 'LS-34', 'LS-17', 'LS-18', 'LS-21', 'LS-22', 'LS-23', 'LS-31', 'LS-32', 'LS-33'],
   'تأهيل دورات مياه': ['LS-02', 'LS-03', 'LS-13', 'LS-14', 'LS-17', 'LS-18', 'LS-22', 'LS-23', 'LS-32'],
   'تأهيل الواجهات والموقع الخارجي': ['LS-03', 'LS-12', 'LS-13', 'LS-27', 'LS-28', 'LS-29', 'LS-30', 'LS-32'],
+  'تطوير غرف التنويم': ['LS-02', 'LS-03', 'LS-35', 'LS-36', 'LS-37', 'LS-38', 'LS-39', 'LS-31', 'LS-32', 'LS-33'],
 };
 export const LS_DEFAULT_NOTES = `1. الأسعار مقطوعية شاملة جميع أعمال التوريد والتنفيذ والمواد والعمالة والمعدات والنقل والاختبار والتشغيل والتسليم والضمان.
 2. يُرجع إلى المخططات والمواصفات الفنية للتفاصيل، وتُعدّ زيارة الموقع والاطلاع على طبيعة الأعمال القائمة إلزامية قبل التسعير.
@@ -95,7 +104,7 @@ export async function mountLsAdmin(t) {
     <div id="tpList"></div></div>`;
   const renderItems = () => {
     const f = norm($('#lsAq', t).value); const grouped = {}; items.filter(i => !f || norm(i.code + ' ' + i.title + ' ' + i.descr + ' ' + i.grp).includes(f)).forEach(i => (grouped[i.grp] = grouped[i.grp] || []).push(i));
-    $('#lsAList', t).innerHTML = Object.entries(grouped).map(([g, arr]) => `<div class="lsg"><div class="lsgh"><b>${esc(g)}</b></div>${arr.map(i => `<div class="lsi adm ${i.active === false ? 'off' : ''}" data-code="${esc(i.code)}"><span class="cd">${esc(i.code)}</span><span class="lst"><b>${esc(i.title)}${i.active === false ? ' <span class="badge ovr">موقوف</span>' : ''}</b><small>${esc(i.descr)}</small></span><span class="acts nocard"><button class="btn sm" data-edit="${esc(i.code)}">✎ تعديل</button></span></div>`).join('')}</div>`).join('') || '<p class="muted">لا نتائج</p>';
+    $('#lsAList', t).innerHTML = Object.entries(grouped).map(([g, arr]) => `<div class="lsg"><div class="lsgh"><b>${esc(g)}</b></div>${arr.map(i => `<div class="lsi adm ${i.active === false ? 'off' : ''}" data-code="${esc(i.code)}"><span class="cd">${esc(i.code)}</span><span class="lst"><b>${esc(i.title)}${i.unit && i.unit !== 'مقطوعية' ? ` <span class="muted small">(${esc(i.unit)})</span>` : ''}${i.active === false ? ' <span class="badge ovr">موقوف</span>' : ''}</b><small>${esc(i.descr)}</small></span><span class="acts nocard"><button class="btn sm" data-edit="${esc(i.code)}">✎ تعديل</button></span></div>`).join('')}</div>`).join('') || '<p class="muted">لا نتائج</p>';
     $$('[data-edit]', t).forEach(b => b.onclick = () => itemForm(items.find(i => i.code === b.getAttribute('data-edit'))));
   };
   const renderTpls = () => {
@@ -107,8 +116,8 @@ export async function mountLsAdmin(t) {
 
   function itemForm(it) {
     const v = it || { code: nextCode(), grp: groupsAr[0] || 'بنود عامة', title: '', descr: '', sort: (Math.max(0, ...items.map(i => i.sort || 0)) + 10), active: true };
-    modal(`<form id="f" class="pgrid">${field('الكود', inp('code', v.code, it ? 'readonly' : 'required'))}${field('المجموعة', `<input name="grp" list="lsGrps" value="${esc(v.grp)}" required><datalist id="lsGrps">${groupsAr.map(g => `<option value="${esc(g)}">`).join('')}</datalist>`)}${field('عنوان البند *', inp('title', v.title, 'required'), 'wide')}${field('الوصف التفصيلي (صياغة الطرح)', `<textarea name="descr" rows="5">${esc(v.descr)}</textarea>`, 'wide')}${field('الترتيب', inp('sort', v.sort, 'type="number" step="1"'))}<label class="chk"><input type="checkbox" name="active" ${v.active !== false ? 'checked' : ''}> فعّال (يظهر للمهندسين)</label><div class="btnrow end wide">${it ? '<button type="button" class="btn danger" data-del>حذف</button>' : ''}<span class="sp"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">حفظ</button></div></form>`, { title: it ? 'تعديل بند مقطوعية' : 'بند مقطوعية جديد', wide: true, onOpen: (w, close) => {
-      $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target); const row = { code: f.code.trim(), grp: f.grp.trim(), title: f.title.trim(), descr: f.descr.trim(), sort: Number(f.sort) || 0, active: !!f.active, updated_at: new Date().toISOString() };
+    modal(`<form id="f" class="pgrid">${field('الكود', inp('code', v.code, it ? 'readonly' : 'required'))}${field('المجموعة', `<input name="grp" list="lsGrps" value="${esc(v.grp)}" required><datalist id="lsGrps">${groupsAr.map(g => `<option value="${esc(g)}">`).join('')}</datalist>`)}${field('عنوان البند *', inp('title', v.title, 'required'), 'wide')}${field('الوصف التفصيلي (صياغة الطرح)', `<textarea name="descr" rows="5">${esc(v.descr)}</textarea>`, 'wide')}${field('الوحدة', sel('unit', UNITS, UNITS.includes(v.unit) ? v.unit : 'مقطوعية'))}${field('الترتيب', inp('sort', v.sort, 'type="number" step="1"'))}<label class="chk"><input type="checkbox" name="active" ${v.active !== false ? 'checked' : ''}> فعّال (يظهر للمهندسين)</label><div class="btnrow end wide">${it ? '<button type="button" class="btn danger" data-del>حذف</button>' : ''}<span class="sp"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">حفظ</button></div></form>`, { title: it ? 'تعديل بند مقطوعية' : 'بند مقطوعية جديد', wide: true, onOpen: (w, close) => {
+      $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target); const row = { code: f.code.trim(), grp: f.grp.trim(), title: f.title.trim(), descr: f.descr.trim(), unit: f.unit || 'مقطوعية', sort: Number(f.sort) || 0, active: !!f.active, updated_at: new Date().toISOString() };
         try { if (it) { await q(sb.from('ls_items').update(row).eq('code', it.code)); } else { if (items.some(i => i.code === row.code)) return toast('الكود مستخدم'); await q(sb.from('ls_items').insert(row)); } close(); toast('تم الحفظ'); mountLsAdmin(t); } catch (er) { err(er); } };
       const d = $('[data-del]', w); if (d) d.onclick = async () => { if (!await confirm('حذف البند من القائمة؟ (لا يؤثر على الجداول السابقة)', 'حذف', true)) return; try { await q(sb.from('ls_items').delete().eq('code', it.code)); close(); mountLsAdmin(t); } catch (er) { err(er); } };
     } });
