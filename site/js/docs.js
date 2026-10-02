@@ -4,15 +4,16 @@ import { $, $$, esc, norm, money, dateAr, toast, err, modal, confirm, field, inp
 import { exportTable, xbtn } from './xlsx.js';
 import { compress } from './treports.js';
 
-const BUCKET = 'project-files';
-export const DOC_CAT = { contract: 'العقد', site_handover: 'محضر تسليم الموقع', initial_handover: 'محضر الاستلام الابتدائي', final_handover: 'محضر الاستلام النهائي', bank_guarantee: 'ضمان بنكي', insurance: 'وثيقة تأمين', letter_in: 'خطاب وارد', letter_out: 'خطاب صادر', change_order: 'أمر تغيير', extension: 'تمديد مدة', minutes: 'وثيقة رسمية أخرى', other: 'أخرى' };
+export const BUCKET = 'project-files';
+export const TENDER_CAT = { tender_terms: 'كراسة الشروط والمواصفات', tender_specs: 'المواصفات الفنية (الطرح)', tender_addendum: 'ملحق / تعميم طرح', site_visit: 'محضر زيارة الموقع', bid_opening: 'محضر فتح المظاريف', award_letter: 'خطاب الترسية' };
+export const DOC_CAT = { ...TENDER_CAT, contract: 'العقد', site_handover: 'محضر تسليم الموقع', initial_handover: 'محضر الاستلام الابتدائي', final_handover: 'محضر الاستلام النهائي', bank_guarantee: 'ضمان بنكي', insurance: 'وثيقة تأمين', letter_in: 'خطاب وارد', letter_out: 'خطاب صادر', change_order: 'أمر تغيير', extension: 'تمديد مدة', minutes: 'وثيقة رسمية أخرى', other: 'أخرى' };
 const REQUIRED_EXEC = ['contract', 'site_handover', 'bank_guarantee', 'insurance'];
 export const DISC = { arch: 'معماري', struct: 'إنشائي', mech: 'ميكانيكي (تكييف)', elec: 'كهربائي', civil: 'مدني', plumb: 'صحي', fire: 'إطفاء وإنذار', medgas: 'غازات طبية', ict: 'اتصالات وشبكات', landscape: 'تنسيق مواقع', other: 'أخرى' };
-export const DWG_ST = { design: 'تصميم', for_approval: 'للاعتماد', approved: 'معتمد', approved_notes: 'معتمد بملاحظات', rejected: 'مرفوض', as_built: 'كما نُفذ', superseded: 'نسخة أقدم' };
+export const DWG_ST = { design: 'تصميم', for_tender: 'للطرح', for_approval: 'للاعتماد', approved: 'معتمد', approved_notes: 'معتمد بملاحظات', rejected: 'مرفوض', as_built: 'كما نُفذ', superseded: 'نسخة أقدم' };
 export const SUB_KIND = { material: 'عينة / مادة', shop_drawing: 'مخطط تنفيذي', method: 'طريقة تنفيذ', subcontractor: 'مقاول باطن', supplier: 'مورد', other: 'أخرى' };
 export const DECISION = { approved: 'معتمد (A)', approved_notes: 'معتمد بملاحظات (B)', resubmit: 'أعد التقديم (C)', rejected: 'مرفوض (D)' };
 export const SUB_ST = { submitted: 'مقدَّم — بانتظار المهندس', reviewed: 'راجعه المهندس — بانتظار القرار', decided: 'صدر القرار' };
-const dwgBadge = s => `<span class="badge ${['approved', 'as_built'].includes(s) ? 'full' : s === 'approved_notes' ? 'sky' : s === 'rejected' ? 'bad' : s === 'for_approval' ? 'ovr' : 'skel'}">${DWG_ST[s] || s}</span>`;
+export const dwgBadge = s => `<span class="badge ${['approved', 'as_built'].includes(s) ? 'full' : s === 'approved_notes' ? 'sky' : s === 'rejected' ? 'bad' : s === 'for_approval' ? 'ovr' : s === 'for_tender' ? 'info' : 'skel'}">${DWG_ST[s] || s}</span>`;
 export const decBadge = d => d ? `<span class="badge ${d === 'approved' ? 'full' : d === 'approved_notes' ? 'sky' : d === 'resubmit' ? 'ovr' : 'bad'}">${DECISION[d]}</span>` : '';
 export const isOverdue = s => s.status !== 'decided' && s.due_on && s.due_on < today();
 const kb = n => n ? (n > 1048576 ? (n / 1048576).toFixed(1) + ' م.ب' : Math.round(n / 1024) + ' ك.ب') : '';
@@ -36,10 +37,10 @@ export async function openFile(row) {
   const { data, error } = await sb.storage.from(BUCKET).createSignedUrl(row.path, 3600); if (error) return err(error);
   window.open(data.signedUrl, '_blank');
 }
-const fileCell = r => r.path ? `<button class="btn sm" data-file="${r.id}">${ico('clip')} ${esc((r.file_name || 'ملف').slice(0, 28))}${r.file_size ? ` <small class="muted">${kb(r.file_size)}</small>` : ''}</button>` : r.link ? `<a class="btn sm" href="${esc(r.link)}" target="_blank" rel="noopener">🔗 رابط</a>` : '<span class="muted">—</span>';
+export const fileCell = r => r.path ? `<button class="btn sm" data-file="${r.id}">${ico('clip')} ${esc((r.file_name || 'ملف').slice(0, 28))}${r.file_size ? ` <small class="muted">${kb(r.file_size)}</small>` : ''}</button>` : r.link ? `<a class="btn sm" href="${esc(r.link)}" target="_blank" rel="noopener">🔗 رابط</a>` : '<span class="muted">—</span>';
 const fileFields = (r, cls = '') => `<div class="fld ${cls}"><span>الملف (PDF / صورة / أوفيس / DWG — حتى 50 م.ب)</span><input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx,.dwg,.dxf,.zip">${r?.path ? `<small class="muted">الملف الحالي: ${esc(r.file_name || '')} — اختيار ملف جديد يستبدله</small>` : ''}</div>${field('أو رابط خارجي (OneDrive / SharePoint)', inp('link', r?.link || '', 'dir="ltr" placeholder="https://…"'), cls)}`;
 async function withFile(form, row, prefix) { const f = form.querySelector('[name=file]'); if (f?.files?.[0]) { toast('جارٍ رفع الملف…'); const u = await uploadOne(f.files[0], prefix); if (row._old) { try { await sb.storage.from(BUCKET).remove([row._old]); } catch (e) { } } Object.assign(row, u); } return row; }
-function bindFiles(root, rows) { $$('[data-file]', root).forEach(b => b.onclick = () => openFile(rows.find(x => x.id === +b.getAttribute('data-file')))); }
+export function bindFiles(root, rows) { $$('[data-file]', root).forEach(b => b.onclick = () => openFile(rows.find(x => x.id === +b.getAttribute('data-file')))); }
 
 // ================= 1) المستندات الرسمية
 export async function projectDocs(t, p) {
@@ -56,8 +57,8 @@ export async function projectDocs(t, p) {
   if (canDocs()) { $('#dNew').onclick = () => docForm(null, p, () => projectDocs(t, p)); $$('[data-d]', t).forEach(b => b.onclick = () => docForm(rows.find(x => x.id === +b.getAttribute('data-d')), p, () => projectDocs(t, p))); }
 }
 const addDays = n => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
-async function docForm(d, p, done) {
-  const v = d || { category: 'contract', doc_date: today() };
+export async function docForm(d, p, done, preset) {
+  const v = d || { category: 'contract', doc_date: today(), ...(preset || {}) };
   await modal(`<form id="f" class="pgrid">
     ${field('نوع المستند *', sel('category', Object.entries(DOC_CAT), v.category, 'id="cat"'))}
     ${field('العنوان *', inp('title', v.title || '', 'required'), 'wide')}
@@ -100,10 +101,10 @@ export async function projectDrawings(t, p) {
     $$('[data-rev]', t).forEach(b => b.onclick = () => { const d = dwgs.find(x => x.id === +b.getAttribute('data-rev')); revForm(d, revsOf(d.id), p, () => projectDrawings(t, p)); });
   }
 }
-async function dwgForm(d, p, done) {
-  const v = d || { discipline: 'arch' };
+export async function dwgForm(d, p, done, preset) {
+  const v = d || { discipline: 'arch', ...(preset || {}) };
   await modal(`<form id="f" class="pgrid">${field('التخصص *', sel('discipline', Object.entries(DISC), v.discipline))}${field('رقم المخطط', inp('dwg_no', v.dwg_no || '', 'dir="ltr" placeholder="A-101"'))}${field('العنوان *', inp('title', v.title || '', 'required'), 'wide')}
-    ${d ? '' : `<div class="wide"><h3 class="sub-h">المراجعة الأولى</h3></div>${field('رقم المراجعة', inp('rev', 'A', 'dir="ltr"'))}${field('الحالة', sel('status', Object.entries(DWG_ST).filter(([k]) => k !== 'superseded'), 'for_approval'))}${field('تاريخ الإصدار', inp('issued_on', today(), 'type="date"'))}${fileFields(null, 'wide')}`}
+    ${d ? '' : `<div class="wide"><h3 class="sub-h">المراجعة الأولى</h3></div>${field('رقم المراجعة', inp('rev', 'A', 'dir="ltr"'))}${field('الحالة', sel('status', Object.entries(DWG_ST).filter(([k]) => k !== 'superseded'), v.status || 'for_approval'))}${field('تاريخ الإصدار', inp('issued_on', today(), 'type="date"'))}${fileFields(null, 'wide')}`}
     <div class="btnrow end wide">${d ? '<button type="button" class="btn danger" data-del>حذف المخطط وكل مراجعاته</button>' : ''}<span class="sp"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">حفظ</button></div></form>`, { title: d ? 'تعديل بيانات المخطط' : 'مخطط جديد', wide: true, onOpen: (w, close) => {
       $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target); const btn = e.target.querySelector('button.primary'); btn.disabled = true;
         try { const row = { project_id: p.id, discipline: f.discipline, dwg_no: f.dwg_no.trim(), title: f.title.trim() };

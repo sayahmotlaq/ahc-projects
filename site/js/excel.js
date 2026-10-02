@@ -130,17 +130,20 @@ function scopeSheet(wb, prj, c){
   pageSetup(ws, false, prj, start);
   return ws;
 }
-export async function exportExcel(prj, c, LOGO_B64){
-  if(!c.groups.length){ toast('لا توجد بنود للتصدير'); return; }
-  toast('جارٍ إنشاء ملف Excel…');
-  try { await loadExcelJS(); } catch(e){ toast('تعذّر تحميل مكتبة Excel — تحقق من الاتصال بالإنترنت'); return; }
+export async function buildExcel(prj, c, LOGO_B64){
+  await loadExcelJS();
   const wb = new ExcelJS.Workbook(); wb.creator = 'تجمع الأحساء الصحي — المرجع الفني الموحد'; wb.created = new Date();
   wb._ahcLogo = wb.addImage({base64: LOGO_B64, extension:'png'});
   if(!prj.hide_prices) await boqSheet(wb, prj, c, true);
   await boqSheet(wb, prj, c, false);
   if(c.groups.some(g => g.lines.some(L => L.free))) scopeSheet(wb, prj, c);
   if(c.groups.some(g => g.lines.some(L => !L.free))) specSheet(wb, prj, c);
-  const buf = await wb.xlsx.writeBuffer();
+  return wb.xlsx.writeBuffer();
+}
+export async function exportExcel(prj, c, LOGO_B64){
+  if(!c.groups.length){ toast('لا توجد بنود للتصدير'); return; }
+  toast('جارٍ إنشاء ملف Excel…');
+  let buf; try { buf = await buildExcel(prj, c, LOGO_B64); } catch(e){ toast('تعذّر تحميل مكتبة Excel — تحقق من الاتصال بالإنترنت'); return; }
   download(new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), `جدول الكميات - ${prj.name||'مشروع'} - ${prj.date||today()}.xlsx`);
   toast('تم تصدير ملف Excel');
 }

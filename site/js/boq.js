@@ -6,7 +6,7 @@ import { loadLS, activeLS, LS_DEFAULT_NOTES, UNITS } from './lumpsum.js';
 
 const STATUS = { draft: 'مسودة', approved: 'معتمد', tender: 'طرح', awarded: 'ترسية', final: 'ختامي' };
 let LOGO_B64 = null;
-async function logo() { if (LOGO_B64) return LOGO_B64; const b = await (await fetch('assets/logo.png')).blob(); LOGO_B64 = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result.split(',')[1]); fr.readAsDataURL(b); }); return LOGO_B64; }
+export async function logo() { if (LOGO_B64) return LOGO_B64; const b = await (await fetch('assets/logo.png')).blob(); LOGO_B64 = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result.split(',')[1]); fr.readAsDataURL(b); }); return LOGO_B64; }
 
 export const FREE_DIV = { code: '00', ar: 'بنود المقطوعية والبنود العامة', en: 'Lump-sum / General items' };
 export { UNITS };
@@ -31,6 +31,14 @@ export function calc(boq, lines) {
   return { groups: ordered, subtotal, cont, base, vat, grand: base + vat };
 }
 
+// بيانات التصدير (تُستخدم من صفحة الجدول ومن حزمة الطرح)
+export async function boqExportData(boq, lines, project) {
+  const c = calc(boq, lines);
+  const codes = [...new Set(c.groups.flatMap(g => g.lines.filter(L => !L.free).map(L => L.r.it.code)))];
+  if (codes.length) { const { data } = await sb.from('items').select('*').in('code', codes); (data || []).forEach(d => { const it = REF.byItem[d.code]; if (it) Object.assign(it, { scope: d.scope, specs: d.specs, health: d.health, accept: d.accept, method: d.method, refs: d.refs, status: d.status }); }); }
+  const prj = { name: project.name, ref: project.ref, facility: project.facility, type: project.type, dept: project.dept, engineer: project.engineer_name || '', date: boq.created_at?.slice(0, 10), contingency: boq.contingency, vat: boq.vat, factor: boq.factor, notes: boq.notes, hide_prices: boq.hide_prices, pricing: boq.pricing, boqName: boq.name };
+  return { prj, c };
+}
 export async function mountBoq(root, boqId, project, onBack) {
   const edit = canEdit();
   let boq = await q(sb.from('boqs').select('*').eq('id', boqId).single());
@@ -61,16 +69,7 @@ export async function mountBoq(root, boqId, project, onBack) {
     <div class="pcard" id="bqNotes" ${boq.notes ? '' : 'hidden'}><h2><span class="ic"></span>ملاحظات عامة</h2><div class="pre" id="bqNotesTxt" style="white-space:pre-wrap;line-height:1.8">${esc(boq.notes || '')}</div></div>
     <div class="pcard"><h2><span class="ic"></span>البنود <span class="muted" id="lineCount"></span>${boq.hide_prices ? ' <span class="badge ovr">نسخة طرح — بلا أسعار</span>' : ''}</h2><div class="tblwrap-bq" id="bqTable"></div><div class="totals" id="bqTotals"></div></div>`;
   $('#bBack').onclick = onBack;
-  $('#bExcel').onclick = async () => {
-    const c = calc(boq, lines);
-    // تفاصيل البنود المستخدمة لصفحة المواصفات
-    const codes = [...new Set(c.groups.flatMap(g => g.lines.map(L => L.r.it.code)))];
-    const { data } = await sb.from('items').select('*').in('code', codes);
-    (data || []).forEach(d => { const it = REF.byItem[d.code]; if (it) Object.assign(it, { scope: d.scope, specs: d.specs, health: d.health, accept: d.accept, method: d.method, refs: d.refs, status: d.status }); });
-    const eng = project.engineer_name || '';
-    const prj = { name: project.name, ref: project.ref, facility: project.facility, type: project.type, dept: project.dept, engineer: eng, date: boq.created_at?.slice(0, 10), contingency: boq.contingency, vat: boq.vat, factor: boq.factor, notes: boq.notes, hide_prices: boq.hide_prices, pricing: boq.pricing, boqName: boq.name };
-    exportExcel(prj, c, await logo());
-  };
+  $('#bExcel').onclick = async () => { const { prj, c } = await boqExportData(boq, lines, project); exportExcel(prj, c, await logo()); };
   if (edit) {
     $('#bSettings').onclick = () => settings();
     $('#bRefresh').onclick = async () => { if (!await confirm('تحديث أسعار جميع البنود من المرجع الحالي؟ ستُستبدل الأسعار المحفوظة في هذا الجدول.')) return; try { for (const ln of lines) { const v = REF.byVar[ln.variant_code]; if (v && Number(v.price) !== Number(ln.unit_price)) { await q(sb.from('boq_lines').update({ unit_price: v.price }).eq('id', ln.id)); ln.unit_price = v.price; } } renderTable(); toast('تم تحديث الأسعار'); } catch (e) { err(e); } };

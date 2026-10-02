@@ -7,6 +7,7 @@ import { projectTasks, projectRequests } from './tasks.js';
 import { projectPayments } from './payments.js';
 import { projectTReports } from './treports.js';
 import { projectDocs, projectDrawings, projectSubmittals, isOverdue as subLate } from './docs.js';
+import { projectTender, tenderData, tenderBox } from './tender.js';
 import { projectChanges, projectCloseout } from './closeout.js';
 import { projectSchedule } from './schedule.js';
 import { projectChallenges } from './challenges.js';
@@ -204,7 +205,7 @@ export async function mountProject(root, id, tab = 'overview', sub) {
   const own = isAdmin() || (edit && p.engineer_id === session.user.id);
   if (tab === 'boq' && sub) { return mountBoq(root, sub, p, () => location.hash = `#/project/${id}/boq`); }
   const st = stageOf(p.stage);
-  const TG = [['overview', 'نظرة عامة', 'dash', [['overview', 'الملخص']]], ['follow', 'المتابعة', 'check', [['schedule', 'الجدول الزمني'], ['treports', 'التقارير والمحاضر'], ['tasks', 'المهام'], ['requests', 'الطلبات'], ['challenges', 'التحديات والمخاطر'], ['updates', 'التحديثات والملاحظات'], ['log', 'سجل المراحل'], ['closeout', 'الإغلاق والضمان']]], ['fin', 'المالية', 'coins', [['boq', 'جداول الكميات'], ['payments', 'المستخلصات'], ['changes', 'أوامر التغيير والتمديدات']]], ['docs', 'المستندات', 'doc', [['docs', 'المستندات الرسمية'], ['drawings', 'المخططات'], ['submittals', 'الاعتمادات']]]];
+  const TG = [['overview', 'نظرة عامة', 'dash', [['overview', 'الملخص']]], ['follow', 'المتابعة', 'check', [['schedule', 'الجدول الزمني'], ['treports', 'التقارير والمحاضر'], ['tasks', 'المهام'], ['requests', 'الطلبات'], ['challenges', 'التحديات والمخاطر'], ['updates', 'التحديثات والملاحظات'], ['log', 'سجل المراحل'], ['closeout', 'الإغلاق والضمان']]], ['fin', 'المالية', 'coins', [['boq', 'جداول الكميات'], ['payments', 'المستخلصات'], ['changes', 'أوامر التغيير والتمديدات']]], ['docs', 'المستندات', 'doc', [['tender', 'حزمة الطرح'], ['docs', 'المستندات الرسمية'], ['drawings', 'المخططات'], ['submittals', 'الاعتمادات']]]];
   const grp = TG.find(g => g[3].some(x => x[0] === tab)) || TG[0];
   const act0 = await loadActivity();
   root.innerHTML = `<div class="phead">
@@ -230,6 +231,7 @@ export async function mountProject(root, id, tab = 'overview', sub) {
   else if (tab === 'changes') projectChanges(t, p);
   else if (tab === 'schedule') projectSchedule(t, p);
   else if (tab === 'closeout') projectCloseout(t, p);
+  else if (tab === 'tender') projectTender(t, p);
   else if (tab === 'docs') projectDocs(t, p);
   else if (tab === 'drawings') projectDrawings(t, p);
   else if (tab === 'submittals') projectSubmittals(t, p);
@@ -269,6 +271,7 @@ async function overview(t, p, edit) {
   const retention = pays.filter(x => ['approved', 'finance', 'paid'].includes(x.status)).reduce((a, x) => a + Number(x.retention_amount || 0), 0);
   const timeline = [...ups.map(u => ({ at: u.happened_on, ic: ({ visit: '📍', issue: '⚠', payment: '💰', letter: '✉', milestone: '★' })[u.kind] || '•', t: u.body, s: `${UPDATE_KINDS[u.kind] || ''} · ${dateAr(u.happened_on)} · ${pname(u.created_by)}`, l: `#/project/${p.id}/updates` })), ...log.map(l => ({ at: l.at, ic: '🚩', t: `انتقل إلى مرحلة ${stageOf(l.to_stage).ar}`, s: `${dateAr(l.at)}${l.note ? ' · ' + l.note : ''}`, l: `#/project/${p.id}/log` })), ...trs.map(r => ({ at: r.report_date, ic: '📋', t: r.title, s: dateAr(r.report_date), l: `#/treport/${r.id}` }))].sort((a, b) => (b.at || '').localeCompare(a.at || '')).slice(0, 7);
   const pre = ['request', 'study', 'approval', 'design', 'tender'].includes(p.stage);
+  const tBox = pre ? tenderBox(p, await tenderData(p, { boqs, docs })) : '';
   const TRK = { visit: 'زيارة', status: 'حالة', weekly: 'أسبوعي', monthly: 'شهري', incident: 'حادثة', meeting: 'محضر' };
   const trBox = `<div class="pcard inbox"><div class="toolbar m0"><h2 class="m0">التقارير والمحاضر</h2><span class="sp"></span>${edit ? `<a class="btn sm primary" href="#/treport/new?p=${p.id}">＋ تقرير</a>` : ''}</div>${trs.length ? trs.map(r => `<a class="it" href="#/treport/${r.id}" style="color:inherit;text-decoration:none;margin:6px 0 0"><div class="ic ${r.status === 'published' ? 'b' : r.status === 'returned' ? 'd' : 'c'}">${ico('file')}</div><div class="t"><b>${esc(r.title)}</b><small>${TRK[r.kind] || ''} · ${dateAr(r.report_date)} · ${({ draft: 'مسودة', published: 'بانتظار المراجعة', reviewed: 'تمت مراجعته', returned: 'معاد' })[r.status] || ''}</small></div></a>`).join('') + `<a class="small" href="#/project/${p.id}/treports" style="display:block;margin-top:8px">كل تقارير المشروع</a>` : `<p class="muted small" style="margin:8px 0 0">لا توجد تقارير أو محاضر مسجلة لهذا المشروع${p.stage === 'execution' ? ' — الزيارة الأسبوعية توثَّق بتقرير خلال 24 ساعة' : ''}.</p>`}</div>`;
   const boqBox = (() => { const last = boqs[0]; return `<div class="pcard inbox boqbox ${!boqs.length && pre ? 'hint' : ''}"><div class="toolbar m0"><h2 class="m0">جداول الكميات ${boqs.length ? `<span class="badge skel">${boqs.length}</span>` : ''}</h2><span class="sp"></span>${edit ? `<button class="btn sm primary" id="ovBoq">＋ جدول جديد</button>` : ''}</div>${last ? `<a class="it" href="#/project/${p.id}/boq/${last.id}" style="color:inherit;text-decoration:none;margin:8px 0 0"><div class="ic b">${ico('coins')}</div><div class="t"><b>${esc(last.name)} <span class="badge ${last.status === 'approved' ? 'full' : 'skel'}">${BOQ_STATUS[last.status] || last.status}</span></b><small>آخر جدول · ${dateAr(last.created_at)}${boqs.length > 1 ? ` · <a href="#/project/${p.id}/boq">كل الجداول (${boqs.length})</a>` : ''}</small></div></a>` : `<p class="muted small" style="margin:8px 0 0">${pre ? 'هذا المشروع بلا جدول كميات بعد — أنشئ جدولاً تقديرياً من المرجع الفني لتحديد الميزانية.' : 'لا توجد جداول كميات مسجلة لهذا المشروع.'}</p>`}</div>`; })();
@@ -280,7 +283,7 @@ async function overview(t, p, edit) {
       <div class="pcard"><h2>آخر النشاط<a class="small" href="#/project/${p.id}/updates">كل التحديثات</a></h2>${timeline.length ? `<div class="tl">${timeline.map(x => `<div class="e"><i>${x.ic}</i><div><b><a href="${x.l}" style="color:inherit">${esc(x.t)}</a></b><small>${esc(x.s)}</small></div></div>`).join('')}</div>` : '<p class="muted">لا يوجد نشاط مسجل بعد.</p>'}</div>
     </div>
     <div class="stack">
-      ${pre ? boqBox : ''}
+      ${pre ? tBox + boqBox : ''}
       ${pre ? '' : trBox}
       <div class="pcard fincard"><div class="row"><span class="muted">المصروف حتى الآن</span>${cv ? `<span class="badge ${paid / cv > (pa / 100) + .1 && p.stage === 'execution' ? 'ovr' : 'full'}">${Math.round(paid / cv * 100)}%</span>` : ''}</div><div class="big num">${money(Math.round(paid))} <small>ر.س</small></div>${cv ? `<div class="bar"><i style="width:${Math.min(100, Math.round(paid / cv * 100))}%"></i></div>` : ''}<div class="row"><span>المتبقي من العقد</span><b class="num">${cv ? money(Math.round(cv - paid)) : '—'}</b></div><div class="row"><span>مستخلصات مصروفة</span><b class="num">${pays.filter(x => x.status === 'paid').length}</b></div><div class="row"><span>قيد الاعتماد</span><b class="num ${payW.length ? 'bad' : ''}">${money(Math.round(payW.reduce((a, x) => a + Number(x.net_amount || 0), 0)))}</b></div><div class="row"><span>ضمان محتجز</span><b class="num">${money(Math.round(retention))}</b></div><div class="btnrow end" style="margin-top:4px"><a class="btn sm" href="#/project/${p.id}/payments">المستخلصات ›</a></div></div>
       <div class="pcard inbox"><h2>يحتاج انتباهاً ${att.length ? `<span class="badge ${att.some(a => a[0] === 'd') ? 'bad' : 'ovr'}">${att.length}</span>` : ''}</h2>${att.length ? att.map(a => `<a class="it" href="${a[4]}" style="color:inherit;text-decoration:none"><div class="ic ${a[0]}">${ico(a[1])}</div><div class="t"><b>${esc(a[2])}</b>${a[3] ? `<small>${esc(a[3])}</small>` : ''}</div></a>`).join('') : '<p class="muted">لا شيء يستدعي الانتباه حالياً.</p>'}</div>
