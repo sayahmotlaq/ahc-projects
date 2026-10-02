@@ -11,6 +11,7 @@ const SEED_GROUPS = [
     I('LS-01', 'تطوير كامل للنطاق', 'تطوير كامل للنطاق المحدد في المخططات يشمل: أعمال الإزالة والتفكيك، الحوائط والقواطع، الأرضيات والوزرات، الأسقف، الدهانات والتكسيات، الأبواب والواجهات، التمديدات الكهربائية والإنارة، التيار الخفيف وإنذار الحريق، التكييف والتهوية، الأعمال الصحية، التنظيف والتشغيل والتسليم؛ وكل ما يلزم لإنجاز العمل كاملاً جاهزاً للاستخدام حسب المخططات والمواصفات.'),
     I('LS-02', 'أعمال الإزالة والتفكيك', 'إزالة وتفكيك الحوائط والقواطع والأرضيات والوزرات والأسقف المستعارة والجبسية والأبواب والتمديدات الكهربائية والميكانيكية والصحية القائمة في نطاق العمل حسب المخططات، مع فصل الخدمات بأمان، وفرز المخلفات ونقلها إلى المواقع المعتمدة، وتسليم ما تطلبه الإدارة من المواد المفكّكة.'),
     I('LS-03', 'الحماية والحواجز المؤقتة وتنظيم الموقع', 'توريد وتركيب حواجز الغبار والعزل المؤقت ومسارات الحركة البديلة واللوحات التحذيرية، وحماية الأرضيات والأجهزة والمناطق التشغيلية المجاورة، والالتزام بمتطلبات مكافحة العدوى (ICRA) والسلامة والعمل خارج أوقات الذروة عند الطلب، وإزالة كل ذلك عند الانتهاء.'),
+    I('LS-40', 'الرسومات التنفيذية والتصاميم التكميلية', 'إعداد وتقديم الرسومات التنفيذية (Shop Drawings) لجميع الأعمال قبل التنفيذ، وإعداد التصاميم التكميلية حيث لا تكفي المخططات المرفقة أو تخلو من التفاصيل (مثل: تفاصيل التمديدات الكهربائية والإنارة ولوحات التوزيع، توزيع الأثاث، التكييف، التيار الخفيف، التفاصيل المعمارية)، بواسطة مهندسين مختصين وعلى حساب المقاول، واعتمادها من المهندس المشرف قبل البدء، مع تسليم مخططات كما نُفِّذ (As-built) في النهاية؛ ويُعدّ ذلك مشمولاً في السعر.'),
     I('LS-04', 'أعمال الهدم الإنشائي والفتحات والتدعيم', 'عمل الفتحات في الحوائط والأسقف وإزالة العناصر الإنشائية غير الحاملة، وتدعيم وتقوية ما يلزم بالكمرات والأعتاب والزوايا الحديدية حسب المخططات وتقرير المهندس الإنشائي، شاملاً الحماية والتثبيت المؤقت.'),
   ]),
   G('الأعمال المعمارية والتشطيبات', [
@@ -64,16 +65,17 @@ const SEED_GROUPS = [
 
 // بذرة النطاقات
 const SEED_TEMPLATES = {
-  'تطوير مدخل رئيسي': ['LS-02', 'LS-03', 'LS-04', 'LS-05', 'LS-06', 'LS-07', 'LS-08', 'LS-09', 'LS-10', 'LS-11', 'LS-15', 'LS-34', 'LS-16', 'LS-17', 'LS-18', 'LS-20', 'LS-21', 'LS-22', 'LS-24', 'LS-31', 'LS-32', 'LS-33'],
-  'تأهيل عام (قسم / جناح)': ['LS-02', 'LS-03', 'LS-05', 'LS-06', 'LS-07', 'LS-08', 'LS-09', 'LS-10', 'LS-34', 'LS-17', 'LS-18', 'LS-21', 'LS-22', 'LS-23', 'LS-31', 'LS-32', 'LS-33'],
-  'تأهيل دورات مياه': ['LS-02', 'LS-03', 'LS-13', 'LS-14', 'LS-17', 'LS-18', 'LS-22', 'LS-23', 'LS-32'],
-  'تأهيل الواجهات والموقع الخارجي': ['LS-03', 'LS-12', 'LS-13', 'LS-27', 'LS-28', 'LS-29', 'LS-30', 'LS-32'],
-  'تطوير غرف التنويم': ['LS-02', 'LS-03', 'LS-35', 'LS-36', 'LS-37', 'LS-38', 'LS-39', 'LS-31', 'LS-32', 'LS-33'],
+  'تطوير مدخل رئيسي': ['LS-40', 'LS-02', 'LS-03', 'LS-04', 'LS-05', 'LS-06', 'LS-07', 'LS-08', 'LS-09', 'LS-10', 'LS-11', 'LS-15', 'LS-34', 'LS-16', 'LS-17', 'LS-18', 'LS-20', 'LS-21', 'LS-22', 'LS-24', 'LS-31', 'LS-32', 'LS-33'],
+  'تأهيل عام (قسم / جناح)': ['LS-40', 'LS-02', 'LS-03', 'LS-05', 'LS-06', 'LS-07', 'LS-08', 'LS-09', 'LS-10', 'LS-34', 'LS-17', 'LS-18', 'LS-21', 'LS-22', 'LS-23', 'LS-31', 'LS-32', 'LS-33'],
+  'تأهيل دورات مياه': ['LS-40', 'LS-02', 'LS-03', 'LS-13', 'LS-14', 'LS-17', 'LS-18', 'LS-22', 'LS-23', 'LS-32'],
+  'تأهيل الواجهات والموقع الخارجي': ['LS-40', 'LS-03', 'LS-12', 'LS-13', 'LS-27', 'LS-28', 'LS-29', 'LS-30', 'LS-32'],
+  'تطوير غرف التنويم': ['LS-40', 'LS-02', 'LS-03', 'LS-35', 'LS-36', 'LS-37', 'LS-38', 'LS-39', 'LS-31', 'LS-32', 'LS-33'],
 };
 export const LS_DEFAULT_NOTES = `1. الأسعار مقطوعية شاملة جميع أعمال التوريد والتنفيذ والمواد والعمالة والمعدات والنقل والاختبار والتشغيل والتسليم والضمان.
 2. يُرجع إلى المخططات والمواصفات الفنية للتفاصيل، وتُعدّ زيارة الموقع والاطلاع على طبيعة الأعمال القائمة إلزامية قبل التسعير.
 3. تشمل الأسعار حماية المناطق التشغيلية المجاورة والالتزام بمتطلبات مكافحة العدوى والسلامة والعمل خارج أوقات الذروة عند الطلب.
-4. أي أعمال لازمة لإنجاز النطاق كاملاً جاهزاً للاستخدام تُعدّ مشمولة في المقطوعية ولو لم تُذكر صراحةً.`;
+4. أي أعمال لازمة لإنجاز النطاق كاملاً جاهزاً للاستخدام تُعدّ مشمولة في المقطوعية ولو لم تُذكر صراحةً.
+5. على المقاول إعداد الرسومات التنفيذية (Shop Drawings) لجميع الأعمال، وإعداد التصاميم التكميلية حيث لا تكفي المخططات المرفقة أو تخلو من التفاصيل (الكهرباء والإنارة، توزيع الأثاث، التكييف، التيار الخفيف وغيرها) بمهندسين مختصين وعلى حسابه، واعتمادها قبل التنفيذ، وتسليم مخططات كما نُفِّذ؛ وكل ذلك مشمول في السعر.`;
 
 // ---------- تحميل القائمة الحية
 let CACHE = null;
@@ -87,6 +89,7 @@ export async function loadLS(force = false) {
   let items = [], tpls = [];
   try { items = await q(sb.from('ls_items').select('*').order('sort').order('code')); tpls = await q(sb.from('ls_templates').select('*').order('sort').order('id')); } catch (e) { items = []; }
   if (!items.length) { let n = 0; items = SEED_GROUPS.flatMap(g => g.items.map(i => ({ ...i, grp: g.ar, sort: ++n * 10, active: true }))); tpls = Object.entries(SEED_TEMPLATES).map(([name, codes], i) => ({ id: -i - 1, name, codes, sort: i, active: true })); }
+  items.sort((a, b) => (Number(a.sort) - Number(b.sort)) || String(a.code).localeCompare(String(b.code))); tpls.sort((a, b) => (Number(a.sort) - Number(b.sort)) || (a.id - b.id));
   CACHE = build(items, tpls); CACHE.all = items; return CACHE;
 }
 export function activeLS(LS) { return build(LS.all.filter(i => i.active !== false), LS.templates.filter(t => t.active !== false)); }
@@ -104,8 +107,13 @@ export async function mountLsAdmin(t) {
     <div id="tpList"></div></div>`;
   const renderItems = () => {
     const f = norm($('#lsAq', t).value); const grouped = {}; items.filter(i => !f || norm(i.code + ' ' + i.title + ' ' + i.descr + ' ' + i.grp).includes(f)).forEach(i => (grouped[i.grp] = grouped[i.grp] || []).push(i));
-    $('#lsAList', t).innerHTML = Object.entries(grouped).map(([g, arr]) => `<div class="lsg"><div class="lsgh"><b>${esc(g)}</b></div>${arr.map(i => `<div class="lsi adm ${i.active === false ? 'off' : ''}" data-code="${esc(i.code)}"><span class="cd">${esc(i.code)}</span><span class="lst"><b>${esc(i.title)}${i.unit && i.unit !== 'مقطوعية' ? ` <span class="muted small">(${esc(i.unit)})</span>` : ''}${i.active === false ? ' <span class="badge ovr">موقوف</span>' : ''}</b><small>${esc(i.descr)}</small></span><span class="acts nocard"><button class="btn sm" data-edit="${esc(i.code)}">✎ تعديل</button></span></div>`).join('')}</div>`).join('') || '<p class="muted">لا نتائج</p>';
+    $('#lsAList', t).innerHTML = Object.entries(grouped).map(([g, arr]) => `<div class="lsg"><div class="lsgh"><b>${esc(g)}</b></div>${arr.map(i => `<div class="lsi adm ${i.active === false ? 'off' : ''}" data-code="${esc(i.code)}"><span class="cd">${esc(i.code)}</span><span class="lst"><b>${esc(i.title)}${i.unit && i.unit !== 'مقطوعية' ? ` <span class="muted small">(${esc(i.unit)})</span>` : ''}${i.active === false ? ' <span class="badge ovr">موقوف</span>' : ''}</b><small>${esc(i.descr)}</small></span><span class="acts nocard"><button class="btn sm" data-mv="${esc(i.code)}" data-dir="-1" title="أعلى">↑</button><button class="btn sm" data-mv="${esc(i.code)}" data-dir="1" title="أسفل">↓</button><button class="btn sm" data-edit="${esc(i.code)}">✎ تعديل</button></span></div>`).join('')}</div>`).join('') || '<p class="muted">لا نتائج</p>';
     $$('[data-edit]', t).forEach(b => b.onclick = () => itemForm(items.find(i => i.code === b.getAttribute('data-edit'))));
+    $$('[data-mv]', t).forEach(b => b.onclick = async () => {
+      const it = items.find(i => i.code === b.getAttribute('data-mv')); const dir = +b.getAttribute('data-dir'); const arr = items.filter(i => i.grp === it.grp); const i = arr.indexOf(it), j = i + dir; if (j < 0 || j >= arr.length) return;
+      const o = arr[j]; let a = Number(it.sort) || 0, c = Number(o.sort) || 0; if (a === c) { if (dir < 0) a -= 1; else a += 1; } else { [a, c] = [c, a]; }
+      try { await Promise.all([q(sb.from('ls_items').update({ sort: a }).eq('code', it.code)), q(sb.from('ls_items').update({ sort: c }).eq('code', o.code))]); it.sort = a; o.sort = c; items.sort((x, y) => (x.sort - y.sort) || x.code.localeCompare(y.code)); renderItems(); } catch (er) { err(er); }
+    });
   };
   const renderTpls = () => {
     $('#tpList', t).innerHTML = LS.templates.length ? `<table class="lst"><thead><tr><th>النطاق</th><th class="c">عدد البنود</th><th>البنود</th><th class="c nocard"></th></tr></thead><tbody>${LS.templates.map(tp => `<tr class="${tp.active === false ? 'muted' : ''}"><td><b>${esc(tp.name)}</b>${tp.active === false ? ' <span class="badge ovr">موقوف</span>' : ''}</td><td class="c">${tp.codes.length}</td><td class="small muted">${tp.codes.map(c => LS.byCode[c]?.title || c).join('، ')}</td><td class="c nocard"><button class="btn sm" data-tp="${tp.id}">✎</button></td></tr>`).join('')}</tbody></table>` : '<p class="muted">لا نطاقات بعد.</p>';

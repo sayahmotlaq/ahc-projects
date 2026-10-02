@@ -155,6 +155,13 @@ export async function mountBoq(root, boqId, project, onBack) {
     }, 200);
     inp.onblur = () => setTimeout(() => drop.classList.remove('show'), 180);
   }
+  async function moveLine(id, dir) {
+    const c = calc(boq, lines); const g = c.groups.find(x => x.lines.some(L => L.ln.id === id)); if (!g) return;
+    const fl = g.lines.filter(L => L.free).map(L => L.ln); const i = fl.findIndex(l => l.id === id); const j = i + dir; if (i < 0 || j < 0 || j >= fl.length) return;
+    [fl[i], fl[j]] = [fl[j], fl[i]];
+    const ups = []; fl.forEach((l, k) => { if (Number(l.sort) !== k) { l.sort = k; ups.push(q(sb.from('boq_lines').update({ sort: k }).eq('id', l.id))); } });
+    try { await Promise.all(ups); renderTable(); } catch (e) { err(e); }
+  }
   function renderTable() {
     const c = calc(boq, lines); const wrap = $('#bqTable');
     $('#lineCount').textContent = lines.length ? `(${lines.length} بند)` : '';
@@ -163,7 +170,7 @@ export async function mountBoq(root, boqId, project, onBack) {
     let n = 0;
     c.groups.forEach(g => {
       h += `<tr class="divrow"><td colspan="10">${g.div.code === '00' ? esc(g.div.ar) : `الشعبة ${g.div.code} — ${esc(g.div.ar)}`}</td></tr>`;
-      g.lines.forEach(L => { n++; const hp = boq.hide_prices; h += `<tr class="${L.free ? 'freerow' : ''}"><td class="c">${n}</td><td class="c"><span class="cd">${esc(L.r.v.code)}</span></td><td>${L.free ? `<div class="desc-ar">${esc(L.ln.title)}</div><div class="spec" style="max-width:none;white-space:pre-wrap">${esc(L.ln.descr || '')}</div>` : `<div class="desc-ar">${esc(L.r.it.ar)} — ${esc(L.r.v.ar)}</div><div class="desc-en">${esc(L.r.v.en || '')}</div>`}</td><td class="spec">${L.free ? '' : esc(L.r.v.spec || '')}</td><td class="c">${esc(L.r.v.unit)}</td><td class="c">${edit ? `<input class="qty" type="number" min="0" step="any" value="${L.ln.qty}" data-i="${L.ln.id}">` : L.ln.qty}</td>${hp ? '' : `<td class="n">${L.price ? fmt(L.price) : '—'}</td><td class="n">${fmt(L.total)}</td>`}<td>${edit ? `<input class="loc" value="${esc(L.ln.loc || '')}" data-li="${L.ln.id}" placeholder="—">` : esc(L.ln.loc || '')}</td>${edit ? `<td class="c noprint" style="white-space:nowrap">${L.free ? `<span class="del" data-edit="${L.ln.id}" title="تعديل" style="color:var(--navy)">✎</span> ` : ''}<span class="del" data-del="${L.ln.id}" title="حذف">✕</span></td>` : ''}</tr>`; });
+      g.lines.forEach(L => { n++; const hp = boq.hide_prices; h += `<tr class="${L.free ? 'freerow' : ''}"><td class="c">${n}</td><td class="c"><span class="cd">${esc(L.r.v.code)}</span></td><td>${L.free ? `<div class="desc-ar">${esc(L.ln.title)}</div><div class="spec" style="max-width:none;white-space:pre-wrap">${esc(L.ln.descr || '')}</div>` : `<div class="desc-ar">${esc(L.r.it.ar)} — ${esc(L.r.v.ar)}</div><div class="desc-en">${esc(L.r.v.en || '')}</div>`}</td><td class="spec">${L.free ? '' : esc(L.r.v.spec || '')}</td><td class="c">${esc(L.r.v.unit)}</td><td class="c">${edit ? `<input class="qty" type="number" min="0" step="any" value="${L.ln.qty}" data-i="${L.ln.id}">` : L.ln.qty}</td>${hp ? '' : `<td class="n">${L.price ? fmt(L.price) : '—'}</td><td class="n">${fmt(L.total)}</td>`}<td>${edit ? `<input class="loc" value="${esc(L.ln.loc || '')}" data-li="${L.ln.id}" placeholder="—">` : esc(L.ln.loc || '')}</td>${edit ? `<td class="c noprint" style="white-space:nowrap">${L.free ? `<span class="del" data-up="${L.ln.id}" title="أعلى" style="color:var(--navy)">↑</span> <span class="del" data-dn="${L.ln.id}" title="أسفل" style="color:var(--navy)">↓</span> <span class="del" data-edit="${L.ln.id}" title="تعديل" style="color:var(--navy)">✎</span> ` : ''}<span class="del" data-del="${L.ln.id}" title="حذف">✕</span></td>` : ''}</tr>`; });
       h += boq.hide_prices ? '' : `<tr class="subrow"><td colspan="7">${g.div.code === '00' ? 'مجموع ' + esc(g.div.ar) : `مجموع الشعبة ${g.div.code}`}</td><td class="n">${fmt(g.total)}</td><td colspan="2"></td></tr>`;
     });
     wrap.innerHTML = h + '</tbody></table>';
@@ -171,6 +178,8 @@ export async function mountBoq(root, boqId, project, onBack) {
       $$('input.qty', wrap).forEach(el => el.onchange = async () => { const id = +el.getAttribute('data-i'); const ln = lines.find(l => l.id === id); ln.qty = Math.max(0, Number(el.value) || 0); try { await q(sb.from('boq_lines').update({ qty: ln.qty }).eq('id', id)); renderTable(); } catch (e) { err(e); } });
       $$('input.loc', wrap).forEach(el => el.onchange = async () => { const id = +el.getAttribute('data-li'); const ln = lines.find(l => l.id === id); ln.loc = el.value.trim(); try { await q(sb.from('boq_lines').update({ loc: ln.loc }).eq('id', id)); } catch (e) { err(e); } });
       $$('[data-edit]', wrap).forEach(el => el.onclick = () => freeForm(lines.find(l => l.id === +el.getAttribute('data-edit'))));
+      $$('[data-up]', wrap).forEach(el => el.onclick = () => moveLine(+el.getAttribute('data-up'), -1));
+      $$('[data-dn]', wrap).forEach(el => el.onclick = () => moveLine(+el.getAttribute('data-dn'), 1));
       $$('[data-del]', wrap).forEach(el => el.onclick = async () => { const id = +el.getAttribute('data-del'); try { await q(sb.from('boq_lines').delete().eq('id', id)); lines = lines.filter(l => l.id !== id); renderTable(); } catch (e) { err(e); } });
     }
     if (boq.hide_prices) { $('#bqTotals').innerHTML = `<p class="muted small">نسخة طرح — تُعبّأ الأسعار من المتنافسين${boq.pricing === 'lumpsum' ? ' (تسعير مقطوعية)' : ''}.</p>`; return; }
