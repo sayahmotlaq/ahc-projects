@@ -3,10 +3,10 @@ import { sb, ROLES, q, session, invalidateRef } from './api.js';
 import { $, $$, esc, money, dateAr, toast, err, confirm, modal, field, inp, sel, formData } from './ui.js';
 
 export async function mountAdmin(root, tab = 'users') {
-  const tabs = [['users', 'المستخدمون'], ['quality', 'جودة البيانات'], ['prices', 'سجل الأسعار'], ['audit', 'سجل التدقيق'], ['settings', 'الإعدادات']];
+  const tabs = [['users', 'المستخدمون'], ['quality', 'جودة البيانات'], ['prices', 'سجل الأسعار'], ['audit', 'سجل التدقيق'], ['lumpsum', 'بنود المقطوعية'], ['settings', 'الإعدادات']];
   root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">الإدارة</h1></div><div class="tabs">${tabs.map(([k, t]) => `<a href="#/admin/${k}" class="${tab === k ? 'on' : ''}">${t}</a>`).join('')}</div><div id="atab"><p class="muted">…</p></div>`;
   const t = $('#atab');
-  if (tab === 'users') users(t); else if (tab === 'quality') quality(t); else if (tab === 'prices') prices(t); else if (tab === 'audit') audit(t); else settings(t);
+  if (tab === 'users') users(t); else if (tab === 'quality') quality(t); else if (tab === 'prices') prices(t); else if (tab === 'audit') audit(t); else if (tab === 'lumpsum') (await import('./lumpsum.js')).mountLsAdmin(t).catch(err); else settings(t);
 }
 async function users(t) {
   const rows = await q(sb.from('profiles').select('*').order('created_at'));

@@ -742,3 +742,5 @@ h2.m0,h3.m0,p.m0,.toolbar h2.m0{margin:0}
 .lsfoot{display:flex;flex-direction:column;gap:8px;padding-top:4px;border-top:1px solid var(--line2)}
 table.bq tr.freerow td .spec{color:var(--grey);font-size:12px;line-height:1.65;margin-top:3px}
 @media (max-width:720px){ .lspick{max-height:none} .lspick .lsbody{min-height:0;max-height:48vh} .lsi{grid-template-columns:auto 1fr} .lsi .cd{display:none} .lsi .lst small{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden} }
+.lsi.adm{grid-template-columns:auto 1fr auto;cursor:default} .lsi.adm:hover{background:none} .lsi.off{opacity:.5} .lsi .acts{align-self:center}
+@media (max-width:720px){ .lsi.adm{grid-template-columns:1fr auto} .lsi.adm .lst small{-webkit-line-clamp:3} }

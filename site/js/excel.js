@@ -107,6 +107,29 @@ function specSheet(wb, prj, c){
   pageSetup(ws, false, prj, specStart);
   return ws;
 }
+function scopeSheet(wb, prj, c){
+  const ws = wb.addWorksheet('نطاق الأعمال والمواصفات', {properties:{tabColor:{argb:'FFA98736'}}});
+  const cols = 3; ws.getColumn(1).width = 5; ws.getColumn(2).width = 34; ws.getColumn(3).width = 110;
+  let r = hdr(ws, prj, 'نطاق الأعمال والمواصفات العامة', 'بيان تفصيلي لبنود المقطوعية — جزء لا يتجزأ من جدول الكميات ووثائق الطرح', {cols, titleCol:3, logoW:190, logoH:67, pairs:[[1,2,3,3]]});
+  const start = r;
+  const block = (title, txt, fill) => { r++; mc(ws,r,1,r,2); const lc = ws.getCell(r,1); lc.value = title; cellStyle(lc, {font:{bold:true, color:{argb:NAVY}}, fill: fill||CARD, align:{vertical:'top'}}); ws.getCell(r,2).border = B; const vc = ws.getCell(r,3); vc.value = txt; cellStyle(vc, {align:{vertical:'top'}}); const n = txt.split('\n').reduce((a,x)=>a+Math.ceil((x.length+4)/115),0); ws.getRow(r).height = Math.min(409, Math.max(18, 14.5*n + 4)); };
+  const head = (txt) => { r++; ws.mergeCells(r,1,r,cols); const dc = ws.getCell(r,1); dc.value = txt; cellStyle(dc, {font:{bold:true, size:12, color:{argb:WHITE}}, fill:NAVY}); ws.getRow(r).height = 22; };
+  if(prj.notes){ head('أولاً: الملاحظات والاشتراطات العامة'); block('ملاحظات عامة', prj.notes, GOLDBG); }
+  head((prj.notes?'ثانياً: ':'') + 'بيان بنود المقطوعية ونطاق كل بند');
+  let n = 0;
+  c.groups.forEach(g => g.lines.filter(L => L.free).forEach(L => { n++; block(`${n}. [${L.r.v.code}] ${L.ln.title}${L.ln.loc?'\n(الموقع: '+L.ln.loc+')':''}`, L.ln.descr || '—'); }));
+  head((prj.notes?'ثالثاً: ':'ثانياً: ') + 'الاشتراطات الفنية العامة');
+  [['المواصفات والكودات', 'تُنفَّذ جميع الأعمال وفق المخططات والمواصفات الفنية المرفقة، وكود البناء السعودي (SBC) بأجزائه ذات العلاقة، والمواصفات القياسية السعودية، ومتطلبات الدفاع المدني، ومتطلبات وزارة الصحة للمنشآت الصحية؛ وعند التعارض يُعتمد الأشد.'],
+   ['مكافحة العدوى والسلامة', 'يلتزم المقاول بمتطلبات مكافحة العدوى (ICRA) وتقييم المخاطر قبل البدء، وبحواجز الغبار والضغط السالب حيث يلزم، وبخطة السلامة والصحة المهنية، وبالعمل خارج أوقات الذروة في المناطق التشغيلية عند طلب الإدارة.'],
+   ['المواد والاعتمادات', 'تُقدَّم عينات وبيانات فنية لجميع المواد والمعدات لاعتمادها من المهندس المشرف قبل التوريد، وتكون المواد جديدة وأصلية من مصادر معتمدة ومطابقة للمواصفات.'],
+   ['الاختبار والتشغيل والتسليم', 'تُختبر جميع الأنظمة بحضور ممثل الإدارة وتُقدَّم تقارير الاختبار، وتُسلَّم المخططات كما نُفِّذ (As-built) وشهادات الضمان والكتيبات والتدريب قبل الاستلام الابتدائي.'],
+   ['الضمان', 'ضمان الأعمال والمواد لمدة لا تقل عن سنة من تاريخ الاستلام الابتدائي ما لم تنص المواصفات أو العقد على مدة أطول، مع إصلاح أي عيوب خلالها على حساب المقاول.'],
+   ['شمولية السعر', 'المبالغ المقطوعة شاملة جميع ما يلزم لإنجاز البند كاملاً جاهزاً للاستخدام من مواد وعمالة ومعدات ونقل ومخلفات واختبار وتشغيل وتصاريح، ولو لم يُذكر صراحةً.']].forEach(([t,x]) => block(t, x));
+  r += 2; const sig = ['إعداد: مهندس المشروع', 'مراجعة: رئيس قسم المشاريع', 'اعتماد: مدير إدارة الخدمات الفنية'];
+  sig.forEach((t, i) => { const cell = ws.getCell(r, i===0?1:(i===1?2:3)); cell.value = t + '\n\nالاسم: ................................\nالتوقيع: ..............................'; cellStyle(cell, {font:{size:9}, align:{vertical:'top'}}); }); ws.getRow(r).height = 62;
+  pageSetup(ws, false, prj, start);
+  return ws;
+}
 export async function exportExcel(prj, c, LOGO_B64){
   if(!c.groups.length){ toast('لا توجد بنود للتصدير'); return; }
   toast('جارٍ إنشاء ملف Excel…');
@@ -115,6 +138,7 @@ export async function exportExcel(prj, c, LOGO_B64){
   wb._ahcLogo = wb.addImage({base64: LOGO_B64, extension:'png'});
   if(!prj.hide_prices) await boqSheet(wb, prj, c, true);
   await boqSheet(wb, prj, c, false);
+  if(c.groups.some(g => g.lines.some(L => L.free))) scopeSheet(wb, prj, c);
   if(c.groups.some(g => g.lines.some(L => !L.free))) specSheet(wb, prj, c);
   const buf = await wb.xlsx.writeBuffer();
   download(new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), `جدول الكميات - ${prj.name||'مشروع'} - ${prj.date||today()}.xlsx`);

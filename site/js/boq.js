@@ -2,7 +2,7 @@
 import { sb, REF, canEdit, q, session, itemDetail } from './api.js';
 import { $, $$, esc, norm, fmt, money, toast, err, confirm, modal, field, inp, sel, formData, debounce } from './ui.js';
 import { exportExcel } from './excel.js';
-import { LS_GROUPS, LS_BY_CODE, LS_TEMPLATES, LS_DEFAULT_NOTES } from './lumpsum.js';
+import { loadLS, activeLS, LS_DEFAULT_NOTES } from './lumpsum.js';
 
 const STATUS = { draft: 'مسودة', approved: 'معتمد', tender: 'طرح', awarded: 'ترسية', final: 'ختامي' };
 let LOGO_B64 = null;
@@ -76,7 +76,7 @@ export async function mountBoq(root, boqId, project, onBack) {
     $('#bRefresh').onclick = async () => { if (!await confirm('تحديث أسعار جميع البنود من المرجع الحالي؟ ستُستبدل الأسعار المحفوظة في هذا الجدول.')) return; try { for (const ln of lines) { const v = REF.byVar[ln.variant_code]; if (v && Number(v.price) !== Number(ln.unit_price)) { await q(sb.from('boq_lines').update({ unit_price: v.price }).eq('id', ln.id)); ln.unit_price = v.price; } } renderTable(); toast('تم تحديث الأسعار'); } catch (e) { err(e); } };
     cascade(); quick();
     $('#bFree').onclick = () => freeForm(null);
-    $('#bTpl').onclick = () => lsPicker();
+    $('#bTpl').onclick = () => lsPicker().catch(err);
   }
   renderTable();
 
@@ -90,15 +90,17 @@ export async function mountBoq(root, boqId, project, onBack) {
     } });
   }
   // ---------- قائمة بنود المقطوعية
-  function lsPicker() {
-    const chips = Object.keys(LS_TEMPLATES).map(n => `<button type="button" class="chip" data-tpl="${esc(n)}">${esc(n)}</button>`).join('');
-    const groups = LS_GROUPS.map(g => `<div class="lsg"><div class="lsgh"><b>${esc(g.ar)}</b><button type="button" class="lnk" data-all>تحديد الكل</button></div>${g.items.map(i => `<label class="lsi" data-code="${i.code}"><input type="checkbox" name="c" value="${i.code}"><span class="cd">${i.code}</span><span class="lst"><b>${esc(i.title)}</b><small>${esc(i.descr)}</small></span></label>`).join('')}</div>`).join('');
-    modal(`<form id="f" class="lspick"><div class="lstop"><input type="search" id="lsq" placeholder="بحث في البنود…" autocomplete="off"><div class="chips">${chips}</div></div><div class="lsbody">${groups}</div><div class="lsfoot"><label class="chk"><input type="checkbox" name="lump" ${boq.pricing === 'lumpsum' || !lines.some(l => l.kind !== 'free') ? 'checked' : ''}> تسعير مقطوعية وإخفاء الأسعار (نسخة طرح)</label><label class="chk"><input type="checkbox" name="notes" ${boq.notes ? '' : 'checked'}> إضافة الملاحظات العامة المعيارية للطرح</label><div class="btnrow end"><span class="muted small" id="lsN">لم يُحدَّد شيء</span><span class="sp"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary" id="lsAdd" disabled>إضافة البنود</button></div></div></form>`, { title: 'بنود المقطوعية — اختر ما يلزم المشروع', wide: true, onOpen: (w, close) => {
+  async function lsPicker() {
+    const LS = activeLS(await loadLS()); const LS_BY_CODE = LS.byCode; const TPL = Object.fromEntries(LS.templates.map(t => [String(t.id), t]));
+    const chips = LS.templates.map(t => `<button type="button" class="chip" data-tpl="${t.id}">${esc(t.name)}</button>`).join('');
+    const groups = LS.groups.map(g => `<div class="lsg"><div class="lsgh"><b>${esc(g.ar)}</b><button type="button" class="lnk" data-all>تحديد الكل</button></div>${g.items.map(i => `<label class="lsi" data-code="${i.code}"><input type="checkbox" name="c" value="${i.code}"><span class="cd">${i.code}</span><span class="lst"><b>${esc(i.title)}</b><small>${esc(i.descr)}</small></span></label>`).join('')}</div>`).join('');
+    modal(`<form id="f" class="lspick"><div class="lstop"><input type="search" id="lsq" placeholder="بحث في البنود…" autocomplete="off"><div class="chips">${chips}${session?.profile?.role === 'admin' ? '<a class="chip" href="#/admin/lumpsum" title="تعديل القائمة والنطاقات">⚙ إدارة القائمة</a>' : ''}</div></div><div class="lsbody">${groups}</div><div class="lsfoot"><label class="chk"><input type="checkbox" name="lump" ${boq.pricing === 'lumpsum' || !lines.some(l => l.kind !== 'free') ? 'checked' : ''}> تسعير مقطوعية وإخفاء الأسعار (نسخة طرح)</label><label class="chk"><input type="checkbox" name="notes" ${boq.notes ? '' : 'checked'}> إضافة الملاحظات العامة المعيارية للطرح</label><div class="btnrow end"><span class="muted small" id="lsN">لم يُحدَّد شيء</span><span class="sp"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary" id="lsAdd" disabled>إضافة البنود</button></div></div></form>`, { title: 'بنود المقطوعية — اختر ما يلزم المشروع', wide: true, onOpen: (w, close) => {
+      const adm = $('a.chip', w); if (adm) adm.onclick = () => setTimeout(close, 50);
       const boxes = $$('input[name=c]', w); const existing = new Set(lines.filter(l => l.kind === 'free').map(l => l.title));
       boxes.forEach(b => { if (existing.has(LS_BY_CODE[b.value].title)) { b.closest('.lsi').classList.add('have'); b.closest('.lsi').title = 'موجود في الجدول'; } });
       const count = () => { const n = boxes.filter(b => b.checked).length; $('#lsN', w).textContent = n ? `${n} بند محدَّد` : 'لم يُحدَّد شيء'; $('#lsAdd', w).disabled = !n; };
       boxes.forEach(b => b.onchange = count);
-      $$('[data-tpl]', w).forEach(c => c.onclick = () => { const set = new Set(LS_TEMPLATES[c.getAttribute('data-tpl')]); boxes.forEach(b => b.checked = set.has(b.value)); $$('[data-tpl]', w).forEach(x => x.classList.toggle('on', x === c)); count(); });
+      $$('[data-tpl]', w).forEach(c => c.onclick = () => { const set = new Set(TPL[c.getAttribute('data-tpl')].codes); boxes.forEach(b => b.checked = set.has(b.value)); $$('[data-tpl]', w).forEach(x => x.classList.toggle('on', x === c)); count(); });
       $$('[data-all]', w).forEach(a => a.onclick = () => { const bs = $$('input[name=c]', a.closest('.lsg')).filter(b => b.closest('.lsi').style.display !== 'none'); const all = bs.every(b => b.checked); bs.forEach(b => b.checked = !all); count(); });
       $('#lsq', w).oninput = () => { const t = norm($('#lsq', w).value); $$('.lsi', w).forEach(el => { const i = LS_BY_CODE[el.getAttribute('data-code')]; el.style.display = !t || norm(i.title + ' ' + i.descr + ' ' + i.code).includes(t) ? '' : 'none'; }); $$('.lsg', w).forEach(g => g.style.display = $$('.lsi', g).some(e => e.style.display !== 'none') ? '' : 'none'); };
       $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target); const codes = boxes.filter(b => b.checked).map(b => b.value); if (!codes.length) return;

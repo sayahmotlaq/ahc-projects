@@ -1,9 +1,11 @@
-// ===== قائمة بنود المقطوعية (Lump-sum) — بنود متعارف عليها لأعمال التغيير والاستبدال والتطوير =====
-// كل بند: كود، عنوان، وصف تفصيلي بصياغة طرح (يحيل إلى المخططات والمواصفات). تُضاف كبنود حرة بوحدة «مقطوعية» وتُعدَّل بحرية بعد الإضافة.
+// ===== قائمة بنود المقطوعية (Lump-sum) ونطاقات العمل =====
+// المصدر الحي: جدولا ls_items و ls_templates في قاعدة البيانات (تُدار من الإدارة ← بنود المقطوعية). القائمة أدناه بذرة/احتياط فقط (0021_ls_catalog.sql).
+import { sb, q } from './api.js';
+import { $, $$, esc, norm, toast, err, confirm, modal, field, inp, formData } from './ui.js';
 const G = (ar, items) => ({ ar, items });
 const I = (code, title, descr) => ({ code, title, descr });
 
-export const LS_GROUPS = [
+const SEED_GROUPS = [
   G('أعمال عامة وتحضيرية', [
     I('LS-01', 'تطوير كامل للنطاق', 'تطوير كامل للنطاق المحدد في المخططات يشمل: أعمال الإزالة والتفكيك، الحوائط والقواطع، الأرضيات والوزرات، الأسقف، الدهانات والتكسيات، الأبواب والواجهات، التمديدات الكهربائية والإنارة، التيار الخفيف وإنذار الحريق، التكييف والتهوية، الأعمال الصحية، التنظيف والتشغيل والتسليم؛ وكل ما يلزم لإنجاز العمل كاملاً جاهزاً للاستخدام حسب المخططات والمواصفات.'),
     I('LS-02', 'أعمال الإزالة والتفكيك', 'إزالة وتفكيك الحوائط والقواطع والأرضيات والوزرات والأسقف المستعارة والجبسية والأبواب والتمديدات الكهربائية والميكانيكية والصحية القائمة في نطاق العمل حسب المخططات، مع فصل الخدمات بأمان، وفرز المخلفات ونقلها إلى المواقع المعتمدة، وتسليم ما تطلبه الإدارة من المواد المفكّكة.'),
@@ -50,11 +52,9 @@ export const LS_GROUPS = [
     I('LS-33', 'السلامة والتصاريح والتنسيق', 'الالتزام بمتطلبات السلامة والصحة المهنية ومكافحة العدوى، واستخراج التصاريح اللازمة، والتنسيق مع الأقسام التشغيلية والجهات المختصة طوال مدة التنفيذ، وتقديم خطة العمل والجدول الزمني والتقارير الدورية.'),
   ]),
 ];
-export const LS_ITEMS = LS_GROUPS.flatMap(g => g.items.map(i => ({ ...i, group: g.ar })));
-export const LS_BY_CODE = Object.fromEntries(LS_ITEMS.map(i => [i.code, i]));
 
-// قوالب سريعة: مجموعة بنود من القائمة
-export const LS_TEMPLATES = {
+// بذرة النطاقات
+const SEED_TEMPLATES = {
   'تطوير مدخل رئيسي': ['LS-02', 'LS-03', 'LS-04', 'LS-05', 'LS-06', 'LS-07', 'LS-08', 'LS-09', 'LS-10', 'LS-11', 'LS-15', 'LS-16', 'LS-17', 'LS-18', 'LS-20', 'LS-21', 'LS-22', 'LS-24', 'LS-31', 'LS-32', 'LS-33'],
   'تأهيل عام (قسم / جناح)': ['LS-02', 'LS-03', 'LS-05', 'LS-06', 'LS-07', 'LS-08', 'LS-09', 'LS-10', 'LS-17', 'LS-18', 'LS-21', 'LS-22', 'LS-23', 'LS-31', 'LS-32', 'LS-33'],
   'تأهيل دورات مياه': ['LS-02', 'LS-03', 'LS-13', 'LS-14', 'LS-17', 'LS-18', 'LS-22', 'LS-23', 'LS-32'],
@@ -64,3 +64,63 @@ export const LS_DEFAULT_NOTES = `1. الأسعار مقطوعية شاملة ج�
 2. يُرجع إلى المخططات والمواصفات الفنية للتفاصيل، وتُعدّ زيارة الموقع والاطلاع على طبيعة الأعمال القائمة إلزامية قبل التسعير.
 3. تشمل الأسعار حماية المناطق التشغيلية المجاورة والالتزام بمتطلبات مكافحة العدوى والسلامة والعمل خارج أوقات الذروة عند الطلب.
 4. أي أعمال لازمة لإنجاز النطاق كاملاً جاهزاً للاستخدام تُعدّ مشمولة في المقطوعية ولو لم تُذكر صراحةً.`;
+
+// ---------- تحميل القائمة الحية
+let CACHE = null;
+function build(items, tpls) {
+  const groups = []; const gmap = {};
+  items.forEach(i => { if (!gmap[i.grp]) { gmap[i.grp] = { ar: i.grp, items: [] }; groups.push(gmap[i.grp]); } gmap[i.grp].items.push(i); });
+  return { groups, items, byCode: Object.fromEntries(items.map(i => [i.code, i])), templates: tpls };
+}
+export async function loadLS(force = false) {
+  if (CACHE && !force) return CACHE;
+  let items = [], tpls = [];
+  try { items = await q(sb.from('ls_items').select('*').order('sort').order('code')); tpls = await q(sb.from('ls_templates').select('*').order('sort').order('id')); } catch (e) { items = []; }
+  if (!items.length) { let n = 0; items = SEED_GROUPS.flatMap(g => g.items.map(i => ({ ...i, grp: g.ar, sort: ++n * 10, active: true }))); tpls = Object.entries(SEED_TEMPLATES).map(([name, codes], i) => ({ id: -i - 1, name, codes, sort: i, active: true })); }
+  CACHE = build(items, tpls); CACHE.all = items; return CACHE;
+}
+export function activeLS(LS) { return build(LS.all.filter(i => i.active !== false), LS.templates.filter(t => t.active !== false)); }
+
+// ---------- إدارة القائمة (الإدارة ← بنود المقطوعية)
+export async function mountLsAdmin(t) {
+  const LS = await loadLS(true); const items = LS.all; const groupsAr = LS.groups.map(g => g.ar);
+  const nextCode = () => { const n = Math.max(0, ...items.map(i => Number((i.code.match(/(\d+)$/) || [])[1] || 0))); return 'LS-' + String(n + 1).padStart(2, '0'); };
+  t.innerHTML = `<div class="pcard"><h2><span class="ic"></span>بنود المقطوعية <span class="muted">(${items.length})</span><span class="sp"></span><button class="btn primary sm" id="lsNew">＋ بند جديد</button></h2>
+    <p class="muted small mb10">هذه القائمة تظهر للمهندسين في جدول الكميات ← «بنود المقطوعية». عدّل العنوان والوصف، أوقف بنداً دون حذفه، أو غيّر ترتيبه ومجموعته. تعديلك لا يمس الجداول المنشأة سابقاً (البند يُنسخ إليها عند الإضافة).</p>
+    <input type="search" id="lsAq" placeholder="بحث…" class="mb10" style="width:100%;max-width:420px">
+    <div id="lsAList"></div></div>
+    <div class="pcard"><h2><span class="ic"></span>نطاقات العمل (القوالب) <span class="muted">(${LS.templates.length})</span><span class="sp"></span><button class="btn primary sm" id="tpNew">＋ نطاق جديد</button></h2>
+    <p class="muted small mb10">كل نطاق يحدد تلقائياً مجموعة بنود عند اختياره في جدول الكميات، ويبقى للمهندس أن يضيف أو يزيل بعدها.</p>
+    <div id="tpList"></div></div>`;
+  const renderItems = () => {
+    const f = norm($('#lsAq', t).value); const grouped = {}; items.filter(i => !f || norm(i.code + ' ' + i.title + ' ' + i.descr + ' ' + i.grp).includes(f)).forEach(i => (grouped[i.grp] = grouped[i.grp] || []).push(i));
+    $('#lsAList', t).innerHTML = Object.entries(grouped).map(([g, arr]) => `<div class="lsg"><div class="lsgh"><b>${esc(g)}</b></div>${arr.map(i => `<div class="lsi adm ${i.active === false ? 'off' : ''}" data-code="${esc(i.code)}"><span class="cd">${esc(i.code)}</span><span class="lst"><b>${esc(i.title)}${i.active === false ? ' <span class="badge ovr">موقوف</span>' : ''}</b><small>${esc(i.descr)}</small></span><span class="acts nocard"><button class="btn sm" data-edit="${esc(i.code)}">✎ تعديل</button></span></div>`).join('')}</div>`).join('') || '<p class="muted">لا نتائج</p>';
+    $$('[data-edit]', t).forEach(b => b.onclick = () => itemForm(items.find(i => i.code === b.getAttribute('data-edit'))));
+  };
+  const renderTpls = () => {
+    $('#tpList', t).innerHTML = LS.templates.length ? `<table class="lst"><thead><tr><th>النطاق</th><th class="c">عدد البنود</th><th>البنود</th><th class="c nocard"></th></tr></thead><tbody>${LS.templates.map(tp => `<tr class="${tp.active === false ? 'muted' : ''}"><td><b>${esc(tp.name)}</b>${tp.active === false ? ' <span class="badge ovr">موقوف</span>' : ''}</td><td class="c">${tp.codes.length}</td><td class="small muted">${tp.codes.map(c => LS.byCode[c]?.title || c).join('، ')}</td><td class="c nocard"><button class="btn sm" data-tp="${tp.id}">✎</button></td></tr>`).join('')}</tbody></table>` : '<p class="muted">لا نطاقات بعد.</p>';
+    $$('[data-tp]', t).forEach(b => b.onclick = () => tplForm(LS.templates.find(x => String(x.id) === b.getAttribute('data-tp'))));
+  };
+  $('#lsAq', t).oninput = renderItems; $('#lsNew', t).onclick = () => itemForm(null); $('#tpNew', t).onclick = () => tplForm(null);
+  renderItems(); renderTpls();
+
+  function itemForm(it) {
+    const v = it || { code: nextCode(), grp: groupsAr[0] || 'بنود عامة', title: '', descr: '', sort: (Math.max(0, ...items.map(i => i.sort || 0)) + 10), active: true };
+    modal(`<form id="f" class="pgrid">${field('الكود', inp('code', v.code, it ? 'readonly' : 'required'))}${field('المجموعة', `<input name="grp" list="lsGrps" value="${esc(v.grp)}" required><datalist id="lsGrps">${groupsAr.map(g => `<option value="${esc(g)}">`).join('')}</datalist>`)}${field('عنوان البند *', inp('title', v.title, 'required'), 'wide')}${field('الوصف التفصيلي (صياغة الطرح)', `<textarea name="descr" rows="5">${esc(v.descr)}</textarea>`, 'wide')}${field('الترتيب', inp('sort', v.sort, 'type="number" step="1"'))}<label class="chk"><input type="checkbox" name="active" ${v.active !== false ? 'checked' : ''}> فعّال (يظهر للمهندسين)</label><div class="btnrow end wide">${it ? '<button type="button" class="btn danger" data-del>حذف</button>' : ''}<span class="sp"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">حفظ</button></div></form>`, { title: it ? 'تعديل بند مقطوعية' : 'بند مقطوعية جديد', wide: true, onOpen: (w, close) => {
+      $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target); const row = { code: f.code.trim(), grp: f.grp.trim(), title: f.title.trim(), descr: f.descr.trim(), sort: Number(f.sort) || 0, active: !!f.active, updated_at: new Date().toISOString() };
+        try { if (it) { await q(sb.from('ls_items').update(row).eq('code', it.code)); } else { if (items.some(i => i.code === row.code)) return toast('الكود مستخدم'); await q(sb.from('ls_items').insert(row)); } close(); toast('تم الحفظ'); mountLsAdmin(t); } catch (er) { err(er); } };
+      const d = $('[data-del]', w); if (d) d.onclick = async () => { if (!await confirm('حذف البند من القائمة؟ (لا يؤثر على الجداول السابقة)', 'حذف', true)) return; try { await q(sb.from('ls_items').delete().eq('code', it.code)); close(); mountLsAdmin(t); } catch (er) { err(er); } };
+    } });
+  }
+  function tplForm(tp) {
+    const v = tp || { name: '', codes: [], sort: (Math.max(0, ...LS.templates.map(x => x.sort || 0)) + 10), active: true }; const set = new Set(v.codes);
+    const list = LS.groups.map(g => `<div class="lsg"><div class="lsgh"><b>${esc(g.ar)}</b><button type="button" class="lnk" data-all>تحديد الكل</button></div>${g.items.filter(i => i.active !== false).map(i => `<label class="lsi" data-code="${i.code}"><input type="checkbox" name="c" value="${i.code}" ${set.has(i.code) ? 'checked' : ''}><span class="cd">${i.code}</span><span class="lst"><b>${esc(i.title)}</b></span></label>`).join('')}</div>`).join('');
+    modal(`<form id="f" class="lspick"><div class="pgrid">${field('اسم النطاق *', inp('name', v.name, 'required placeholder="مثال: تطوير مدخل رئيسي"'), 'wide')}${field('الترتيب', inp('sort', v.sort, 'type="number"'))}<label class="chk"><input type="checkbox" name="active" ${v.active !== false ? 'checked' : ''}> فعّال</label></div><div class="lsbody">${list}</div><div class="lsfoot"><div class="btnrow end">${tp ? '<button type="button" class="btn danger" data-del>حذف</button>' : ''}<span class="muted small" id="tpN"></span><span class="sp"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">حفظ</button></div></div></form>`, { title: tp ? 'تعديل نطاق' : 'نطاق عمل جديد', wide: true, onOpen: (w, close) => {
+      const boxes = $$('input[name=c]', w); const count = () => $('#tpN', w).textContent = `${boxes.filter(b => b.checked).length} بند`; boxes.forEach(b => b.onchange = count); count();
+      $$('[data-all]', w).forEach(a => a.onclick = () => { const bs = $$('input[name=c]', a.closest('.lsg')); const all = bs.every(b => b.checked); bs.forEach(b => b.checked = !all); count(); });
+      $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target); const row = { name: f.name.trim(), codes: boxes.filter(b => b.checked).map(b => b.value), sort: Number(f.sort) || 0, active: !!f.active, updated_at: new Date().toISOString() };
+        try { if (tp) await q(sb.from('ls_templates').update(row).eq('id', tp.id)); else await q(sb.from('ls_templates').insert(row)); close(); toast('تم الحفظ'); mountLsAdmin(t); } catch (er) { err(er); } };
+      const d = $('[data-del]', w); if (d) d.onclick = async () => { if (!await confirm('حذف النطاق؟', 'حذف', true)) return; try { await q(sb.from('ls_templates').delete().eq('id', tp.id)); close(); mountLsAdmin(t); } catch (er) { err(er); } };
+    } });
+  }
+}
