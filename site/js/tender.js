@@ -20,8 +20,8 @@ export async function tenderData(p, pre = {}) {
   const items = [
     { k: 'boq', req: true, ok: tboqs.length > 0, label: 'جدول كميات بحالة «طرح»', hint: tboqs.length ? `${tboqs.map(b => b.name).join('، ')}` : (boqs.length ? 'افتح الجدول ← إعدادات الجدول ← الحالة: طرح' : 'أنشئ جدول الكميات (مقطوعية أو من المرجع)'), link: boqs.length ? `#/project/${p.id}/boq${boqs.length === 1 ? '/' + boqs[0].id : ''}` : `#/project/${p.id}/boq?new=1` },
     { k: 'notes', req: false, ok: tboqs.some(b => (b.notes || '').trim()), label: 'ملاحظات عامة في جدول الطرح', hint: 'الرجوع للمخططات، شمولية الأسعار، زيارة الموقع… (إعدادات الجدول)', link: tboqs[0] ? `#/project/${p.id}/boq/${tboqs[0].id}` : null },
-    { k: 'terms', req: true, ok: by('tender_terms').length > 0, label: 'كراسة الشروط والمواصفات', hint: 'ملف الكراسة المعتمد (PDF / Word) أو رابطه', act: 'doc:tender_terms' },
     { k: 'dwg', req: true, ok: tdw.length > 0, label: 'مخططات الطرح', hint: tdw.length ? Object.entries(tdw.reduce((a, x) => (a[x.d.discipline] = (a[x.d.discipline] || 0) + 1, a), {})).map(([k, n]) => `${DISC[k]} ${n}`).join(' · ') : 'ارفع كل مخطط بمراجعة بحالة «للطرح» — تبقى في تبويب المخططات وتُجمع هنا', act: 'dwg' },
+    { k: 'terms', req: false, ok: by('tender_terms').length > 0, label: 'كراسة الشروط والمواصفات', hint: 'إن وُجدت من إدارة المشتريات (PDF / Word أو رابط) — ليست شرطاً حالياً', act: 'doc:tender_terms' },
     { k: 'specs', req: false, ok: by('tender_specs').length > 0, label: 'المواصفات الفنية', hint: 'لبنود المرجع تُولَّد ورقة المواصفات تلقائياً في ملف Excel؛ ارفع ملفاً مستقلاً إن وُجد', act: 'doc:tender_specs' },
     { k: 'visit', req: false, ok: by('site_visit').length > 0, label: 'محضر زيارة الموقع', hint: 'يُرفع بعد زيارة المتنافسين للموقع', act: 'doc:site_visit' },
   ];
