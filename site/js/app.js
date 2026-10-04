@@ -7,7 +7,7 @@ const app = $('#app');
 const NAV = [
   ['today', 'يومي', 'sun'], ['dashboard', 'لوحة المؤشرات', 'dash'], ['projects', 'المشاريع', 'folder'],
   ['sec', 'المتابعة'],
-  ['tasks', 'المهام', 'check'], ['requests', 'الطلبات', 'inbox'], ['challenges', 'التحديات والمخاطر', 'alert'], ['treports', 'التقارير الفنية والمحاضر', 'file'],
+  ['tasks', 'المهام', 'check'], ['requests', 'الطلبات', 'inbox'], ['challenges', 'التحديات والمخاطر', 'alert'], ['treports', 'التقارير الفنية والمحاضر', 'file'], ['leaves', 'الإجازات والتغطية', 'clock'],
   ['sec', 'المستندات والمالية'],
   ['submittals', 'الاعتمادات', 'stamp'], ['documents', 'المستندات الرسمية', 'doc'], ['drawings', 'المخططات', 'draw'], ['payments', 'المستخلصات', 'coins'],
   ['sec', 'النظام'],
@@ -117,6 +117,7 @@ async function route() {
     else if (parts[0] === 'drawings') { const { mountDrawingsAll } = await import('./docs.js'); await mountDrawingsAll(m, params); }
     else if (parts[0] === 'performance') { const pf = await import('./perf.js'); if (parts[1]) await pf.mountPerson(m, parts[1], params); else await pf.mountPerformance(m, params); }
     else if (parts[0] === 'me') { const { mountMyWork } = await import('./perf.js'); await mountMyWork(m, params); }
+    else if (parts[0] === 'leaves') { const { mountLeaves } = await import('./leaves.js'); await mountLeaves(m, params); }
     else if (parts[0] === 'settings') { const { mountSettings } = await import('./notif.js'); await mountSettings(m); }
     else if (parts[0] === 'submittals') { const { mountSubmittals } = await import('./docs.js'); await mountSubmittals(m, params); }
     else if (parts[0] === 'report') { const { mountReport } = await import('./report.js'); await mountReport(m, parts[1] || 'general', params); }

@@ -72,7 +72,7 @@ jobs:
       - name: Push hook config + stale-project notifications
         if: steps.db.outputs.url != ''
         run: |
-          printf "insert into private.secrets(key,value) values ('push_url', :'url'), ('push_secret', :'sec') on conflict (key) do update set value = excluded.value;\nselect public.notify_stale_projects() as stale_notified;\nselect public.sync_schedule_progress() as schedule_synced;\nselect public.notify_late_milestones() as late_milestones;\nselect public.notify_overdue_challenges() as overdue_challenges;\n" | psql "${{ steps.db.outputs.url }}" -v ON_ERROR_STOP=1 -v url="$SUPABASE_URL/functions/v1/push" -v sec="$PUSH_SECRET" 2>&1 | tee -a "$RUNNER_TEMP/seed.txt"; test ${PIPESTATUS[1]} -eq 0
+          printf "insert into private.secrets(key,value) values ('push_url', :'url'), ('push_secret', :'sec') on conflict (key) do update set value = excluded.value;\nselect public.notify_stale_projects() as stale_notified;\nselect public.sync_schedule_progress() as schedule_synced;\nselect public.notify_late_milestones() as late_milestones;\nselect public.notify_overdue_challenges() as overdue_challenges;\nselect public.notify_leave_events() as leave_events;\n" | psql "${{ steps.db.outputs.url }}" -v ON_ERROR_STOP=1 -v url="$SUPABASE_URL/functions/v1/push" -v sec="$PUSH_SECRET" 2>&1 | tee -a "$RUNNER_TEMP/seed.txt"; test ${PIPESTATUS[1]} -eq 0
       - name: Daily digests (scheduled runs only)
         if: github.event_name == 'schedule' && steps.db.outputs.url != ''
         run: |

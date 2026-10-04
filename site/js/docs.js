@@ -22,7 +22,7 @@ async function loadProfiles() { if (!profiles.length) profiles = await q(sb.from
 const pname = id => profiles.find(p => p.id === id)?.full_name || '—';
 
 // ---------- ملفات: رفع (مع ضغط الصور) وفتح بروابط موقّعة
-async function uploadOne(file, prefix) {
+export async function uploadOne(file, prefix) {
   let blob = file, name = file.name;
   if (/^image\//.test(file.type) && file.size > 400 * 1024) { try { blob = await compress(file, 2000, 0.85); name = name.replace(/\.[^.]+$/, '') + '.jpg'; } catch (e) { } }
   // مفتاح التخزين يجب أن يكون ASCII فقط (أسماء الملفات العربية تُرفض من Supabase Storage بخطأ Invalid key) — الاسم الأصلي يُحفظ في السجل للعرض
