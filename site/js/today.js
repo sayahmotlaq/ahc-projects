@@ -73,5 +73,6 @@ export async function mountToday(root, params) {
         <div class="pcard"><h2>ما حدث منذ آخر زيارة <span class="badge skel">${notes.length}</span></h2><p class="muted small" style="margin:-6px 0 8px">${lastSeen ? 'منذ ' + dateAr(lastSeen) + ' ' + new Date(lastSeen).toLocaleTimeString('ar-SA-u-nu-latn', { hour: '2-digit', minute: '2-digit' }) : 'آخر 24 ساعة'}</p>${notes.length ? notes.map(n => `<a class="nitem ${n.read_at ? '' : 'new'}" href="${esc(n.link || '#')}" style="padding:8px 4px"><span class="nic">${ico(ICON_K[n.kind] || 'bell')}</span><span class="nt"><b>${esc(n.title)}</b>${n.body ? `<small>${esc(n.body)}</small>` : ''}<em>${ago(n.created_at)}</em></span></a>`).join('') : '<p class="muted">لا جديد يخصك منذ آخر زيارة.</p>'}</div>
       </div>
     </div></div>`;
+  import('./messages.js').then(m => m.bindMessagesCard(root)).catch(() => { });
   bindInbox(root, todayItems, () => { const h = $('.inbox h2 .badge', root); const n = root.querySelectorAll('.qi').length; if (h) h.textContent = n; if (!n) { const box = $('.inbox', root); if (box && !box.querySelector('p.muted')) box.insertAdjacentHTML('beforeend', '<p class="muted">أنجزت كل ما ينتظرك 👌</p>'); } });
 }

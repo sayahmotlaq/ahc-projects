@@ -21,9 +21,10 @@ async function loadMessages(all = false) {
 }
 
 // ---------- بطاقة «يومي»
+let LAST = null;
 export async function todayMessagesCard(root, focusId) {
   await loadProfiles();
-  const { msgs, reads, me, admin } = await loadMessages(false);
+  const { msgs, reads, me, admin } = await loadMessages(false); LAST = { msgs, reads, me, admin, focusId };
   const mine = m => m.author_id === me;
   const authors = [...new Set(msgs.map(m => m.author_id))];
   const title = admin ? 'رسائلك للفريق' : authors.length === 1 ? `رسائل اليوم من ${esc(first(pname(authors[0])))}` : 'رسائل اليوم من الإدارة';
@@ -46,9 +47,13 @@ export async function todayMessagesCard(root, focusId) {
   };
   const html = `<div class="pcard msgs" id="msgsCard"><h2>${title} ${msgs.length ? `<span class="badge ${msgs.some(m => m.recipients?.includes(me) && !reads.some(x => x.message_id === m.id && x.user_id === me) && m.author_id !== me) ? 'bad' : 'skel'}">${msgs.length}</span>` : ''}<span class="sp"></span>${admin ? '<button class="btn sm primary" id="mNew">＋ رسالة</button>' : ''}<button class="btn sm" id="mArch">الأرشيف</button></h2>
     ${msgs.length ? `<div class="mlist">${msgs.map(item).join('')}</div>` : `<p class="muted small m0">لم ترسل رسالة اليوم — كلمة صباحية قصيرة للفريق، أو شكر لمن أنجز أمس، تصنع فرقاً.</p>`}</div>`;
-  const bind = () => {
+  return html;
+}
+export function bindMessagesCard(root) {
+  if (!LAST) return; const { msgs, reads, me, focusId } = LAST;
+  {
     const card = $('#msgsCard', root); if (!card) return;
-    const refresh = async () => { const h = await todayMessagesCard(root); card.outerHTML = h || ''; bind(); };
+    const refresh = async () => { const h = await todayMessagesCard(root); card.outerHTML = h || ''; bindMessagesCard(root); };
     const nb = $('#mNew', card); if (nb) nb.onclick = () => composer(null, refresh);
     $('#mArch', card).onclick = () => archive(refresh);
     $$('[data-read]', card).forEach(b => b.onclick = async () => { try { await q(sb.from('message_reads').upsert({ message_id: +b.getAttribute('data-read'), user_id: me })); b.closest('.msg').classList.remove('new'); refresh(); } catch (e) { err(e); } });
@@ -57,10 +62,8 @@ export async function todayMessagesCard(root, focusId) {
     $$('[data-arch]', card).forEach(b => b.onclick = async () => { try { await q(sb.from('messages').update({ archived: true }).eq('id', +b.getAttribute('data-arch'))); toast('أُرشفت'); refresh(); } catch (e) { err(e); } });
     $$('[data-edit]', card).forEach(b => b.onclick = () => composer(msgs.find(x => x.id === +b.getAttribute('data-edit')), refresh));
     $$('[data-task]', card).forEach(b => b.onclick = async () => { const m = msgs.find(x => x.id === +b.getAttribute('data-task')); const { taskForm } = await import('./tasks.js'); const pid = (m.link || '').match(/#\/project\/([0-9a-f-]{36})/)?.[1]; const p = pid ? await q(sb.from('projects').select('*').eq('id', pid).single()) : await pickProject(); if (!p) return; taskForm(null, p, refresh, { title: m.body.slice(0, 80), details: m.body, assignee_id: m.audience === 'users' && m.recipients.length === 1 ? m.recipients[0] : (p.engineer_id || '') }); });
-    if (focusId) { const el = $('#msg' + focusId, card); if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.classList.add('hl'); } }
-  };
-  setTimeout(bind, 0);
-  return html;
+    if (focusId) { const el = $('#msg' + focusId, card); if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.classList.add('hl'); } LAST.focusId = null; }
+  }
 }
 async function pickProject() {
   const ps = await q(sb.from('projects').select('*').eq('archived', false).order('name'));
