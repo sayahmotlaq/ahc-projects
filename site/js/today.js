@@ -17,7 +17,7 @@ const N = (n, one, two, few, many) => n === 1 ? one : n === 2 ? two : n >= 3 && 
 const acts = n => N(n, 'إجراء واحد', 'إجراءان', 'إجراءات', 'إجراءً');
 const ago = d => { const m = Math.floor((Date.now() - new Date(d)) / 60000); return m < 60 ? `منذ ${Math.max(1, m)} د` : m < 1440 ? `منذ ${Math.floor(m / 60)} س` : dateAr(d); };
 
-export async function mountToday(root) {
+export async function mountToday(root, params) {
   root.innerHTML = '<div class="loading"><div class="spin"></div>جارٍ تجهيز يومك…</div>';
   const me = session.user.id; const admin = isAdmin();
   const first = (session.profile?.full_name || '').trim().split(' ')[0] || '';
@@ -27,6 +27,7 @@ export async function mountToday(root) {
   else lastSeen = sessionStorage.getItem('ahc_prev_seen') || lastSeen;
   const sinceIso = lastSeen || new Date(Date.now() - 864e5).toISOString();
   const leavesCard = await import('./leaves.js').then(m => m.todayLeavesCard()).catch(() => '');
+  const msgsCard = await import('./messages.js').then(m => m.todayMessagesCard(root, params?.get?.('msg'))).catch(e => { console.error(e); return ''; });
   const [D, notes, allToday, meetings] = await Promise.all([
     loadDashData(),
     q(sb.from('notifications').select('*').gte('created_at', sinceIso).order('id', { ascending: false }).limit(20)),
@@ -59,6 +60,7 @@ export async function mountToday(root) {
   const lead = closing ? (nDone ? `أنجزت اليوم ${acts(nDone)} موثقة باسمك${nTodo ? `، وبقي ${acts(nTodo)} لغدٍ` : '، ولم يبقَ عليك شيء معلق'}.` : `لم يُسجَّل لك إجراء اليوم${nTodo ? `، وينتظرك ${acts(nTodo)}` : ''}.`) : (nTodo ? `عليك اليوم ${acts(nTodo)}${nDone ? `، وأنجزت حتى الآن ${acts(nDone)}` : ''}.` : (nDone ? `أنجزت حتى الآن ${acts(nDone)}، ولا شيء معلق عليك.` : 'لا شيء معلق عليك الآن.'));
   root.innerHTML = `<div class="today">
     <div class="hero ${closing ? 'pm' : 'am'}"><div><div class="muted small">${now.toLocaleDateString('ar-SA-u-ca-gregory-nu-latn', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div><h1>${esc(greet)}</h1><p>${esc(lead)}</p></div><div class="btnrow">${canEdit() ? `<a class="btn" href="#/treport/new">${ico('file')} تقرير فني</a>` : ''}<a class="btn primary" href="#/dashboard">${ico('dash')} لوحة المؤشرات</a></div></div>
+    ${msgsCard}
     ${pulseHtml}
     <div class="two">
       <div class="stack">

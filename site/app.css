@@ -810,3 +810,18 @@ table.bq tr.freerow td .spec{color:var(--grey);font-size:12px;line-height:1.65;m
 .pp:hover{transform:translateY(-2px);box-shadow:var(--shadow2,0 8px 24px rgba(0,0,0,.08))}
 .pp .av{grid-row:1/3;width:38px;height:38px;border-radius:50%;background:var(--navy);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}
 .pp b{font-size:13px;white-space:nowrap} .pp small{color:var(--grey);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px}
+
+/* ===== رسائل اليوم ===== */
+.msgs h2{display:flex;align-items:center;gap:8px} .msgs .mlist{display:flex;flex-direction:column;gap:10px}
+.msg{border:1px solid var(--line2);border-radius:14px;padding:12px 14px;background:#fff;border-inline-start:4px solid var(--line);transition:box-shadow .2s}
+.msg.k-direct{border-inline-start-color:var(--navy)} .msg.k-thanks{border-inline-start-color:var(--sage);background:linear-gradient(180deg,#F7FAF2,#fff)} .msg.k-alert{border-inline-start-color:var(--gold);background:linear-gradient(180deg,#FFFBEF,#fff)} .msg.k-info{border-inline-start-color:var(--lblue)}
+.msg.new{box-shadow:0 0 0 2px rgba(39,168,223,.35)} .msg.hl{animation:mhl 1.6s ease-out} @keyframes mhl{0%{background:#FFF4D6}100%{background:#fff}}
+.msg.pinned{background:linear-gradient(180deg,#FAF8F5,#fff)} .msg.off{opacity:.6}
+.msg .mh{display:flex;align-items:center;gap:10px;margin-bottom:6px} .msg .av{width:34px;height:34px;border-radius:50%;background:var(--navy);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex:none}
+.msg .mi b{display:block;font-size:13.5px} .msg .mi small{color:var(--grey);font-size:11.5px} .msg .kchip{font-weight:700;color:var(--navy)} .msg .lock{color:#8A6D1F}
+.msg .mb{font-size:14.5px;line-height:1.85;white-space:pre-wrap;color:var(--text)}
+.msg .mlink{display:inline-flex;align-items:center;gap:6px;margin-top:6px;font-size:12.5px;background:var(--surface2,#FAF8F5);border:1px solid var(--line2);border-radius:8px;padding:4px 10px;color:var(--navy);text-decoration:none}
+.msg .mreplies{margin-top:8px;border-top:1px dashed var(--line2);padding-top:6px;font-size:12.5px} .msg .mr{padding:2px 0}
+.msg .mf{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px} .msg .read{color:var(--sage);font-weight:700;font-size:12.5px}
+.chip.chk{cursor:pointer} .chip.chk input{margin:0 0 0 4px}
+@media (max-width:720px){ .msg{padding:10px 12px} .msg .mb{font-size:14px} .msg .mf .btn{font-size:11.5px} }

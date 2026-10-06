@@ -103,7 +103,7 @@ async function route() {
   const m = $('#main'); setNav(parts[0]); watch(m);
   const rkey = parts.slice(0, 2).join('/'); if (m._rkey !== rkey && parts[0] !== 'ref') { m._rkey = rkey; markRoute(); m.innerHTML = skeleton(parts[0] === 'project' ? 'page' : ['dashboard', 'today', 'performance', 'me'].includes(parts[0]) ? 'page' : 'list'); m.classList.remove('pagein'); void m.offsetWidth; m.classList.add('pagein'); }
   try {
-    if (parts[0] === 'today') { const { mountToday } = await import('./today.js'); await mountToday(m); }
+    if (parts[0] === 'today') { const { mountToday } = await import('./today.js'); await mountToday(m, params); }
     else if (parts[0] === 'dashboard') { const { mountDashboard } = await import('./projects.js'); await mountDashboard(m); }
     else if (parts[0] === 'projects') { const { mountProjects } = await import('./projects.js'); await mountProjects(m, params); }
     else if (parts[0] === 'project') { await ensureRef(); const { mountProject } = await import('./projects.js'); await mountProject(m, parts[1], parts[2] || 'overview', parts[3]); }
