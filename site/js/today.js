@@ -2,6 +2,7 @@
 import { sb, isAdmin, canEdit, role, q, session, today, STAGES } from './api.js';
 import { $, $$, esc, money, dateAr, ico } from './ui.js';
 import { loadDashData, FINISHED } from './projects.js';
+import { inboxItem, bindInbox, openProjectDrawer } from './quick.js';
 
 const GREET_AM = ['صباح الخير يا {n}، يوم جديد وفرصة جديدة.', 'صباح النشاط يا {n}.', 'أهلاً {n}، جهّزت لك خلاصة يومك.', 'صباح الخير {n}، لنبدأ بالأهم.', 'يومك سعيد يا {n}.'];
 const GREET_PM = ['مساء الخير يا {n}.', 'أهلاً {n}، هذا وضع يومك حتى الآن.', 'مساؤك طيب {n}.'];
@@ -26,15 +27,21 @@ export async function mountToday(root) {
   else lastSeen = sessionStorage.getItem('ahc_prev_seen') || lastSeen;
   const sinceIso = lastSeen || new Date(Date.now() - 864e5).toISOString();
   const leavesCard = await import('./leaves.js').then(m => m.todayLeavesCard()).catch(() => '');
-  const [D, notes, mineToday, meetings] = await Promise.all([
+  const [D, notes, allToday, meetings] = await Promise.all([
     loadDashData(),
     q(sb.from('notifications').select('*').gte('created_at', sinceIso).order('id', { ascending: false }).limit(20)),
-    q(sb.from('v_user_activity').select('*').eq('user_id', me).gte('at', today() + 'T00:00:00').order('at', { ascending: false })),
+    q(sb.from('v_user_activity').select('*').gte('at', today() + 'T00:00:00').order('at', { ascending: false })),
     q(sb.from('tech_reports').select('id,title,project_id,next_meeting,projects(name)').gte('next_meeting', today()).lte('next_meeting', plus(7)).order('next_meeting')),
   ]);
+  const mineToday = allToday.filter(a => a.user_id === me);
+  // نبض الفريق اليوم (للإدارة): من فعل ماذا
+  const pulse = admin ? Object.values(allToday.filter(a => a.user_id && a.user_id !== me).reduce((m, a) => { const u = m[a.user_id] || (m[a.user_id] = { id: a.user_id, n: 0, last: a }); u.n++; return m; }, {})).sort((a, b) => b.n - a.n) : [];
   const myProjects = admin ? D.projects : D.projects.filter(p => p.engineer_id === me);
   const now = new Date(); const h = now.getHours(); const dow = now.getDay(); // 0 أحد … 4 خميس
   const closing = h >= 15;
+  const profs = admin ? await q(sb.from('profiles').select('id,full_name')) : []; const pn = id => profs.find(x => x.id === id)?.full_name || '';
+  const initials = n => (n || '؟').trim().split(' ').filter(Boolean).slice(0, 2).map(x => x[0]).join('');
+  const pulseHtml = admin ? `<div class="pcard pulse"><h2>نبض الفريق اليوم <span class="badge ${pulse.length ? 'full' : 'skel'}">${pulse.length}</span><a class="small" href="#/performance">الأداء</a></h2>${pulse.length ? `<div class="pstrip">${pulse.map(u => { const nm = pn(u.id) || u.last.user_name || ''; return `<a class="pp" href="${esc(u.last.link || '#/performance')}" title="${esc(u.last.title || '')}"><span class="av">${esc(initials(nm))}</span><b>${esc(nm.split(' ').slice(0, 2).join(' ') || '—')}</b><small>${u.n} ${u.n === 1 ? 'إجراء' : u.n === 2 ? 'إجراءان' : 'إجراءات'} · ${esc((u.last.title || '').slice(0, 42))}</small></a>`; }).join('')}</div>` : `<p class="muted small m0">لم يسجّل أحد من الفريق نشاطاً بعد اليوم${h < 10 ? ' — ما زال الوقت مبكراً' : ''}.</p>`}</div>` : '';
   const seed = dayOfYear();
   const greet = (closing ? (dow === 4 ? THU : pick(CLOSE, seed)) : dow === 0 && h < 12 ? SUN + ' ' + pick(GREET_AM, seed) : h < 12 ? pick(GREET_AM, seed) : pick(GREET_PM, seed)).replace(/\{n\}/g, first);
   // المطلوب اليوم: من صندوق الإجراءات + مهامي اليوم
@@ -52,9 +59,10 @@ export async function mountToday(root) {
   const lead = closing ? (nDone ? `أنجزت اليوم ${acts(nDone)} موثقة باسمك${nTodo ? `، وبقي ${acts(nTodo)} لغدٍ` : '، ولم يبقَ عليك شيء معلق'}.` : `لم يُسجَّل لك إجراء اليوم${nTodo ? `، وينتظرك ${acts(nTodo)}` : ''}.`) : (nTodo ? `عليك اليوم ${acts(nTodo)}${nDone ? `، وأنجزت حتى الآن ${acts(nDone)}` : ''}.` : (nDone ? `أنجزت حتى الآن ${acts(nDone)}، ولا شيء معلق عليك.` : 'لا شيء معلق عليك الآن.'));
   root.innerHTML = `<div class="today">
     <div class="hero ${closing ? 'pm' : 'am'}"><div><div class="muted small">${now.toLocaleDateString('ar-SA-u-ca-gregory-nu-latn', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div><h1>${esc(greet)}</h1><p>${esc(lead)}</p></div><div class="btnrow">${canEdit() ? `<a class="btn" href="#/treport/new">${ico('file')} تقرير فني</a>` : ''}<a class="btn primary" href="#/dashboard">${ico('dash')} لوحة المؤشرات</a></div></div>
+    ${pulseHtml}
     <div class="two">
       <div class="stack">
-        <div class="pcard inbox"><h2>مطلوب منك اليوم ${nTodo ? `<span class="badge ${todayItems.some(i => i.bad) ? 'bad' : 'ovr'}">${nTodo}</span>` : ''}</h2>${todayItems.length ? todayItems.map(i => `<div class="it"><div class="ic ${i.cls}">${ico(i.ic)}</div><div class="t"><b>${esc(i.title)}</b><small>${esc(i.sub)}</small></div><span class="age ${i.bad ? 'bad' : ''}">${i.bad ? 'متأخر' : D.ago(i.age)}</span><a class="btn sm ${i.cls === 'a' ? 'primary' : ''}" href="${i.link}">${i.act}</a></div>`).join('') : '<p class="muted">لا يوجد ما ينتظرك الآن 👌</p>'}</div>
+        <div class="pcard inbox"><h2>مطلوب منك اليوم ${nTodo ? `<span class="badge ${todayItems.some(i => i.bad) ? 'bad' : 'ovr'}">${nTodo}</span>` : ''}</h2>${todayItems.length ? todayItems.map((i, idx) => inboxItem(i, idx, D.ago)).join('') : '<p class="muted">لا يوجد ما ينتظرك الآن 👌</p>'}</div>
         <div class="pcard"><h2>هذا الأسبوع <span class="badge skel">${week.length}</span></h2>${week.length ? `<div class="tl">${week.slice(0, 10).map(w => `<div class="e"><i>${ico(w[1])}</i><div><b><a href="${w[3]}" style="color:inherit">${esc(w[2])}</a></b><small>${w[0] === today() ? 'اليوم' : w[0] === plus(1) ? 'غداً' : dateAr(w[0])}</small></div></div>`).join('')}</div>` : '<p class="muted">لا مواعيد خلال الأيام السبعة القادمة.</p>'}</div>
       </div>
       <div class="stack">
@@ -63,4 +71,5 @@ export async function mountToday(root) {
         <div class="pcard"><h2>ما حدث منذ آخر زيارة <span class="badge skel">${notes.length}</span></h2><p class="muted small" style="margin:-6px 0 8px">${lastSeen ? 'منذ ' + dateAr(lastSeen) + ' ' + new Date(lastSeen).toLocaleTimeString('ar-SA-u-nu-latn', { hour: '2-digit', minute: '2-digit' }) : 'آخر 24 ساعة'}</p>${notes.length ? notes.map(n => `<a class="nitem ${n.read_at ? '' : 'new'}" href="${esc(n.link || '#')}" style="padding:8px 4px"><span class="nic">${ico(ICON_K[n.kind] || 'bell')}</span><span class="nt"><b>${esc(n.title)}</b>${n.body ? `<small>${esc(n.body)}</small>` : ''}<em>${ago(n.created_at)}</em></span></a>`).join('') : '<p class="muted">لا جديد يخصك منذ آخر زيارة.</p>'}</div>
       </div>
     </div></div>`;
+  bindInbox(root, todayItems, () => { const h = $('.inbox h2 .badge', root); const n = root.querySelectorAll('.qi').length; if (h) h.textContent = n; if (!n) { const box = $('.inbox', root); if (box && !box.querySelector('p.muted')) box.insertAdjacentHTML('beforeend', '<p class="muted">أنجزت كل ما ينتظرك 👌</p>'); } });
 }

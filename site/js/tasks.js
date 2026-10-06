@@ -52,7 +52,7 @@ function taskRows(rows, opts = {}) {
 }
 
 // ---------- نموذج الطلب (مهندس) / الرد (أدمن)
-async function requestForm(r, project, done) {
+export async function requestForm(r, project, done) {
   const admin = isAdmin(); const me = session.user.id; const mine = r && r.created_by === me && r.status === 'new';
   let replies = r ? await q(sb.from('request_replies').select('*').eq('request_id', r.id).order('id')) : [];
   await loadProfiles();

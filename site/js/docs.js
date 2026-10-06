@@ -185,7 +185,7 @@ async function subForm(s, p, existing, done, resubmitOf = null) {
       const del = $('[data-del]', w); if (del) del.onclick = async () => { if (!await confirm('حذف طلب الاعتماد وملفاته؟', 'حذف', true)) return; const fs = await q(sb.from('submittal_files').select('path').eq('submittal_id', s.id)); const paths = fs.map(r => r.path).filter(Boolean); if (paths.length) { try { await sb.storage.from(BUCKET).remove(paths); } catch (e) { } } await q(sb.from('submittals').delete().eq('id', s.id)); close(); done(); };
     } });
 }
-async function subDetail(s, p, existing, done) {
+export async function subDetail(s, p, existing, done) {
   const files = await q(sb.from('submittal_files').select('*').eq('submittal_id', s.id).order('id'));
   const chain = existing.filter(x => x.no === s.no && x.id !== s.id).sort((a, b) => a.rev - b.rev);
   const admin = isAdmin(), edit = canEdit(); const V = (k, v) => `<div class="kv"><span>${k}</span><b>${v}</b></div>`;

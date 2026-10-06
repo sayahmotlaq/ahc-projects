@@ -20,7 +20,7 @@ export function compress(file, max = 1600, qual = 0.82) {
     img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('صورة غير صالحة')); }; img.src = url;
   });
 }
-async function signed(paths) {
+export async function signed(paths) {
   if (!paths.length) return {};
   const { data, error } = await sb.storage.from(BUCKET).createSignedUrls(paths, 3600); if (error) throw error;
   const m = {}; (data || []).forEach(d => { if (d.signedUrl) m[d.path] = d.signedUrl; }); return m;

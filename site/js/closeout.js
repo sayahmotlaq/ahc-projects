@@ -48,7 +48,7 @@ async function coForm(c, p, rows, done) {
       const del = $('[data-del]', w); if (del) del.onclick = async () => { if (!await confirm('حذف أمر التغيير؟', 'حذف', true)) return; await q(sb.from('change_orders').delete().eq('id', c.id)); close(); done(); };
     } });
 }
-async function coDetail(c, p, rows, done) {
+export async function coDetail(c, p, rows, done) {
   const V = (k, v) => `<div class="kv"><span>${k}</span><b>${v}</b></div>`;
   await modal(`<div class="kvs">${V('النوع', CO_KIND[c.kind])}${V('الحالة', coBadge(c.status))}${c.kind !== 'time' ? V('المبلغ', `<span class="${Number(c.amount) < 0 ? 'bad' : ''}">${signed(c.amount)} ر.س</span>`) : ''}${c.kind !== 'cost' ? V('أيام التمديد', c.days) : ''}${V('مقدّمه', esc(c.requested_by || '—'))}${V('تاريخ الطلب', dateAr(c.requested_on))}${c.decided_at ? V('القرار', `${esc(pname(c.decided_by))} · ${dateAr(c.decided_at)}`) : ''}</div>
     ${c.description ? `<h3 class="sub-h">الوصف</h3><p class="pre">${esc(c.description)}</p>` : ''}${c.reason ? `<h3 class="sub-h">المبرر</h3><p class="pre">${esc(c.reason)}</p>` : ''}${c.decision_note ? `<h3 class="sub-h">ملاحظة القرار</h3><p class="pre">${esc(c.decision_note)}</p>` : ''}

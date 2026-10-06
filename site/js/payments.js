@@ -104,7 +104,7 @@ async function payForm(pm, project, existing, done) {
 }
 
 // ---------- بطاقة تفاصيل المستخلص (مع السجل والإجراءات)
-async function payDetail(pm, project, existing, done) {
+export async function payDetail(pm, project, existing, done) {
   const log = await q(sb.from('payment_log').select('*').eq('payment_id', pm.id).order('id'));
   const profs = await q(sb.from('profiles').select('id,full_name'));
   const nm = id => profs.find(p => p.id === id)?.full_name || '—';
