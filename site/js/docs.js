@@ -3,6 +3,7 @@ import { sb, REF, loadRef, canEdit, canDocs, isAdmin, q, session, today, SETTING
 import { $, $$, esc, norm, money, dateAr, toast, err, modal, confirm, field, inp, sel, formData, ico, money_inp } from './ui.js';
 import { exportTable, xbtn } from './xlsx.js';
 import { compress } from './treports.js';
+import { threadBox, mountThread } from './thread.js';
 
 export const BUCKET = 'project-files';
 export const TENDER_CAT = { tender_terms: 'كراسة الشروط والمواصفات', tender_specs: 'المواصفات الفنية (الطرح)', tender_addendum: 'ملحق / تعميم طرح', site_visit: 'محضر زيارة الموقع', bid_opening: 'محضر فتح المظاريف', award_letter: 'خطاب الترسية' };
@@ -200,8 +201,9 @@ export async function subDetail(s, p, existing, done) {
     ${s.decided_at ? `<h3 class="sub-h">قرار الإدارة</h3><div class="pre">${decBadge(s.decision)}<br>${esc(s.decision_note || '')}<div class="muted small">${esc(pname(s.decided_by))} · ${dateAr(s.decided_at)}</div></div>` : ''}
     ${files.some(f => f.side === 'response') ? `<h3 class="sub-h">مرفقات الرد</h3><div>${filesHtml('response')}</div>` : ''}
     ${chain.length ? `<h3 class="sub-h">تقديمات سابقة / لاحقة لنفس الطلب</h3><ul class="rlist">${chain.map(c => `<li><span class="ltr">R${c.rev}</span> — ${dateAr(c.submitted_on)} — ${c.status === 'decided' ? DECISION[c.decision] : SUB_ST[c.status]}</li>`).join('')}</ul>` : ''}
+    ${threadBox('submittal', s.id)}
     <div class="mt12 btnrow end wrap" >${edit && s.status !== 'decided' ? '<button class="btn" data-edit>تعديل</button>' : ''}${edit && s.status === 'submitted' ? '<button class="btn primary" data-review>مراجعة المهندس</button>' : ''}${admin && s.status !== 'decided' ? '<button class="btn primary" data-decide>قرار الإدارة</button>' : ''}${edit && s.status === 'decided' && ['resubmit', 'rejected', 'approved_notes'].includes(s.decision) && !existing.some(x => x.parent_id === s.id) ? '<button class="btn" data-resub>إعادة التقديم (نسخة جديدة)</button>' : ''}<span class="sp"></span><button class="btn" data-x>إغلاق</button></div>`, { title: `SUB-${String(s.no).padStart(3, '0')}${s.rev ? '-R' + s.rev : ''} — ${s.title}`, wide: true, onOpen: (w, close) => {
-      bindFiles(w, files);
+      bindFiles(w, files); mountThread(w, 'submittal', s.id, { projectId: p.id });
       const ed = $('[data-edit]', w); if (ed) ed.onclick = () => { close(); subForm(s, p, existing, done); };
       const rv = $('[data-review]', w); if (rv) rv.onclick = () => { close(); reviewForm(s, p, done); };
       const dc = $('[data-decide]', w); if (dc) dc.onclick = () => { close(); decideForm(s, p, done); };

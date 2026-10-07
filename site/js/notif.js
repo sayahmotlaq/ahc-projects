@@ -3,7 +3,7 @@ import { sb, q, session } from './api.js';
 import { $, $$, esc, dateAr, toast, err, ico, confirm } from './ui.js';
 
 export const N_KINDS = { task: 'المهام', request: 'الطلبات', treport: 'التقارير الفنية', comment: 'التعليقات', payment: 'المستخلصات', submittal: 'الاعتمادات', challenge: 'التحديات العالية', stage: 'تغيير المراحل', stale: 'مشاريع بلا تحديث' };
-const ICON = { digest: '☀️', exec: '🏛️', milestone: '🚩', task: '✅', request: '📨', treport: '📋', comment: '💬', payment: '💰', submittal: '📐', challenge: '⚠️', stage: '🚩', stale: '⏳', leave: '🏖️', msg: '📣', info: 'ℹ️' };
+const ICON = { digest: '☀️', exec: '🏛️', milestone: '🚩', task: '✅', request: '📨', treport: '📋', comment: '💬', payment: '💰', submittal: '📐', challenge: '⚠️', stage: '🚩', stale: '⏳', leave: '🏖️', msg: '📣', comment: '💬', info: 'ℹ️' };
 let cache = [], unread = 0, timer = null, open = false;
 const ago = d => { const m = Math.floor((Date.now() - new Date(d)) / 60000); return m < 1 ? 'الآن' : m < 60 ? `منذ ${m} د` : m < 1440 ? `منذ ${Math.floor(m / 60)} س` : dateAr(d); };
 

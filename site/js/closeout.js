@@ -1,6 +1,7 @@
 // ===== أوامر التغيير والتمديدات + الإغلاق والضمان =====
 import { sb, canEdit, isAdmin, q, session, today, SETTINGS } from './api.js';
 import { $, $$, esc, money, fmt, dateAr, toast, err, modal, confirm, field, inp, sel, formData, money_inp, ico } from './ui.js';
+import { threadBox, mountThread } from './thread.js';
 
 export const CO_KIND = { cost: 'مالي (زيادة / تخفيض)', time: 'زمني (تمديد مدة)', both: 'مالي وزمني' };
 export const CO_STATUS = { draft: 'مسودة', submitted: 'بانتظار الاعتماد', approved: 'معتمد', rejected: 'مرفوض' };
@@ -52,7 +53,9 @@ export async function coDetail(c, p, rows, done) {
   const V = (k, v) => `<div class="kv"><span>${k}</span><b>${v}</b></div>`;
   await modal(`<div class="kvs">${V('النوع', CO_KIND[c.kind])}${V('الحالة', coBadge(c.status))}${c.kind !== 'time' ? V('المبلغ', `<span class="${Number(c.amount) < 0 ? 'bad' : ''}">${signed(c.amount)} ر.س</span>`) : ''}${c.kind !== 'cost' ? V('أيام التمديد', c.days) : ''}${V('مقدّمه', esc(c.requested_by || '—'))}${V('تاريخ الطلب', dateAr(c.requested_on))}${c.decided_at ? V('القرار', `${esc(pname(c.decided_by))} · ${dateAr(c.decided_at)}`) : ''}</div>
     ${c.description ? `<h3 class="sub-h">الوصف</h3><p class="pre">${esc(c.description)}</p>` : ''}${c.reason ? `<h3 class="sub-h">المبرر</h3><p class="pre">${esc(c.reason)}</p>` : ''}${c.decision_note ? `<h3 class="sub-h">ملاحظة القرار</h3><p class="pre">${esc(c.decision_note)}</p>` : ''}
+    ${threadBox('change', c.id)}
     <div class="mt12 btnrow end wrap" >${(isAdmin() || ['draft', 'submitted', 'rejected'].includes(c.status)) && canEdit() ? '<button class="btn" data-edit>تعديل</button>' : ''}${isAdmin() && c.status === 'submitted' ? '<button class="btn primary" data-dec="approved">اعتماد</button><button class="btn danger" data-dec="rejected">رفض</button>' : ''}${isAdmin() && c.status === 'approved' ? '<button class="btn" data-dec="submitted">إلغاء الاعتماد</button>' : ''}<span class="sp"></span><button class="btn" data-x>إغلاق</button></div>`, { title: `أمر التغيير رقم ${c.no} — ${c.title}`, wide: true, onOpen: (w, close) => {
+      mountThread(w, 'change', c.id, { projectId: p.id });
       const ed = $('[data-edit]', w); if (ed) ed.onclick = () => { close(); coForm(c, p, rows, done); };
       $$('[data-dec]', w).forEach(b => b.onclick = async () => { const to = b.getAttribute('data-dec'); close();
         await modal(`<form id="f"><label class="fld"><span>ملاحظة القرار${to === 'rejected' ? ' *' : ''}</span><textarea name="note" rows="3" ${to === 'rejected' ? 'required' : ''}></textarea></label>${to === 'approved' ? `<p class="mt8 muted small" >سيُحدَّث إجمالي العقد${c.kind !== 'time' ? ` بمقدار ${signed(c.amount)} ر.س` : ''}${c.kind !== 'cost' ? ` وتُضاف ${c.days} يوماً على المدة` : ''} تلقائياً.</p>` : ''}<div class="mt10 btnrow end" ><button type="button" class="btn" data-x>إلغاء</button><button class="btn ${to === 'rejected' ? 'danger' : 'primary'}">${({ approved: 'اعتماد', rejected: 'رفض', submitted: 'إلغاء الاعتماد' })[to]}</button></div></form>`, { title: `قرار أمر التغيير ${c.no}`, onOpen: (w2, close2) => { $('#f', w2).onsubmit = async e => { e.preventDefault(); const f = formData(e.target); try { await q(sb.from('change_orders').update({ status: to, decision_note: f.note.trim() || null, decided_by: to === 'submitted' ? null : session.user.id, decided_at: to === 'submitted' ? null : new Date().toISOString() }).eq('id', c.id)); toast('تم'); close2(); done(); } catch (er) { err(er); } }; } }); });

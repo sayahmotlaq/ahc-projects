@@ -2,6 +2,7 @@
 import { sb, canEdit, isAdmin, role, q, session, today } from './api.js';
 import { $, $$, esc, money, fmt, dateAr, toast, err, modal, confirm, field, inp, sel, formData, money_inp } from './ui.js';
 import { exportTable, xbtn } from './xlsx.js';
+import { threadBox, mountThread } from './thread.js';
 
 export const P_STATUS = { draft: 'مسودة', submitted: 'مقدَّم', review: 'قيد المراجعة', approved: 'معتمد', finance: 'محال للمالية', paid: 'مصروف', rejected: 'مرفوض' };
 export const P_KIND = { advance: 'دفعة مقدمة', interim: 'مستخلص جارٍ', final: 'مستخلص ختامي', retention_release: 'إفراج عن الضمان' };
@@ -114,7 +115,9 @@ export async function payDetail(pm, project, existing, done) {
     <div class="mt8 kvs" >${V('تاريخ التقديم', dateAr(pm.submitted_on))}${V('تاريخ الاعتماد', dateAr(pm.approved_on))}${V('الإحالة للمالية', dateAr(pm.sent_finance_on))}${V('تاريخ الصرف', dateAr(pm.paid_on))}${V('أمر الدفع', esc(pm.payment_order_no || '—'))}${pm.reject_reason ? V('سبب الرفض', `<span class="bad">${esc(pm.reject_reason)}</span>`) : ''}</div>
     ${pm.notes ? `<p class="pre">${esc(pm.notes)}</p>` : ''}
     <h3 class="sub-h">سجل الإجراءات</h3>${log.length ? `<table class="lst"><thead><tr><th>التاريخ</th><th>الإجراء</th><th>بواسطة</th><th>ملاحظة</th></tr></thead><tbody>${log.map(l => `<tr><td>${dateAr(l.at)}</td><td>${l.from_status ? P_STATUS[l.from_status] + ' ← ' : ''}${P_STATUS[l.to_status] || l.to_status}</td><td>${esc(nm(l.by_user))}</td><td class="muted">${esc(l.note || '')}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">—</p>'}
+    ${threadBox('payment', pm.id)}
     <div class="mt12 btnrow end" >${canEditPay(pm) ? '<button class="btn" data-edit>تعديل البيانات</button>' : ''}<span class="sp"></span>${acts.map(([to, l, c]) => `<button class="btn ${c}" data-to="${to}">${l}</button>`).join('')}<button class="btn" data-x>إغلاق</button></div>`, { title: `مستخلص رقم ${pm.no}`, wide: true, onOpen: (w, close) => {
+      mountThread(w, 'payment', pm.id, { projectId: project.id });
       $$('[data-to]', w).forEach(b => b.onclick = () => { close(); transition(pm, b.getAttribute('data-to'), done); });
       const ed = $('[data-edit]', w); if (ed) ed.onclick = () => { close(); payForm(pm, project, existing, done); };
     } });

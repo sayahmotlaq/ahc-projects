@@ -117,6 +117,7 @@ async function route() {
     else if (parts[0] === 'drawings') { const { mountDrawingsAll } = await import('./docs.js'); await mountDrawingsAll(m, params); }
     else if (parts[0] === 'performance') { const pf = await import('./perf.js'); if (parts[1]) await pf.mountPerson(m, parts[1], params); else await pf.mountPerformance(m, params); }
     else if (parts[0] === 'me') { const { mountMyWork } = await import('./perf.js'); await mountMyWork(m, params); }
+    else if (parts[0] === 'open') { const k = parts[1], id = parts[2]; history.replaceState(null, '', location.pathname + location.search + '#/today'); setNav('today'); const { mountToday } = await import('./today.js'); await mountToday(m, new URLSearchParams()); const { openQuick } = await import('./quick.js'); openQuick({ q: { k, id: /^\d+$/.test(id) ? +id : id }, link: '#/today' }, () => route()); }
     else if (parts[0] === 'leaves') { const { mountLeaves } = await import('./leaves.js'); await mountLeaves(m, params); }
     else if (parts[0] === 'settings') { const { mountSettings } = await import('./notif.js'); await mountSettings(m); }
     else if (parts[0] === 'submittals') { const { mountSubmittals } = await import('./docs.js'); await mountSubmittals(m, params); }

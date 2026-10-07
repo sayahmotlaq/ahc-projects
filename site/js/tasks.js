@@ -2,6 +2,7 @@
 import { sb, canEdit, isAdmin, q, session, today } from './api.js';
 import { $, $$, esc, dateAr, toast, err, modal, confirm, field, inp, sel, formData, calBtn, bindCal } from './ui.js';
 import { exportTable, xbtn } from './xlsx.js';
+import { threadBox, mountThread } from './thread.js';
 
 export const T_STATUS = { open: 'مفتوحة', in_progress: 'قيد التنفيذ', done: 'منجزة', cancelled: 'ملغاة' };
 export const R_STATUS = { new: 'جديد', in_review: 'قيد المراجعة', approved: 'معتمد', rejected: 'مرفوض', done: 'منفذ' };
@@ -35,8 +36,8 @@ export async function taskForm(t, project, done, preset = null) {
       ${field('الحالة', sel('status', [['open', 'مفتوحة'], ['in_progress', 'قيد التنفيذ'], ['done', 'منجزة']], t.status))}
       ${field('ملاحظة الإنجاز', `<textarea name="progress_note" rows="3">${esc(t.progress_note || '')}</textarea>`, 'wide')}
       <div class="btnrow end wide">${t?.due_date ? calBtn({ uid: 'task-' + t.id, title: 'مهمة: ' + t.title, date: t.due_date, desc: project?.name || '', url: '#/project/' + t.project_id + '/tasks' }, 'btn') : ''}<span class="sp"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">تحديث</button></div></form>`;
-  await modal(html, { title: t ? (admin ? 'تعديل المهمة' : 'تحديث حالة المهمة') : 'مهمة جديدة', wide: admin, onOpen: (w, close) => {
-    bindCal(w);
+  await modal(html + (t ? threadBox('task', t.id) : ''), { title: t ? (admin ? 'تعديل المهمة' : 'تحديث حالة المهمة') : 'مهمة جديدة', wide: true, onOpen: (w, close) => {
+    bindCal(w); if (t) mountThread(w, 'task', t.id, { projectId: t.project_id || project?.id });
     $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target);
       try {
         if (admin) { const row = { project_id: project.id, title: f.title.trim(), details: f.details.trim(), assignee_id: f.assignee_id || null, assignee_name: f.assignee_name.trim(), priority: f.priority, due_date: f.due_date || null }; if (preset?.report_id) row.report_id = preset.report_id; if (preset?.challenge_id) row.challenge_id = preset.challenge_id; if (t) { row.status = f.status; row.progress_note = f.progress_note; await q(sb.from('tasks').update(row).eq('id', t.id)); } else await q(sb.from('tasks').insert({ ...row, status: 'open', created_by: me })); }
@@ -59,19 +60,19 @@ export async function requestForm(r, project, done) {
   const canEditBody = !r || mine || admin;
   const html = `<div>
     ${r ? `<div class="pcard" style="padding:12px 14px;margin-bottom:10px"><div class="uh"><span class="badge skel">${R_KIND[r.kind]}</span> ${rBadge(r.status)} ${prioBadge(r.priority)} <span class="muted">· ${esc(pname(r.created_by))} · ${dateAr(r.created_at)}</span></div><b>${esc(r.title)}</b><div class="pre muted">${esc(r.details || '')}</div>${r.response ? `<div class="mt8 notice" ><b>رد الإدارة:</b> ${esc(r.response)} <span class="muted">— ${esc(pname(r.responded_by))} ${dateAr(r.responded_at)}</span></div>` : ''}
-      ${replies.length ? `<h3 class="sub">المتابعات</h3>${replies.map(x => `<div class="upd"><div class="uh"><b>${esc(pname(x.by_user))}</b> <span class="muted">${dateAr(x.at)}</span>${x.status_after ? ' ' + rBadge(x.status_after) : ''}</div><div class="ub">${esc(x.body)}</div></div>`).join('')}` : ''}</div>` : ''}
+</div>` : ''}
     <form id="f" class="pgrid">
       ${canEditBody ? `${field('نوع الطلب', sel('kind', Object.entries(R_KIND), r?.kind || 'approval'))}${field('الأولوية', sel('priority', Object.entries(PRIO), r?.priority || 'normal'))}${field('عنوان الطلب *', inp('title', r?.title || '', 'required'), 'wide')}${field('التفاصيل / المبررات', `<textarea name="details" rows="3">${esc(r?.details || '')}</textarea>`, 'wide')}${field('المطلوب قبل', inp('due_date', r?.due_date || '', 'type="date"'))}` : ''}
       ${admin && r ? `${field('حالة الطلب', sel('status', Object.entries(R_STATUS), r.status))}${field('رد الإدارة', `<textarea name="response" rows="3">${esc(r.response || '')}</textarea>`, 'wide')}` : ''}
-      ${r ? field('إضافة متابعة / تعليق', `<textarea name="reply" rows="2" placeholder="اختياري — يُحفظ في سجل الطلب"></textarea>`, 'wide') : ''}
-      <div class="btnrow end wide">${r && (admin || mine) ? '<button type="button" class="btn danger" data-del>حذف</button>' : ''}<span class="sp"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">${r ? 'حفظ' : 'إرسال الطلب'}</button></div></form></div>`;
+      <div class="btnrow end wide">${r && (admin || mine) ? '<button type="button" class="btn danger" data-del>حذف</button>' : ''}<span class="sp"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">${r ? 'حفظ' : 'إرسال الطلب'}</button></div></form>${r ? threadBox('request', r.id) : ''}</div>`;
   await modal(html, { title: r ? 'الطلب #' + r.id : 'طلب جديد إلى الإدارة', wide: true, onOpen: (w, close) => {
+    if (r) mountThread(w, 'request', r.id, { projectId: r.project_id });
     $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target);
       try {
         let id = r?.id;
         if (!r) { const x = await q(sb.from('requests').insert({ project_id: project.id, kind: f.kind, priority: f.priority, title: f.title.trim(), details: f.details.trim(), due_date: f.due_date || null, created_by: me }).select('id').single()); id = x.id; }
         else { const row = {}; if (canEditBody) Object.assign(row, { kind: f.kind, priority: f.priority, title: f.title.trim(), details: f.details.trim(), due_date: f.due_date || null }); if (admin) Object.assign(row, { status: f.status, response: f.response }); if (Object.keys(row).length) await q(sb.from('requests').update(row).eq('id', r.id)); }
-        if (r && f.reply && f.reply.trim()) await q(sb.from('request_replies').insert({ request_id: id, body: f.reply.trim(), status_after: admin ? f.status : null, by_user: me }));
+        if (r && admin && f.status !== r.status) await q(sb.from('request_replies').insert({ request_id: id, body: 'تغيير حالة الطلب إلى: ' + (R_STATUS[f.status] || f.status) + (f.response && f.response !== (r.response || '') ? ' — ' + f.response : ''), status_after: f.status, by_user: me }));
         toast(r ? 'تم الحفظ' : 'أُرسل الطلب'); close(); done();
       } catch (er) { err(er); } };
     const del = $('[data-del]', w); if (del) del.onclick = async () => { if (!await confirm('حذف الطلب؟', 'حذف', true)) return; await q(sb.from('requests').delete().eq('id', r.id)); close(); done(); };

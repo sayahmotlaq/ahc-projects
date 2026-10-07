@@ -1,6 +1,7 @@
 // ===== الإجراء السريع: قرارات من مكانك بلا انتقال + درج المشروع =====
 import { sb, q, session, isAdmin, today, STAGES, stageOf } from './api.js';
 import { $, $$, esc, money, dateAr, toast, err, modal, field, inp, formData, ico } from './ui.js';
+import { threadBox, mountThread } from './thread.js';
 
 let profiles = [];
 async function loadProfiles() { if (!profiles.length) profiles = await q(sb.from('profiles').select('id,full_name,role')); return profiles; }
@@ -13,6 +14,7 @@ export async function openQuick(item, done) {
   const finish = () => done && done(item);
   try {
     await loadProfiles();
+    if (!k.pid && ['request', 'payment', 'submittal', 'task', 'change'].includes(k.k)) { const tbl = { request: 'requests', payment: 'payments', submittal: 'submittals', task: 'tasks', change: 'change_orders' }[k.k]; const ent = await q(sb.from(tbl).select('project_id').eq('id', k.id).single()); k.pid = ent.project_id; }
     switch (k.k) {
       case 'request': { const [r, p] = await Promise.all([q(sb.from('requests').select('*').eq('id', k.id).single()), proj(k.pid)]); const { requestForm } = await import('./tasks.js'); return requestForm(r, p, finish); }
       case 'payment': { const [pm, p, all] = await Promise.all([q(sb.from('payments').select('*').eq('id', k.id).single()), proj(k.pid), q(sb.from('payments').select('*').eq('project_id', k.pid))]); const { payDetail } = await import('./payments.js'); return payDetail(pm, p, all, finish); }
@@ -42,11 +44,13 @@ async function quickReport(id, done) {
       ${P(r.kind === 'meeting' ? 'ما دار في الاجتماع' : 'الملخص', r.summary)}${P('الملاحظات والمخالفات', r.findings)}${P('التوصيات / المطلوب', r.recommendations)}
       ${items.length ? `<h3 class="sub-h">القرارات والتكليفات (${items.length})</h3><ul class="rlist small">${items.slice(0, 6).map(it => `<li>${esc(it.text)}${it.owner ? ` — <span class="muted">${esc(it.owner)}</span>` : ''}${it.due ? ` <span class="muted">· ${dateAr(it.due)}</span>` : ''}</li>`).join('')}</ul>` : ''}
       ${photos.length ? `<h3 class="sub-h">الصور (${photos.length})</h3><div class="qphotos">${photos.map(p => `<a href="${urls[p.path] || '#'}" target="_blank"><img src="${urls[p.path] || ''}" alt="" loading="lazy"></a>`).join('')}</div>` : ''}
+      ${threadBox('treport', id, 'التعليقات والمتابعة')}
       <form id="f" class="mt10"><label class="fld"><span>ملاحظة المراجعة (اختياري — إلزامي عند الإعادة)</span><textarea name="note" rows="2"></textarea></label></form>
       <div class="btnrow end wrap mt10"><a class="btn" href="#/treport/${id}">التقرير كاملاً</a><span class="sp"></span>${admin && r.status === 'published' ? '<button class="btn danger" data-rv="returned">إعادة للمهندس</button><button class="btn primary" data-rv="reviewed">تمت المراجعة ✓</button>' : ''}</div></div>`, { title: r.title, wide: true, onOpen: (w, close) => {
       $$('[data-rv]', w).forEach(b => b.onclick = async () => { const to = b.getAttribute('data-rv'); const note = $('[name=note]', w).value.trim(); if (to === 'returned' && !note) { toast('اكتب سبب الإعادة'); $('[name=note]', w).focus(); return; }
         try { await q(sb.from('tech_reports').update({ status: to, review_note: note || null, reviewed_by: session.user.id, reviewed_at: new Date().toISOString() }).eq('id', id)); if (note) await q(sb.from('report_comments').insert({ report_id: id, body: (to === 'reviewed' ? 'ملاحظة المراجعة: ' : 'أُعيد التقرير: ') + note, by_user: session.user.id })); toast(to === 'reviewed' ? 'تمت المراجعة' : 'أُعيد للمهندس'); close(); done(); } catch (e) { err(e); } });
       $$('a[href]', w).forEach(a => a.onclick = () => close());
+      mountThread(w, 'treport', id, { projectId: r.project_id });
     } });
 }
 

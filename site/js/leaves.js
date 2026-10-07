@@ -3,6 +3,7 @@ import { sb, q, session, isAdmin, role, today } from './api.js';
 import { $, $$, esc, dateAr, toast, err, modal, confirm, field, inp, sel, formData, ico, debounce } from './ui.js';
 import { exportTable } from './xlsx.js';
 import { uploadOne, openFile } from './docs.js';
+import { threadBox, mountThread } from './thread.js';
 
 export const KINDS = { annual: 'سنوية', emergency: 'اضطرارية', sick: 'مرضية', mission: 'انتداب / مهمة عمل', unpaid: 'بدون راتب', other: 'أخرى' };
 export const LSTATUS = { pending_delegate: 'بانتظار قبول البديل', pending_approval: 'بانتظار اعتماد الإدارة', approved: 'معتمدة', rejected: 'مرفوضة', cancelled: 'ملغاة', returned: 'منتهية — استُلم العمل' };
@@ -160,8 +161,10 @@ export async function openLeave(id, D, done) {
       <div id="hoView">${hoList(ho, false, deleg || admin)}</div>
       ${l.handover_note ? `<p class="small" style="white-space:pre-wrap"><b>ملاحظات التسليم:</b> ${esc(l.handover_note)}</p>` : ''}${l.delegate_note ? `<p class="small"><b>ردّ البديل:</b> ${esc(l.delegate_note)}</p>` : ''}
       <h3 class="sub-h">السجل</h3><div class="tl">${log.map(x => `<div class="e"><i>•</i><div><b>${LOG[x.action] || x.action}</b><small class="muted"> — ${esc(pname(x.by_user))} · ${new Date(x.at).toLocaleString('ar-SA-u-ca-gregory-nu-latn', { dateStyle: 'medium', timeStyle: 'short' })}${x.note ? ' · ' + esc(x.note) : ''}</small></div></div>`).join('')}</div>
+      ${threadBox('leave', l.id)}
       ${actions.length ? `<div class="btnrow end mt12" style="flex-wrap:wrap;gap:8px">${actions.join('')}</div>` : ''}
     </div>`, { title: `طلب إجازة #${l.id}`, wide: true, onOpen: (w, close) => {
+      mountThread(w, 'leave', l.id);
       const att = $('#lvAtt', w); if (att) att.onclick = () => openFile(l);
       $$('[data-ho]', w).forEach(cb => cb.onchange = async () => { ho[+cb.getAttribute('data-ho')].done = cb.checked; try { await q(sb.from('leaves').update({ handover: ho }).eq('id', l.id)); cb.closest('.hoi').classList.toggle('done', cb.checked); } catch (e) { err(e); } });
       const act = async (a) => {
