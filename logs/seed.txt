@@ -1,0 +1,81 @@
+run 37613764905 Wed Oct  7 11:26:00 UTC 2026
+CREATE VIEW
+GRANT
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+GRANT
+GRANT
+DROP POLICY
+CREATE POLICY
+DROP POLICY
+CREATE POLICY
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+GRANT
+GRANT
+DROP POLICY
+CREATE POLICY
+DROP POLICY
+CREATE POLICY
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+GRANT
+GRANT
+DROP POLICY
+CREATE POLICY
+CREATE FUNCTION
+DROP TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+DROP TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+divisions: 24 in file, 24 in db, 0 to write, 0 protected
+divisions: upserted 0
+sections: 551 in file, 551 in db, 0 to write, 0 protected
+sections: upserted 0
+items: 1802 in file, 1802 in db, 0 to write, 0 protected
+items: upserted 0
+variants: 12352 in file, 12352 in db, 0 to write, 0 protected
+variants: upserted 0
+ref_version 204 done
+import already applied bece0caf7629
+INSERT 0 2
+ stale_notified 
+----------------
+              0
+(1 row)
+
+ schedule_synced 
+-----------------
+               0
+(1 row)
+
+ late_milestones 
+-----------------
+               0
+(1 row)
+
+ overdue_challenges 
+--------------------
+                  0
+(1 row)
+
+ leave_events 
+--------------
+            0
+(1 row)
+
+ scheduled_messages 
+--------------------
+                  0
+(1 row)
+
