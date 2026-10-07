@@ -137,7 +137,7 @@ export async function publishShare(from, to) {
         } catch (er) { err(er); btn.disabled = false; btn.textContent = 'إنشاء الرابط'; } };
     } });
 }
-function linkModal(url, title, pin) {
+export function linkModal(url, title, pin) {
   const msg = `${title}\n${url}${pin ? '\nرمز الدخول: ' + pin : ''}`;
   modal(`<div class="sharebox"><p class="small muted m0">انسخ الرابط وأرسله في واتساب أو البريد. يفتح مباشرة على الجوال بلا تسجيل دخول.</p>
     <div class="linkrow"><input id="shUrl" value="${esc(url)}" readonly dir="ltr"><button class="btn primary" id="shCopy">${ico('clip')} نسخ</button></div>
