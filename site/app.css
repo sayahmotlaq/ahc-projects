@@ -865,3 +865,8 @@ table.bq tr.freerow td .spec{color:var(--grey);font-size:12px;line-height:1.65;m
 .pickl{max-height:50vh;overflow:auto;display:flex;flex-direction:column;gap:4px}
 .pk{display:flex;gap:8px;align-items:center;padding:6px 8px;border-radius:8px;cursor:pointer} .pk:hover{background:var(--bg)} .pk.off{opacity:.5} .pk small{margin-inline-start:auto}
 @media (max-width:720px){ .bitem{grid-template-columns:auto 1fr;} .bside{grid-column:2;flex-direction:row;justify-content:flex-start;min-width:0} .bact{grid-column:2;flex-direction:row} }
+
+.lanes{display:flex;flex-direction:column;gap:4px;margin-top:6px;padding:8px 10px;background:#fff;border:1px solid var(--line2);border-radius:10px}
+.lane{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;font-size:12.5px} .lane i{font-style:normal;color:var(--muted);min-width:62px} .lane .ln{color:var(--text)}
+.lchip{display:inline-block;color:#fff;font-size:10.5px;font-weight:800;padding:2px 9px;border-radius:999px}
+.lane.dec .ln{font-weight:700;color:#A6503B} .lanes .lat{font-size:11px}

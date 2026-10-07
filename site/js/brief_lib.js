@@ -1,6 +1,12 @@
 // ===== العروض التنفيذية: منطق مشترك بين المنصة والصفحة العامة (حالة البند، العدّاد، تصدير PowerPoint بهوية التجمع) =====
 export const B_KIND = { targets: 'منجزات مستهدفة', proposal: 'مقترح', update: 'تحديث تنفيذي', other: 'عرض' };
 export const B_ST = { draft: 'مسودة', published: 'منشور', archived: 'مؤرشف' };
+// مسارا المشتريات والمالية لكل بند (مرحلة من قائمة + ملاحظة)؛ المفتاح الفارغ = لم يبدأ
+export const PROC = [['', 'لم يبدأ'], ['docs', 'إعداد الكراسة'], ['tender', 'مطروح'], ['opened', 'فُتحت المظاريف'], ['award', 'ترسية'], ['contract', 'عقد / أمر شراء'], ['done', 'مكتمل']];
+export const FIN = [['', 'لم يبدأ'], ['budget', 'اعتماد الميزانية'], ['commit', 'ارتباط مالي'], ['invoice', 'مستخلص مقدَّم'], ['paying', 'تحت الصرف'], ['paid', 'صُرف'], ['done', 'مكتمل']];
+export const laneAr = (list, k) => (list.find(x => x[0] === (k || '')) || list[0])[1];
+export const laneColor = (list, k) => { const i = list.findIndex(x => x[0] === (k || '')); return i <= 0 ? 'grey' : i === list.length - 1 ? 'sage' : i >= list.length - 3 ? 'navy' : 'sky'; };
+export const laneHex = (list, k) => COLORS[laneColor(list, k)];
 const STAGE_AR = { request: 'طلب / فكرة', study: 'دراسة', approval: 'اعتماد', design: 'تصميم', tender: 'طرح', award: 'ترسية', execution: 'تنفيذ', handover: 'استلام ابتدائي', warranty: 'فترة الضمان', closed: 'مقفل', onhold: 'موقوف', cancelled: 'ملغى' };
 export const COLORS = { navy: '123B5C', sky: '27A8DF', gold: 'B8860B', sage: '2E8B57', rust: 'A0522D', grey: '6B7A88', ink: '1C2B36', light: 'EEF3F7' };
 const num = v => Number(v || 0);
@@ -31,7 +37,8 @@ export function briefStats(items) {
   const st = items.map(itemState); const n = items.length;
   const done = st.filter(s => s.pct === 100).length, exec = st.filter(s => /^تنفيذ/.test(s.chip) && s.pct < 100).length, early = n - done - exec;
   const avg = n ? Math.round(st.reduce((a, s) => a + (s.pct ?? 0), 0) / n) : 0;
-  return { n, done, exec, early, avg };
+  const decisions = items.filter(it => it.needs_decision).length, challenges = items.filter(it => (it.challenge || '').trim()).length;
+  return { n, done, exec, early, avg, decisions, challenges };
 }
 
 // ---------- تصدير PowerPoint بهوية التجمع (يُحمَّل pptxgen.bundle.js محلياً عند الطلب)
@@ -76,7 +83,7 @@ export async function buildBriefPptx(B, items, { org = 'تجمع الأحساء 
       T(s, 'بنداً في هذا العرض', { x: px + 0.2, y: py + 1.8, w: pw - 0.4, h: 0.4, fontSize: 14, bold: true, color: 'FFFFFF', align: 'center' });
     }
     // المؤشرات الأربعة
-    const stats = [[String(st.n), 'بنداً في العرض', 'FFFFFF'], [String(st.exec + st.done), 'قيد التنفيذ أو منجزة', '8FE0B0'], [String(st.early), 'دراسة / طرح / حصر', 'F2C94C'], [st.avg + '٪', 'متوسط التقدم', '7FD0F2']];
+    const stats = [[String(st.n), 'بنداً في العرض', 'FFFFFF'], [String(st.exec + st.done), 'قيد التنفيذ أو منجزة', '8FE0B0'], [String(st.early), 'دراسة / طرح / حصر', 'F2C94C'], st.decisions ? [String(st.decisions), 'تحتاج قرار الرئيس التنفيذي', 'F28B82'] : [st.avg + '٪', 'متوسط التقدم', '7FD0F2']];
     const bw = (W - 2 * M - 3 * 0.2) / 4;
     stats.forEach(([n, l, c], i) => { const x = W - M - (i + 1) * bw - i * 0.2; RR(s, { x, y: 4.3, w: bw, h: 0.95, fill: { color: 'FFFFFF', transparency: 92 }, line: { color: 'FFFFFF', transparency: 80, width: 0.5 }, rectRadius: 0.1 }); T(s, n, { x: x + 0.15, y: 4.33, w: 1.1, h: 0.9, fontSize: 30, bold: true, color: c, align: 'center', valign: 'middle' }); T(s, l, { x: x + 1.3, y: 4.35, w: bw - 1.45, h: 0.85, fontSize: 12, color: 'DDE7EF', valign: 'middle' }); });
     if (B.intro) { RR(s, { x: M, y: 5.5, w: W - 2 * M, h: 1.25, fill: { color: NAVY2 }, line: { color: '2A5C85', width: 0.5 }, rectRadius: 0.1 }); T(s, cut(B.intro, 420), { x: M + 0.25, y: 5.58, w: W - 2 * M - 0.5, h: 1.1, fontSize: 12, color: 'E6EEF5', valign: 'middle', lineSpacingMultiple: 1.2 }); }
@@ -123,7 +130,24 @@ export async function buildBriefPptx(B, items, { org = 'تجمع الأحساء 
         cell(cut(it.title, 80), { bold: true, fontSize: 9.5, fill: { color: zebra } }), cell(String(i + 1), { align: 'center', bold: true, color: navy, fill: { color: zebra } })]); });
     s.addTable(rows, { x: M, y: 1.3, w: W - 2 * M, colW: [2.1, 2.5, 1.8, 2.1, 3.23, 0.4], rowH: [0.38, ...slice.map(() => 0.44)], border: { type: 'solid', color: LINE, pt: 0.75 }, margin: [0.03, 0.08, 0.03, 0.08], autoPage: false });
   }
-  // ---------- 4) الخاتمة / القرارات المطلوبة
+  // ---------- 4) الوضع مع المشتريات والمالية والتحديات (إن وُجدت بيانات)
+  const laneItems = items.filter(it => it.proc_stage || it.proc_note || it.fin_stage || it.fin_note || (it.challenge || '').trim());
+  if (laneItems.length) {
+    const LPP = 12, lpages = Math.ceil(items.length / LPP);
+    for (let pg = 0; pg < lpages; pg++) {
+      const s = pres.addSlide(); s.background = { color: 'FFFFFF' }; chrome(s, false); pageNo(s, ++pn);
+      T(s, 'الوضع مع المشتريات والمالية والتحديات' + (lpages > 1 ? ` (${pg + 1} من ${lpages})` : ''), { x: M, y: 0.4, w: 9.5, h: 0.5, fontSize: 22, bold: true, color: navy });
+      T(s, `${st.decisions ? st.decisions + ' بنداً تحتاج قرار الرئيس التنفيذي · ' : ''}آخر تحديث للمسارات ${(() => { const d = items.map(i => i.lanes_at).filter(Boolean).sort().pop(); return d ? dAr(d.slice(0, 10)) : issued; })()}`, { x: M, y: 0.9, w: 9.5, h: 0.28, fontSize: 11, color: st.decisions ? 'C0392B' : grey });
+      const laneCell = (list, k, note, zebra) => ({ text: [{ text: laneAr(list, k), options: { bold: true, color: laneHex(list, k), fontSize: 9.5, breakLine: !!note } }, ...(note ? [{ text: cut(note, 60), options: { color: grey, fontSize: 8 } }] : [])], options: { align: 'right', valign: 'middle', rtlMode: true, fontFace: 'Tajawal', fill: { color: zebra } } });
+      const rows = [[hdr('التحدي'), hdr('المالية'), hdr('المشتريات'), hdr('البند'), hdr('م')]];
+      const slice = items.slice(pg * LPP, pg * LPP + LPP);
+      slice.forEach((it, k) => { const i = pg * LPP + k, zebra = k % 2 ? 'F6F8FB' : 'FFFFFF';
+        rows.push([{ text: [...(it.needs_decision ? [{ text: 'يحتاج قراركم: ', options: { bold: true, color: 'C0392B', fontSize: 9 } }] : []), { text: cut(it.challenge || (it.needs_decision ? '' : '—'), 110), options: { color: it.needs_decision ? 'C0392B' : ink, fontSize: 9, bold: !!it.needs_decision } }], options: { align: 'right', valign: 'middle', rtlMode: true, fontFace: 'Tajawal', fill: { color: it.needs_decision ? 'FDECEA' : zebra } } },
+          laneCell(FIN, it.fin_stage, it.fin_note, zebra), laneCell(PROC, it.proc_stage, it.proc_note, zebra), cell(cut(it.title, 70), { bold: true, fontSize: 9.5, fill: { color: zebra } }), cell(String(i + 1), { align: 'center', bold: true, color: navy, fill: { color: zebra } })]); });
+      s.addTable(rows, { x: M, y: 1.3, w: W - 2 * M, colW: [3.6, 2.3, 2.3, 3.53, 0.4], rowH: [0.38, ...slice.map(() => 0.44)], border: { type: 'solid', color: LINE, pt: 0.75 }, margin: [0.03, 0.08, 0.03, 0.08], autoPage: false });
+    }
+  }
+  // ---------- 5) الخاتمة / القرارات المطلوبة
   if (B.closing) {
     const s = pres.addSlide(); s.background = { color: navy }; chrome(s, true);
     s.addShape(pres.ShapeType.ellipse, { x: -1.6, y: 4.2, w: 5.2, h: 5.2, fill: { color: sky, transparency: 88 }, line: { color: sky, transparency: 100, width: 0 } });

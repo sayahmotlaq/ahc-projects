@@ -1,6 +1,6 @@
 // ===== عارض العرض التنفيذي (بلا حساب): بنود حيّة من المنصة + تفاصيل عند الطلب + ملاحظات للقسم + تنزيل PowerPoint =====
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { B_KIND, itemState, briefStats, daysLeft, buildBriefPptx, dAr, dShort } from './brief_lib.js';
+import { B_KIND, itemState, briefStats, daysLeft, buildBriefPptx, dAr, dShort, PROC, FIN, laneAr, laneHex } from './brief_lib.js';
 const cfg = window.AHC_CONFIG || {};
 const sb = createClient(cfg.url, cfg.anon, { auth: { persistSession: false } });
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -15,6 +15,7 @@ const I = {
 };
 const params = new URLSearchParams(location.search); const token = params.get('t') || '';
 let B = null;
+const lanes = it => { const has = it.proc_stage || it.proc_note || it.fin_stage || it.fin_note || (it.challenge || '').trim(); if (!has) return ''; return `<div class="lanes">${it.proc_stage || it.proc_note ? `<div class="lane"><i>المشتريات</i><span class="lc" style="background:#${laneHex(PROC, it.proc_stage)}">${esc(laneAr(PROC, it.proc_stage))}</span>${it.proc_note ? `<span>${esc(it.proc_note)}</span>` : ''}</div>` : ''}${it.fin_stage || it.fin_note ? `<div class="lane"><i>المالية</i><span class="lc" style="background:#${laneHex(FIN, it.fin_stage)}">${esc(laneAr(FIN, it.fin_stage))}</span>${it.fin_note ? `<span>${esc(it.fin_note)}</span>` : ''}</div>` : ''}${(it.challenge || '').trim() ? `<div class="lane ${it.needs_decision ? 'dec' : ''}"><i>التحدي</i>${it.needs_decision ? '<span class="lc" style="background:#C0392B">يحتاج قراركم</span>' : ''}<span>${esc(it.challenge)}</span></div>` : ''}${it.lanes_at ? `<small>آخر تحديث ${dShort(it.lanes_at)}</small>` : ''}</div>`; };
 
 async function load(pin) {
   const { data, error } = await sb.rpc('get_brief', { p_token: token, p_pin: pin || null });
@@ -29,13 +30,13 @@ function showPin(wrong) { $('#app').innerHTML = `<div class="xerr"><h2>رمز ا
 function render() {
   const items = B.items || []; const st = briefStats(items); const dl = daysLeft(B.ref_date);
   const refL = B.ref_date ? (B.ref_label || 'الموعد') : 'الموعد';
-  const card = (it, i) => { const S = itemState(it); const more = !!(it.notes || it.project || S.line); return `<div class="bi" data-i="${i}"><span class="no">${i + 1}</span><div class="m"><b>${esc(it.title)}</b>${S.line ? `<small>${esc(S.line)}</small>` : ''}${S.pct != null ? `<div class="pb"><i data-w="${S.pct}" style="background:#${S.hex}"></i></div>` : ''}${it.expected || it.show_text ? `<div class="ex">${it.expected ? `<div><span>المستهدف وقت ${esc(refL)}</span><b>${esc(it.expected)}</b></div>` : ''}${it.show_text ? `<div><span>ما سيُعرض ميدانياً</span><b>${esc(it.show_text)}</b></div>` : ''}</div>` : ''}${more ? `<small class="hint">اضغط لاستعراض التفاصيل</small>` : ''}</div><div class="side"><span class="ch" style="background:#${S.hex}">${esc(S.chip)}</span>${it.target_date ? `<span class="tgt">${dShort(it.target_date)}</span>` : ''}</div><span class="chev">${I.chev}</span></div>`; };
+  const card = (it, i) => { const S = itemState(it); const more = !!(it.notes || it.project || S.line); return `<div class="bi" data-i="${i}"><span class="no">${i + 1}</span><div class="m"><b>${esc(it.title)}</b>${S.line ? `<small>${esc(S.line)}</small>` : ''}${S.pct != null ? `<div class="pb"><i data-w="${S.pct}" style="background:#${S.hex}"></i></div>` : ''}${it.expected || it.show_text ? `<div class="ex">${it.expected ? `<div><span>المستهدف وقت ${esc(refL)}</span><b>${esc(it.expected)}</b></div>` : ''}${it.show_text ? `<div><span>ما سيُعرض ميدانياً</span><b>${esc(it.show_text)}</b></div>` : ''}</div>` : ''}${lanes(it)}${more ? `<small class="hint">اضغط لاستعراض التفاصيل</small>` : ''}</div><div class="side"><span class="ch" style="background:#${S.hex}">${esc(S.chip)}</span>${it.target_date ? `<span class="tgt">${dShort(it.target_date)}</span>` : ''}</div><span class="chev">${I.chev}</span></div>`; };
   $('#app').innerHTML = `
   <div class="top" id="top"><div class="in"><img src="assets/logo.png" alt=""><div class="t"><b>${esc(B.title)}</b><small>تجمع الأحساء الصحي · ${B_KIND[B.kind] || 'عرض'}</small></div><button class="ibtn" id="prn" title="طباعة / PDF">${I.print}</button></div></div>
   <div class="wrap">
     <header class="bhero in"><span class="kd">${esc((B_KIND[B.kind] || 'عرض').toUpperCase())}</span><h1>${esc(B.title)}</h1>${B.subtitle ? `<p class="sub">${esc(B.subtitle)}</p>` : ''}
       ${dl != null ? `<div class="cd ${dl < 0 ? 'over' : ''}"><b>${Math.abs(dl)}</b><span>${dl < 0 ? 'يوماً مضت على' : dl === 0 ? 'اليوم هو' : 'يوماً متبقية حتى'} <b>${esc(B.ref_label || 'الموعد')}</b><br>${dAr(B.ref_date)}</span></div>` : ''}
-      <div class="bst"><div><b>${st.n}</b><span>بنداً</span></div><div><b>${st.exec + st.done}</b><span>قيد التنفيذ أو منجزة</span></div><div><b>${st.avg}%</b><span>متوسط التقدم</span></div></div>
+      <div class="bst"><div><b>${st.n}</b><span>بنداً</span></div><div><b>${st.exec + st.done}</b><span>قيد التنفيذ أو منجزة</span></div><div><b>${st.avg}%</b><span>متوسط التقدم</span></div>${st.decisions ? `<div class="dec"><b>${st.decisions}</b><span>تحتاج قراركم</span></div>` : ''}</div>
       <div class="meta"><span>إعداد <b>${esc(B.by || 'قسم المشاريع')}</b></span><span>آخر تحديث <b>${dAr(B.updated)}</b></span><span>الأرقام حيّة من منصة إدارة المشاريع</span></div></header>
     ${B.intro ? `<div class="bintro in" style="animation-delay:.05s">${esc(B.intro).replace(/\n/g, '<br>')}</div>` : ''}
     <section class="sec in" style="animation-delay:.1s"><h2>البنود <span class="n">${items.length}</span></h2><div class="card">${items.length ? items.map(card).join('') : '<div class="empty">لا بنود في هذا العرض بعد</div>'}</div></section>
@@ -75,6 +76,7 @@ function openItem(i) {
   const body = `<p style="margin:0 0 12px"><span class="ch" style="background:#${S.hex};color:#fff;font-size:12px;font-weight:800;padding:5px 12px;border-radius:999px">${esc(S.chip)}</span>${S.late ? ' <span class="tag bad">متأخر</span>' : ''}${it.target_date ? ` <span class="tag">المستهدف ${dAr(it.target_date)}</span>` : ''}</p>
     ${S.pct != null ? `<div class="pb"><i data-w="${S.pct}" style="width:${S.pct}%;background:#${S.hex}"></i></div><div style="font-size:11.5px;color:var(--muted);margin:4px 0 12px">التقدم ${S.pct}%${p && p.stage === 'execution' ? ` · المخطط ${Math.round(Number(p.pl) || 0)}%` : ''}</div>` : ''}
     <div class="dg">${S.line ? `<div><span>الوضع الراهن</span><b>${esc(S.line)}</b></div>` : ''}${it.expected ? `<div><span>الإنجاز المتوقع${B.ref_date ? ' بحلول ' + esc(B.ref_label || 'الموعد') : ''}</span><b>${esc(it.expected)}</b></div>` : ''}${it.show_text ? `<div><span>ما سيُعرض ميدانياً</span><b>${esc(it.show_text)}</b></div>` : ''}${it.notes ? `<div><span>ملاحظات</span><b>${esc(it.notes)}</b></div>` : ''}</div>
+    ${lanes(it)}
     ${p ? `<div class="kv">${p.facility ? `<div><span>المنشأة</span><b>${esc(p.facility)}</b></div>` : ''}${p.contractor ? `<div><span>المقاول</span><b>${esc(p.contractor)}</b></div>` : ''}${p.start ? `<div><span>المباشرة</span><b>${dAr(p.start)}</b></div>` : ''}${p.end ? `<div><span>الانتهاء</span><b>${dAr(p.end)}</b></div>` : ''}</div>` : ''}
     <div class="act"><button class="btn" id="nb">${I.msg} ملاحظة على هذا البند</button></div>`;
   openSheet(it.title, p ? 'مرتبط بمشروع في المنصة — الوضع حيّ' : 'بند من خارج المنصة', body);

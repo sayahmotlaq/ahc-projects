@@ -179,7 +179,7 @@ svg{max-width:100%}
 .cd span{display:block;font-size:12.5px;color:#DDE7EF;line-height:1.4}
 .cd span b{font-size:13px;color:#fff;display:inline;min-width:0}
 .cd.over b{color:#F28B82}
-.bst{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.bst{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:8px;margin-top:12px}
 .bst div{background:rgba(255,255,255,.08);border-radius:12px;padding:10px 8px;text-align:center}
 .bst b{display:block;font-size:22px;font-weight:800;line-height:1.1}
 .bst span{font-size:11px;color:#B9CBD9;line-height:1.3;display:block;margin-top:2px}
@@ -210,3 +210,9 @@ svg{max-width:100%}
 .tools{display:flex;gap:8px;margin-top:12px}
 .tools .btn{flex:1}
 @media print{.bhero{background:#123B5C!important;-webkit-print-color-adjust:exact;print-color-adjust:exact} .fab,.tools{display:none}}
+
+.lanes{display:flex;flex-direction:column;gap:5px;margin-top:8px;padding:8px 10px;background:var(--bg);border-radius:10px}
+.lane{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;font-size:12.5px;line-height:1.5} .lane i{font-style:normal;color:var(--muted);min-width:58px;font-size:11.5px}
+.lc{display:inline-block;color:#fff;font-size:10.5px;font-weight:800;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.lane.dec span:last-child{font-weight:700;color:var(--red)} .lanes small{font-size:10.5px;color:var(--faint)}
+.bst div.dec{background:rgba(192,57,43,.35);grid-column:1/-1} .bst div.dec b{color:#FFD1CC}
