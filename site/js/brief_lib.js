@@ -5,7 +5,7 @@ const STAGE_AR = { request: 'طلب / فكرة', study: 'دراسة', approval: 
 export const COLORS = { navy: '123B5C', sky: '27A8DF', gold: 'B8860B', sage: '2E8B57', rust: 'A0522D', grey: '6B7A88', ink: '1C2B36', light: 'EEF3F7' };
 const num = v => Number(v || 0);
 export const dAr = (d, o = { year: 'numeric', month: 'long', day: 'numeric' }) => d ? new Date(d).toLocaleDateString('ar-SA-u-ca-gregory-nu-latn', o) : '';
-export const dShort = d => dAr(d, { month: 'short', day: 'numeric' });
+export const dShort = d => dAr(d, String(d || '').slice(0, 4) === String(new Date().getFullYear()) ? { month: 'short', day: 'numeric' } : { year: 'numeric', month: 'short', day: 'numeric' });
 export const daysLeft = d => d ? Math.round((new Date(d + 'T00:00:00') - new Date(new Date().toDateString())) / 864e5) : null;
 
 // حالة البند الموحدة: شريحة + لون + نسبة + سطر الوضع الراهن
