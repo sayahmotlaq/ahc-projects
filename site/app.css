@@ -883,3 +883,16 @@ table.bq tr.freerow td .spec{color:var(--grey);font-size:12px;line-height:1.65;m
 .tatt{margin-top:6px;display:flex;flex-wrap:wrap}
 .thf .thatt{padding:7px 9px;cursor:pointer}
 .thpend{margin-top:4px;display:flex;flex-wrap:wrap}
+
+/* ===== الإشارة @ ===== */
+.thread{position:relative}
+.mnbox{position:absolute;z-index:5;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 24px rgba(18,59,92,.14);padding:4px;min-width:220px;max-width:320px}
+.mni{display:flex;align-items:center;gap:8px;width:100%;background:none;border:0;padding:7px 10px;border-radius:8px;font:inherit;font-size:13px;cursor:pointer;text-align:right;color:var(--text)}
+.mni.on,.mni:hover{background:#EEF4F9} .mni small{margin-inline-start:auto;color:var(--muted);font-size:11px}
+.mni .av,.mnr .av{width:26px;height:26px;border-radius:50%;background:var(--navy);color:#fff;font-size:11px;font-weight:800;display:grid;place-items:center;flex:none}
+.tx .mn{color:var(--blue);font-weight:800;background:#EEF4F9;border-radius:6px;padding:0 4px}
+.thhint{display:block;margin-top:4px;font-size:11px}
+.mnr{display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border-radius:10px;border:1px solid var(--line2);background:#FFF8F4;cursor:pointer;margin-bottom:6px}
+.mnr.seen{background:var(--surface2);opacity:.85} .mnr:hover{border-color:var(--lblue)}
+.mnr .mt{flex:1;min-width:0;font-size:13px;line-height:1.5} .mnr .mt small{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mnseen summary{cursor:pointer;margin:4px 0 6px}

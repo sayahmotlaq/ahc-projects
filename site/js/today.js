@@ -27,6 +27,13 @@ export async function mountToday(root, params) {
   else lastSeen = sessionStorage.getItem('ahc_prev_seen') || lastSeen;
   const sinceIso = lastSeen || new Date(Date.now() - 864e5).toISOString();
   const leavesCard = await import('./leaves.js').then(m => m.todayLeavesCard()).catch(() => '');
+  // ذُكرت في متابعات (@منشن) — غير المقروءة أولاً ثم آخر 5 مقروءة
+  const mentions = await q(sb.from('mentions').select('*').eq('user_id', me).order('id', { ascending: false }).limit(30)).catch(() => []);
+  const unseenM = mentions.filter(m => !m.seen_at), seenM = mentions.filter(m => m.seen_at).slice(0, 5);
+  const mprofs = mentions.length ? await q(sb.from('profiles').select('id,full_name')).catch(() => []) : []; const pname = id => mprofs.find(x => x.id === id)?.full_name || '';
+  const K_AR = { task: 'مهمة', request: 'طلب', challenge: 'تحدٍ', submittal: 'اعتماد', payment: 'مستخلص', change: 'أمر تغيير', treport: 'تقرير', leave: 'إجازة' };
+  const mentionRow = m => `<div class="mnr ${m.seen_at ? 'seen' : ''}" data-mn="${m.id}" data-k="${m.kind}" data-ref="${esc(m.ref_id)}"><span class="av">${esc((pname(m.by_user) || '؟').trim().split(' ').filter(Boolean).slice(0, 2).map(x => x[0]).join(''))}</span><div class="mt"><b>${esc(pname(m.by_user))}</b> ذكرك في ${K_AR[m.kind] || m.kind}${m.project_id ? ` — ${esc(D.projects.find(p => p.id === m.project_id)?.name || '')}` : ''}<small>${esc(m.excerpt)}</small></div><small class="muted">${dateAr(m.at)}</small></div>`;
+  let mentionsCard = '';
   const msgsCard = await import('./messages.js').then(m => m.todayMessagesCard(root, params?.get?.('msg'))).catch(e => { console.error(e); return ''; });
   const [D, notes, allToday, meetings] = await Promise.all([
     loadDashData(),
@@ -38,6 +45,7 @@ export async function mountToday(root, params) {
   // نبض الفريق اليوم (للإدارة): من فعل ماذا
   const pulse = admin ? Object.values(allToday.filter(a => a.user_id && a.user_id !== me).reduce((m, a) => { const u = m[a.user_id] || (m[a.user_id] = { id: a.user_id, n: 0, last: a }); u.n++; return m; }, {})).sort((a, b) => b.n - a.n) : [];
   const myProjects = admin ? D.projects : D.projects.filter(p => p.engineer_id === me);
+  mentionsCard = mentions.length ? `<div class="pcard mentions"><h2>ذُكرت في متابعات <span class="badge ${unseenM.length ? 'bad' : 'skel'}">${unseenM.length || mentions.length}</span></h2>${unseenM.map(mentionRow).join('')}${seenM.length ? `<details class="mnseen"><summary class="muted small">المقروءة (${seenM.length})</summary>${seenM.map(mentionRow).join('')}</details>` : ''}</div>` : '';
   const now = new Date(); const h = now.getHours(); const dow = now.getDay(); // 0 أحد … 4 خميس
   const closing = h >= 15;
   const profs = admin ? await q(sb.from('profiles').select('id,full_name')) : []; const pn = id => profs.find(x => x.id === id)?.full_name || '';
@@ -68,11 +76,13 @@ export async function mountToday(root, params) {
         <div class="pcard"><h2>هذا الأسبوع <span class="badge skel">${week.length}</span></h2>${week.length ? `<div class="tl">${week.slice(0, 10).map(w => `<div class="e"><i>${ico(w[1])}</i><div><b><a href="${w[3]}" style="color:inherit">${esc(w[2])}</a></b><small>${w[0] === today() ? 'اليوم' : w[0] === plus(1) ? 'غداً' : dateAr(w[0])}</small></div></div>`).join('')}</div>` : '<p class="muted">لا مواعيد خلال الأيام السبعة القادمة.</p>'}</div>
       </div>
       <div class="stack">
+        ${mentionsCard}
         ${leavesCard}
         <div class="pcard"><h2>${closing ? 'ما أنجزته اليوم' : 'أنجزته حتى الآن'} <span class="badge ${nDone ? 'full' : 'skel'}">${nDone}</span></h2>${mineToday.length ? `<div class="tl">${mineToday.map(a => `<div class="e"><i>${ico({ treport: 'file', update: 'edit', payment: 'coins', submittal: 'stamp', submittal_review: 'stamp', submittal_decision: 'stamp', task_done: 'check', task_created: 'check', challenge: 'alert', stage: 'chart', request: 'inbox', request_response: 'inbox', document: 'doc', drawing: 'draw', boq: 'book', comment: 'inbox', project: 'folder' }[a.kind] || 'dash')}</i><div><b><a href="${esc(a.link || '#')}" style="color:inherit">${esc(a.title)}</a></b><small>${esc(D.projects.find(p => p.id === a.project_id)?.name || '')} · ${new Date(a.at).toLocaleTimeString('ar-SA-u-nu-latn', { hour: '2-digit', minute: '2-digit' })}</small></div></div>`).join('')}</div>` : `<p class="muted">${closing ? 'لم يُسجَّل إجراء اليوم.' : 'لم تسجل إجراءً بعد. أول تحديث أو تقرير سيظهر هنا فوراً.'}</p>`}<div class="btnrow end" style="margin-top:6px"><a class="btn sm" href="#/${admin ? 'performance/' + me : 'me'}">سجل إنجازاتي الكامل ›</a></div></div>
         <div class="pcard"><h2>ما حدث منذ آخر زيارة <span class="badge skel">${notes.length}</span></h2><p class="muted small" style="margin:-6px 0 8px">${lastSeen ? 'منذ ' + dateAr(lastSeen) + ' ' + new Date(lastSeen).toLocaleTimeString('ar-SA-u-nu-latn', { hour: '2-digit', minute: '2-digit' }) : 'آخر 24 ساعة'}</p>${notes.length ? notes.map(n => `<a class="nitem ${n.read_at ? '' : 'new'}" href="${esc(n.link || '#')}" style="padding:8px 4px"><span class="nic">${ico(ICON_K[n.kind] || 'bell')}</span><span class="nt"><b>${esc(n.title)}</b>${n.body ? `<small>${esc(n.body)}</small>` : ''}<em>${ago(n.created_at)}</em></span></a>`).join('') : '<p class="muted">لا جديد يخصك منذ آخر زيارة.</p>'}</div>
       </div>
     </div></div>`;
   import('./messages.js').then(m => m.bindMessagesCard(root)).catch(() => { });
+  $$('.mnr', root).forEach(el => el.onclick = async () => { const id = +el.dataset.mn; if (!el.classList.contains('seen')) { el.classList.add('seen'); sb.from('mentions').update({ seen_at: new Date().toISOString() }).eq('id', id).then(() => { }); } const { openQuick } = await import('./quick.js'); const ref = el.dataset.ref; openQuick({ q: { k: el.dataset.k, id: /^\d+$/.test(ref) ? +ref : ref }, link: '#/today' }, () => mountToday(root, params)); });
   bindInbox(root, todayItems, () => { const h = $('.inbox h2 .badge', root); const n = root.querySelectorAll('.qi').length; if (h) h.textContent = n; if (!n) { const box = $('.inbox', root); if (box && !box.querySelector('p.muted')) box.insertAdjacentHTML('beforeend', '<p class="muted">أنجزت كل ما ينتظرك 👌</p>'); } });
 }
