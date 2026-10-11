@@ -9,7 +9,8 @@ export const F_KIND = { hospital: 'مستشفى', center: 'مركز صحي', oth
 // استخراج الإحداثيات من رابط خرائط Google (الطويل) أو من نص "lat, lng"
 export function parseLatLng(s) {
   s = String(s || '').trim(); if (!s) return null;
-  const pats = [/@(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/, /[?&](?:q|ll|query|destination|center)=(-?\d{1,2}\.\d+)(?:,|%2C)(-?\d{1,3}\.\d+)/, /!3d(-?\d{1,2}\.\d+)!4d(-?\d{1,3}\.\d+)/, /^(-?\d{1,2}\.\d+)\s*[,\s]\s*(-?\d{1,3}\.\d+)$/];
+  // الأولوية لإحداثيات المكان نفسه (!3d..!4d..) ثم q=/ll= ثم مركز الخريطة بعد @ (قد يكون بعيداً عند التصغير) ثم النص المباشر
+  const pats = [/!3d(-?\d{1,2}\.\d+)!4d(-?\d{1,3}\.\d+)/, /[?&](?:q|ll|query|destination|center)=(-?\d{1,2}\.\d+)(?:,|%2C)(-?\d{1,3}\.\d+)/, /@(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/, /^(-?\d{1,2}\.\d+)\s*[,\s]\s*(-?\d{1,3}\.\d+)$/];
   for (const re of pats) { const m = s.match(re); if (m) { const lat = +m[1], lng = +m[2]; if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) return { lat, lng }; } }
   return null;
 }
