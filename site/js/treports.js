@@ -1,6 +1,7 @@
 // ===== التقارير الفنية ومحاضر الاجتماعات =====
 import { sb, canEdit, isAdmin, q, session, today } from './api.js';
 import { $, $$, esc, dateAr, toast, err, modal, confirm, field, inp, sel, formData, ico } from './ui.js';
+import { attachBox, mountAttachBox } from './attach.js';
 
 export const TR_KIND = { visit: 'زيارة ميدانية', status: 'تقرير حالة', weekly: 'تقرير أسبوعي', monthly: 'تقرير شهري', incident: 'بلاغ / ملاحظة عاجلة', meeting: 'محضر اجتماع' };
 export const TR_STATUS = { draft: 'مسودة', published: 'بانتظار المراجعة', reviewed: 'تمت المراجعة', returned: 'مُعاد للمهندس' };
@@ -56,7 +57,8 @@ export async function projectTReports(t, p) {
 export async function mountTReportEditor(root, id, params) {
   await loadProfiles();
   const projects = await q(sb.from('projects').select('id,name,engineer_id').eq('archived', false).order('name'));
-  const r = id ? await q(sb.from('tech_reports').select('*').eq('id', id).single()) : { project_id: params.get('p') || projects[0]?.id || '', kind: params.get('k') || 'visit', report_date: today(), items: [], status: 'draft' };
+  const r = id ? await q(sb.from('tech_reports').select('*').eq('id', id).maybeSingle()) : { project_id: params.get('p') || projects[0]?.id || '', kind: params.get('k') || 'visit', report_date: today(), items: [], status: 'draft' };
+  if (id && !r) return root.innerHTML = '<div class="empty-boq">التقرير غير موجود — ربما حُذف.</div>';
   if (id && !canEditReport(r)) return location.hash = '#/treport/' + id;
   let photos = id ? await q(sb.from('report_photos').select('*').eq('report_id', id).order('sort').order('id')) : [];
   let urls = await signed(photos.map(p => p.path)).catch(() => ({}));
@@ -84,7 +86,8 @@ export async function mountTReportEditor(root, id, params) {
         <div class="photogrid" id="pg"></div>
         <div class="btnrow"><label class="btn primary"><input type="file" accept="image/*" capture="environment" multiple hidden id="cam">${ico('camera')} التقاط صورة</label><label class="btn"><input type="file" accept="image/*" multiple hidden id="gal">${ico('image')} من الاستوديو</label><span class="muted small" id="pinfo"></span></div></div>
     </div>
-    <div class="mt12 btnrow end" >${id && (isAdmin() || r.status === 'draft') ? '<button type="button" class="btn danger" id="del">حذف</button>' : ''}<span class="sp"></span><a class="btn" href="#/${id ? 'treport/' + id : 'treports'}">إلغاء</a><button type="button" class="btn" id="saveDraft">حفظ كمسودة</button><button type="button" class="btn primary" id="publish">${r.status === 'reviewed' ? 'حفظ' : 'نشر التقرير'}</button></div>
+    <div class="fld wide">${id ? attachBox('المرفقات (PDF وملفات أخرى)') : '<span>المرفقات (PDF وملفات أخرى)</span><p class="muted small m0">احفظ التقرير أولاً ثم أرفق الملفات من صفحة التعديل أو من صفحة التقرير.</p>'}</div>
+    <div class="mt12 btnrow end" >${id && (isAdmin() || (mine(r) && r.status !== 'reviewed')) ? '<button type="button" class="btn danger" id="del">حذف</button>' : ''}<span class="sp"></span><a class="btn" href="#/${id ? 'treport/' + id : 'treports'}">إلغاء</a><button type="button" class="btn" id="saveDraft">حفظ كمسودة</button><button type="button" class="btn primary" id="publish">${r.status === 'reviewed' ? 'حفظ' : 'نشر التقرير'}</button></div>
   </form>`;
   const f = $('#trf');
   const toggle = () => { const m = meeting(); $$('.notmeeting', f).forEach(e => e.style.display = m ? 'none' : ''); $$('.onlymeeting', f).forEach(e => e.style.display = m ? '' : 'none'); $('#lblSummary').textContent = m ? 'جدول الأعمال وما دار في الاجتماع' : 'ملخص الزيارة / وصف الوضع'; };
@@ -119,7 +122,8 @@ export async function mountTReportEditor(root, id, params) {
   }
   $('#saveDraft').onclick = () => save(r.status === 'reviewed' ? null : 'draft');
   $('#publish').onclick = () => save(r.status === 'reviewed' ? null : 'published');
-  const del = $('#del'); if (del) del.onclick = async () => { if (!await confirm('حذف التقرير وصوره نهائياً؟', 'حذف', true)) return; if (photos.length) await sb.storage.from(BUCKET).remove(photos.map(p => p.path)); await q(sb.from('tech_reports').delete().eq('id', id)); location.hash = '#/treports'; };
+  if (id) mountAttachBox(root, 'treport:' + id, { projectId: r.project_id });
+  const del = $('#del'); if (del) del.onclick = async () => { if (!await confirm('حذف التقرير وصوره ومرفقاته نهائياً؟', 'حذف', true)) return; try { const A = await import('./attach.js'); for (const a of await A.loadAttachments(['treport:' + id])) await A.deleteAttachment(a); } catch (e) { } if (photos.length) await sb.storage.from(BUCKET).remove(photos.map(p => p.path)); await q(sb.from('tech_reports').delete().eq('id', id)); location.hash = '#/treports'; };
 }
 
 // ---------- عرض التقرير
@@ -145,9 +149,11 @@ export async function mountTReport(root, id) {
   root.innerHTML = `<div class="phead noprint"><div class="crumb"><a href="#/treports">التقارير الفنية</a><span class="sep">›</span><a href="#/project/${r.project_id}/treports">${esc(r.projects?.name || '')}</a><span class="sep">›</span><span>${esc(r.title)}</span></div>
     <div class="btnrow wrap">${trBadge(r.status)}<span class="sp"></span>${editable ? `<a class="btn" href="#/treport/${id}/edit">تعديل</a>` : ''}${r.status === 'draft' && mine(r) ? '<button class="btn primary" id="pub">نشر التقرير</button>' : ''}${r.status === 'returned' && mine(r) ? '<button class="btn primary" id="pub">إعادة النشر بعد التعديل</button>' : ''}${admin && r.status === 'published' ? '<button class="btn primary" id="rev">✓ تمت المراجعة</button><button class="btn" id="ret">إعادة للمهندس</button>' : ''}${admin ? '<button class="btn" id="mkTask">＋ مهمة من التقرير</button>' : ''}<button class="btn" id="pdf">${ico('download')} PDF</button><button class="btn" id="prn">${ico('print')} طباعة</button></div></div>
   <div class="rep" id="rep"></div>
+  <div class="pcard noprint">${attachBox('المرفقات')}</div>
   <div class="pcard noprint"><h2><span class="ic"></span>التعليقات <span class="muted">(${comments.length})</span></h2>${comments.length ? comments.map(c => `<div class="upd"><div class="uh"><b>${esc(pname(c.by_user))}</b> <span class="muted">· ${dateAr(c.at)}</span>${admin || c.by_user === session.user.id ? ` <button class="btn sm" data-delc="${c.id}">حذف</button>` : ''}</div><div class="ub">${esc(c.body)}</div></div>`).join('') : '<p class="muted">لا توجد تعليقات.</p>'}
     <form id="cf" class="mt8 btnrow" ><input name="body" placeholder="اكتب تعليقاً…" required class="sp"><button class="btn primary">إرسال</button></form></div>`;
   const { paginate } = await import('./report.js'); paginate($('#rep'), blocks);
+  mountAttachBox(root, 'treport:' + id, { projectId: r.project_id, canAdd: editable });
   const reload = () => mountTReport(root, id);
   $('#cf').onsubmit = async e => { e.preventDefault(); const d = formData(e.target); try { await q(sb.from('report_comments').insert({ report_id: id, body: d.body.trim(), by_user: session.user.id })); reload(); } catch (er) { err(er); } };
   $$('[data-delc]').forEach(b => b.onclick = async () => { await q(sb.from('report_comments').delete().eq('id', +b.getAttribute('data-delc'))); reload(); });

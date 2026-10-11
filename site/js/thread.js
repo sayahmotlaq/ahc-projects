@@ -1,6 +1,7 @@
 // ===== سلسلة المتابعة الموحدة: تعليقات/متابعات لأي عنصر (مهمة، طلب، تحدٍ، اعتماد، مستخلص، أمر تغيير، تقرير، إجازة) =====
 import { sb, q, session, isAdmin } from './api.js';
 import { $, $$, esc, dateAr, toast, err } from './ui.js';
+import { uploadAttachment, loadAttachments, attachChip, bindChips, ACCEPT } from './attach.js';
 
 export const THREAD_KINDS = { task: 'المهمة', request: 'الطلب', challenge: 'التحدي', submittal: 'الاعتماد', payment: 'المستخلص', change: 'أمر التغيير', treport: 'التقرير', leave: 'الإجازة', boq: 'جدول الكميات' };
 // المتابعات القديمة لها جداولها؛ الباقي في comments
@@ -12,25 +13,34 @@ const initials = n => (n || '؟').trim().split(' ').filter(Boolean).slice(0, 2).
 const when = d => { const m = Math.floor((Date.now() - new Date(d)) / 6e4); const t = new Date(d).toLocaleTimeString('ar-SA-u-nu-latn', { hour: '2-digit', minute: '2-digit' }); return m < 1 ? 'الآن' : m < 60 ? `منذ ${m} د` : m < 1440 ? `اليوم ${t}` : m < 2880 ? `أمس ${t}` : `${dateAr(d)} ${t}`; };
 const R_ST = { new: 'جديد', in_review: 'قيد المراجعة', approved: 'معتمد', rejected: 'مرفوض', done: 'منفّذ', closed: 'مغلق' };
 
-export const threadBox = (kind, refId, title = 'المتابعة والتعليقات') => `<div class="thread" data-th="${kind}:${refId}"><h3 class="sub-h thh">${esc(title)} <span class="muted thn"></span></h3><div class="thl"><p class="muted small">جارٍ التحميل…</p></div><form class="thf"><textarea name="body" rows="1" placeholder="اكتب متابعة… (Enter للإرسال، Shift+Enter لسطر جديد)" maxlength="2000"></textarea><button class="btn primary sm">إضافة</button></form></div>`;
+export const threadBox = (kind, refId, title = 'المتابعة والتعليقات') => `<div class="thread" data-th="${kind}:${refId}"><h3 class="sub-h thh">${esc(title)} <span class="muted thn"></span></h3><div class="thl"><p class="muted small">جارٍ التحميل…</p></div><form class="thf"><label class="btn sm ghost thatt" title="إرفاق ملف (PDF، صورة، Word…)">📎<input type="file" multiple accept="${ACCEPT}" hidden></label><textarea name="body" rows="1" placeholder="اكتب متابعة… (Enter للإرسال، Shift+Enter لسطر جديد)" maxlength="2000"></textarea><button class="btn primary sm">إضافة</button></form><div class="thpend"></div></div>`;
 
 export async function mountThread(container, kind, refId, { projectId = null, onPosted = null } = {}) {
   const box = container.matches?.('.thread') ? container : $(`.thread[data-th="${kind}:${refId}"]`, container); if (!box) return;
   await loadProfiles(); const me = session.user.id, admin = isAdmin();
-  const list = $('.thl', box), form = $('.thf', box), ta = $('textarea', form), n = $('.thn', box);
+  const list = $('.thl', box), form = $('.thf', box), ta = $('textarea', form), n = $('.thn', box), fin = $('input[type=file]', form), pendBox = $('.thpend', box);
+  let pending = [];
+  const renderPend = () => { pendBox.innerHTML = pending.length ? pending.map((f, i) => `<span class="achip pend">📎 ${esc(f.name)} <button type="button" data-rm="${i}">✕</button></span>`).join('') : ''; $$('[data-rm]', pendBox).forEach(b => b.onclick = () => { pending.splice(+b.dataset.rm, 1); renderPend(); }); };
+  fin.onchange = () => { pending.push(...fin.files); fin.value = ''; renderPend(); if (!ta.value.trim()) ta.placeholder = 'اكتب تعليقاً مع المرفق ثم Enter'; };
   const render = async () => {
     const rows = await q(sb.from('v_thread').select('*').eq('kind', kind).eq('ref_id', refId).order('at'));
+    const atts = await loadAttachments(rows.map(r => 'thread:' + r.uid)).catch(() => []);
     n.textContent = rows.length ? `(${rows.length})` : '';
-    list.innerHTML = rows.length ? rows.map(r => `<div class="tm ${r.by_user === me ? 'mine' : ''}" data-uid="${r.uid}"><span class="av">${esc(initials(pname(r.by_user)))}</span><div class="tb"><div class="th"><b>${esc(pname(r.by_user))}</b><small>${when(r.at)}</small>${r.status_after ? `<span class="badge skel">${R_ST[r.status_after] || esc(r.status_after)}</span>` : ''}${admin || r.by_user === me ? `<button type="button" class="x" data-del="${r.uid}" title="حذف">✕</button>` : ''}</div><div class="tx">${esc(r.body)}</div></div></div>`).join('') : '<p class="muted small thempty">لا متابعات بعد — أول متابعة تُسجَّل باسمك وتُحسب نشاطاً على المشروع.</p>';
+    list.innerHTML = rows.length ? rows.map(r => { const ra = atts.filter(a => a.ref === 'thread:' + r.uid); return `<div class="tm ${r.by_user === me ? 'mine' : ''}" data-uid="${r.uid}"><span class="av">${esc(initials(pname(r.by_user)))}</span><div class="tb"><div class="th"><b>${esc(pname(r.by_user))}</b><small>${when(r.at)}</small>${r.status_after ? `<span class="badge skel">${R_ST[r.status_after] || esc(r.status_after)}</span>` : ''}${admin || r.by_user === me ? `<button type="button" class="x" data-del="${r.uid}" title="حذف">✕</button>` : ''}</div>${r.body ? `<div class="tx">${esc(r.body)}</div>` : ''}${ra.length ? `<div class="tatt">${ra.map(attachChip).join('')}</div>` : ''}</div></div>`; }).join('') : '<p class="muted small thempty">لا متابعات بعد — أول متابعة تُسجَّل باسمك وتُحسب نشاطاً على المشروع.</p>';
+    bindChips(list, atts);
     list.scrollTop = list.scrollHeight;
-    $$('[data-del]', list).forEach(b => b.onclick = async () => { const uid = b.getAttribute('data-del'); const [p, id] = uid.split('-'); const tbl = { c: 'comments', r: 'request_replies', n: 'challenge_notes', t: 'report_comments' }[p]; try { await q(sb.from(tbl).delete().eq('id', +id)); render(); } catch (e) { err(e); } });
+    $$('[data-del]', list).forEach(b => b.onclick = async () => { const uid = b.getAttribute('data-del'); const [p, id] = uid.split('-'); const tbl = { c: 'comments', r: 'request_replies', n: 'challenge_notes', t: 'report_comments' }[p]; try { await q(sb.from(tbl).delete().eq('id', +id)); const { deleteAttachment } = await import('./attach.js'); for (const a of await loadAttachments(['thread:' + uid]).catch(() => [])) { try { await deleteAttachment(a); } catch (e) { } } render(); } catch (e) { err(e); } });
   };
   const post = async () => {
-    const body = ta.value.trim(); if (!body) return; const btn = $('button', form); btn.disabled = true;
+    let body = ta.value.trim(); if (!body && !pending.length) return; if (!body) body = pending.length === 1 ? 'مرفق: ' + pending[0].name : `${pending.length} مرفقات`;
+    const btn = $('button.primary', form); btn.disabled = true;
     try {
-      const w = WRITE[kind];
-      if (w) { const row = { body, by_user: me }; row[w[1]] = refId; await q(sb.from(w[0]).insert(row)); }
-      else await q(sb.from('comments').insert({ kind, ref_id: refId, project_id: projectId, body, by_user: me }));
+      const w = WRITE[kind]; let ins;
+      if (w) { const row = { body, by_user: me }; row[w[1]] = refId; ins = await q(sb.from(w[0]).insert(row).select('id').single()); }
+      else ins = await q(sb.from('comments').insert({ kind, ref_id: refId, project_id: projectId, body, by_user: me }).select('id').single());
+      const uid = (w ? { request: 'r', challenge: 'n', treport: 't' }[kind] : 'c') + '-' + ins.id;
+      const files = pending; pending = []; renderPend();
+      for (const f of files) { try { toast(`رفع ${f.name}…`); await uploadAttachment(f, 'thread:' + uid, projectId); } catch (e) { err(e); } }
       ta.value = ''; ta.style.height = ''; await render(); onPosted && onPosted(body); toast('سُجّلت المتابعة');
     } catch (e) { err(e); } finally { btn.disabled = false; }
   };

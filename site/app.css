@@ -870,3 +870,16 @@ table.bq tr.freerow td .spec{color:var(--grey);font-size:12px;line-height:1.65;m
 .lane{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;font-size:12.5px} .lane i{font-style:normal;color:var(--muted);min-width:62px} .lane .ln{color:var(--text)}
 .lchip{display:inline-block;color:#fff;font-size:10.5px;font-weight:800;padding:2px 9px;border-radius:999px}
 .lane.dec .ln{font-weight:700;color:#A6503B} .lanes .lat{font-size:11px}
+
+/* ===== المرفقات ===== */
+.attbox .attl{display:flex;flex-direction:column;gap:4px;margin:6px 0 8px}
+.attrow{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surface2);border:1px solid var(--line2);border-radius:10px;font-size:13px}
+.attrow .aname{background:none;border:0;padding:0;font:inherit;color:var(--blue);cursor:pointer;text-align:right;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.attrow .x{background:none;border:0;color:var(--muted);cursor:pointer;font-size:13px}
+.attadd.busy{opacity:.6;pointer-events:none}
+.achip{display:inline-flex;align-items:center;gap:4px;max-width:260px;font:inherit;font-size:12px;background:#EEF4F9;color:var(--blue);border:1px solid #D6E6F2;border-radius:999px;padding:3px 10px;cursor:pointer;margin:2px 2px 0 0}
+.achip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.achip.pend{background:var(--goldbg,#FFF4D6);color:var(--text);cursor:default} .achip.pend button{background:none;border:0;cursor:pointer;color:var(--muted);padding:0 2px}
+.tatt{margin-top:6px;display:flex;flex-wrap:wrap}
+.thf .thatt{padding:7px 9px;cursor:pointer}
+.thpend{margin-top:4px;display:flex;flex-wrap:wrap}

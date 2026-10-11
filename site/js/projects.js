@@ -56,7 +56,7 @@ export async function loadDashData() {
   const inbox = [];
   const push = (cls, ic, title, sub, link, age, act, bad, qd) => inbox.push({ cls, ic, title, sub, link, age, act, bad, q: qd || null });
   if (admin) {
-    reqs.forEach(r => push('b', 'inbox', `طلب: ${r.title}`, `${r.projects?.name || ''} · ${pname(r.created_by)}`, `#/project/${r.project_id}/requests`, r.created_at, 'الرد', false, { k: 'request', id: r.id, pid: r.project_id }));
+    reqs.forEach(r => push('b', 'inbox', `طلب: ${r.title}`, `${r.projects?.name || 'طلب عام'} · ${pname(r.created_by)}`, r.project_id ? `#/project/${r.project_id}/requests` : '#/requests', r.created_at, 'الرد', false, { k: 'request', id: r.id, pid: r.project_id }));
     payPend.forEach(r => push('a', 'coins', `مستخلص رقم ${r.no} — ${r.projects?.name || ''}`, `الصافي ${money(Math.round(r.net_amount))} ر.س · ${({ submitted: 'مقدَّم', review: 'قيد المراجعة', approved: 'معتمد — للإحالة' })[r.status]}`, `#/project/${r.project_id}/payments`, r.updated_at, 'اعتماد', false, { k: 'payment', id: r.id, pid: r.project_id }));
     subs.filter(s => s.status === 'reviewed').forEach(s => push('b', 'stamp', `SUB-${String(s.no).padStart(3, '0')}${s.rev ? '-R' + s.rev : ''} ${s.title}`, `${s.projects?.name || ''} · راجعه المهندس`, `#/project/${s.project_id}/submittals`, s.submitted_on, 'القرار', subLate(s), { k: 'submittal', id: s.id, pid: s.project_id }));
     trs.forEach(r => push('c', 'file', r.title, `${r.projects?.name || ''} · ${pname(r.created_by)}`, `#/treport/${r.id}`, r.published_at, 'مراجعة', false, { k: 'treport', id: r.id }));

@@ -16,7 +16,7 @@ export async function openQuick(item, done) {
     await loadProfiles();
     if (!k.pid && ['request', 'payment', 'submittal', 'task', 'change'].includes(k.k)) { const tbl = { request: 'requests', payment: 'payments', submittal: 'submittals', task: 'tasks', change: 'change_orders' }[k.k]; const ent = await q(sb.from(tbl).select('project_id').eq('id', k.id).single()); k.pid = ent.project_id; }
     switch (k.k) {
-      case 'request': { const [r, p] = await Promise.all([q(sb.from('requests').select('*').eq('id', k.id).single()), proj(k.pid)]); const { requestForm } = await import('./tasks.js'); return requestForm(r, p, finish); }
+      case 'request': { const [r, p] = await Promise.all([q(sb.from('requests').select('*').eq('id', k.id).single()), k.pid ? proj(k.pid) : null]); const { requestForm } = await import('./tasks.js'); return requestForm(r, p, finish); }
       case 'payment': { const [pm, p, all] = await Promise.all([q(sb.from('payments').select('*').eq('id', k.id).single()), proj(k.pid), q(sb.from('payments').select('*').eq('project_id', k.pid))]); const { payDetail } = await import('./payments.js'); return payDetail(pm, p, all, finish); }
       case 'submittal': { const [s, p, all] = await Promise.all([q(sb.from('submittals').select('*').eq('id', k.id).single()), proj(k.pid), q(sb.from('submittals').select('*').eq('project_id', k.pid))]); const { subDetail } = await import('./docs.js'); return subDetail(s, p, all, finish); }
       case 'treport': return quickReport(k.id, finish);
@@ -34,7 +34,7 @@ export async function openQuick(item, done) {
 
 // ---------- مراجعة تقرير فني من مكانك
 async function quickReport(id, done) {
-  const r = await q(sb.from('tech_reports').select('*, projects(id,name,engineer_id,engineer_name)').eq('id', id).single());
+  const r = await q(sb.from('tech_reports').select('*, projects(id,name,engineer_id,engineer_name)').eq('id', id).maybeSingle()); if (!r) return toast('التقرير غير موجود — ربما حُذف', 'bad');
   const [photos, { TR_KIND, signed }] = await Promise.all([q(sb.from('report_photos').select('*').eq('report_id', id).order('sort').order('id').limit(6)), import('./treports.js')]);
   const urls = await signed(photos.map(p => p.path)).catch(() => ({}));
   const admin = isAdmin(); const items = Array.isArray(r.items) ? r.items : [];

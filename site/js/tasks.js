@@ -3,6 +3,7 @@ import { sb, canEdit, isAdmin, q, session, today } from './api.js';
 import { $, $$, esc, dateAr, toast, err, modal, confirm, field, inp, sel, formData, calBtn, bindCal } from './ui.js';
 import { exportTable, xbtn } from './xlsx.js';
 import { threadBox, mountThread } from './thread.js';
+import { attachBox, mountAttachBox } from './attach.js';
 
 export const T_STATUS = { open: 'مفتوحة', in_progress: 'قيد التنفيذ', done: 'منجزة', cancelled: 'ملغاة' };
 export const R_STATUS = { new: 'جديد', in_review: 'قيد المراجعة', approved: 'معتمد', rejected: 'مرفوض', done: 'منفذ' };
@@ -59,18 +60,19 @@ export async function requestForm(r, project, done) {
   await loadProfiles();
   const canEditBody = !r || mine || admin;
   const html = `<div>
+    ${!project ? '<p class="notice small">طلب عام غير مرتبط بمشروع (استفسار، احتياج إداري، طلب دعم…). يصل إلى الإدارة ويُتابع من صفحة الطلبات.</p>' : ''}
     ${r ? `<div class="pcard" style="padding:12px 14px;margin-bottom:10px"><div class="uh"><span class="badge skel">${R_KIND[r.kind]}</span> ${rBadge(r.status)} ${prioBadge(r.priority)} <span class="muted">· ${esc(pname(r.created_by))} · ${dateAr(r.created_at)}</span></div><b>${esc(r.title)}</b><div class="pre muted">${esc(r.details || '')}</div>${r.response ? `<div class="mt8 notice" ><b>رد الإدارة:</b> ${esc(r.response)} <span class="muted">— ${esc(pname(r.responded_by))} ${dateAr(r.responded_at)}</span></div>` : ''}
 </div>` : ''}
     <form id="f" class="pgrid">
       ${canEditBody ? `${field('نوع الطلب', sel('kind', Object.entries(R_KIND), r?.kind || 'approval'))}${field('الأولوية', sel('priority', Object.entries(PRIO), r?.priority || 'normal'))}${field('عنوان الطلب *', inp('title', r?.title || '', 'required'), 'wide')}${field('التفاصيل / المبررات', `<textarea name="details" rows="3">${esc(r?.details || '')}</textarea>`, 'wide')}${field('المطلوب قبل', inp('due_date', r?.due_date || '', 'type="date"'))}` : ''}
       ${admin && r ? `${field('حالة الطلب', sel('status', Object.entries(R_STATUS), r.status))}${field('رد الإدارة', `<textarea name="response" rows="3">${esc(r.response || '')}</textarea>`, 'wide')}` : ''}
-      <div class="btnrow end wide">${r && (admin || mine) ? '<button type="button" class="btn danger" data-del>حذف</button>' : ''}<span class="sp"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">${r ? 'حفظ' : 'إرسال الطلب'}</button></div></form>${r ? threadBox('request', r.id) : ''}</div>`;
-  await modal(html, { title: r ? 'الطلب #' + r.id : 'طلب جديد إلى الإدارة', wide: true, onOpen: (w, close) => {
-    if (r) mountThread(w, 'request', r.id, { projectId: r.project_id });
+      <div class="btnrow end wide">${r && (admin || mine) ? '<button type="button" class="btn danger" data-del>حذف</button>' : ''}<span class="sp"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">${r ? 'حفظ' : 'إرسال الطلب'}</button></div></form>${r ? attachBox('مرفقات الطلب') + threadBox('request', r.id) : '<p class="muted small">بعد الإرسال يمكنك إرفاق ملفات (PDF وغيرها) من نافذة الطلب.</p>'}</div>`;
+  await modal(html, { title: r ? 'الطلب #' + r.id : (project ? 'طلب جديد إلى الإدارة' : 'طلب عام إلى الإدارة'), wide: true, onOpen: (w, close) => {
+    if (r) { mountThread(w, 'request', r.id, { projectId: r.project_id }); mountAttachBox(w, 'request:' + r.id, { projectId: r.project_id }); }
     $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target);
       try {
         let id = r?.id;
-        if (!r) { const x = await q(sb.from('requests').insert({ project_id: project.id, kind: f.kind, priority: f.priority, title: f.title.trim(), details: f.details.trim(), due_date: f.due_date || null, created_by: me }).select('id').single()); id = x.id; }
+        if (!r) { const x = await q(sb.from('requests').insert({ project_id: project?.id || null, status: 'new', kind: f.kind, priority: f.priority, title: f.title.trim(), details: f.details.trim(), due_date: f.due_date || null, created_by: me }).select('id').single()); id = x.id; }
         else { const row = {}; if (canEditBody) Object.assign(row, { kind: f.kind, priority: f.priority, title: f.title.trim(), details: f.details.trim(), due_date: f.due_date || null }); if (admin) Object.assign(row, { status: f.status, response: f.response }); if (Object.keys(row).length) await q(sb.from('requests').update(row).eq('id', r.id)); }
         if (r && admin && f.status !== r.status) await q(sb.from('request_replies').insert({ request_id: id, body: 'تغيير حالة الطلب إلى: ' + (R_STATUS[f.status] || f.status) + (f.response && f.response !== (r.response || '') ? ' — ' + f.response : ''), status_after: f.status, by_user: me }));
         toast(r ? 'تم الحفظ' : 'أُرسل الطلب'); close(); done();
@@ -79,7 +81,7 @@ export async function requestForm(r, project, done) {
   } });
 }
 function requestRows(rows, opts = {}) {
-  return `<table class="lst"><thead><tr>${opts.project ? '<th>المشروع</th>' : ''}<th>الطلب</th><th>النوع</th><th>مقدّم الطلب</th><th>التاريخ</th><th>المطلوب قبل</th><th>الحالة</th><th>رد الإدارة</th><th></th></tr></thead><tbody>${rows.map(r => `<tr class="${['approved', 'rejected', 'done'].includes(r.status) ? 'off' : ''}">${opts.project ? `<td><a href="#/project/${r.project_id}/requests">${esc(r.projects?.name || '')}</a></td>` : ''}<td><b>${esc(r.title)}</b> ${prioBadge(r.priority)}<br><span class="muted">${esc((r.details || '').slice(0, 120))}</span></td><td>${R_KIND[r.kind] || r.kind}</td><td>${esc(pname(r.created_by))}</td><td>${dateAr(r.created_at)}</td><td class="${isLate(r, ['approved', 'rejected', 'done']) ? 'bad' : ''}">${dateAr(r.due_date)}</td><td>${rBadge(r.status)}</td><td class="muted">${esc((r.response || '').slice(0, 120))}</td><td><button class="btn sm" data-r="${r.id}">${isAdmin() ? 'رد / تعديل' : 'فتح'}</button></td></tr>`).join('')}</tbody></table>`;
+  return `<table class="lst"><thead><tr>${opts.project ? '<th>المشروع</th>' : ''}<th>الطلب</th><th>النوع</th><th>مقدّم الطلب</th><th>التاريخ</th><th>المطلوب قبل</th><th>الحالة</th><th>رد الإدارة</th><th></th></tr></thead><tbody>${rows.map(r => `<tr class="${['approved', 'rejected', 'done'].includes(r.status) ? 'off' : ''}">${opts.project ? `<td>${r.project_id ? `<a href="#/project/${r.project_id}/requests">${esc(r.projects?.name || '')}</a>` : '<span class="badge skel">طلب عام</span>'}</td>` : ''}<td><b>${esc(r.title)}</b> ${prioBadge(r.priority)}<br><span class="muted">${esc((r.details || '').slice(0, 120))}</span></td><td>${R_KIND[r.kind] || r.kind}</td><td>${esc(pname(r.created_by))}</td><td>${dateAr(r.created_at)}</td><td class="${isLate(r, ['approved', 'rejected', 'done']) ? 'bad' : ''}">${dateAr(r.due_date)}</td><td>${rBadge(r.status)}</td><td class="muted">${esc((r.response || '').slice(0, 120))}</td><td><button class="btn sm" data-r="${r.id}">${isAdmin() ? 'رد / تعديل' : 'فتح'}</button></td></tr>`).join('')}</tbody></table>`;
 }
 
 // ---------- تبويبات المشروع
@@ -116,12 +118,13 @@ export async function mountTasks(root, params) {
 }
 export async function mountRequests(root, params) {
   await loadProfiles();
-  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">الطلبات</h1></div>
+  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">الطلبات</h1><span class="sp"></span>${canEdit() ? '<button class="btn primary" id="rNew">＋ طلب عام (بلا مشروع)</button>' : ''}</div>
     <div class="filters"><input id="fq" placeholder="بحث…"><select id="fSt"><option value="">بانتظار الرد</option><option value="all">الكل</option>${Object.entries(R_STATUS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select><select id="fK"><option value="">كل الأنواع</option>${Object.entries(R_KIND).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div><div id="rl"><p class="muted">…</p></div>`;
   const all = await q(sb.from('requests').select('*, projects(name)').order('id', { ascending: false }));
   const render = () => { const qs = $('#fq').value.toLowerCase(), st = $('#fSt').value, k = $('#fK').value;
     const rows = all.filter(r => (st === 'all' || (st ? r.status === st : ['new', 'in_review'].includes(r.status))) && (!k || r.kind === k) && (!qs || (r.title + ' ' + (r.details || '') + ' ' + (r.projects?.name || '')).toLowerCase().includes(qs)));
     $('#rl').innerHTML = rows.length ? `<div class="pcard">${requestRows(rows, { project: true })}</div>` : '<div class="empty-boq">لا توجد طلبات مطابقة</div>';
-    $$('[data-r]', root).forEach(b => b.onclick = () => { const r = all.find(x => x.id === +b.getAttribute('data-r')); requestForm(r, { id: r.project_id }, () => mountRequests(root, params)); }); };
+    $$('[data-r]', root).forEach(b => b.onclick = () => { const r = all.find(x => x.id === +b.getAttribute('data-r')); requestForm(r, r.project_id ? { id: r.project_id } : null, () => mountRequests(root, params)); }); };
   ['fq', 'fSt', 'fK'].forEach(id => $('#' + id).oninput = render); render();
+  const nb = $('#rNew', root); if (nb) nb.onclick = () => requestForm(null, null, () => mountRequests(root, params));
 }
