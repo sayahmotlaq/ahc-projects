@@ -23,7 +23,7 @@ const stageBadge = k => { const s = stageOf(k); return `<span class="stage" styl
 // ---------- لوحة المؤشرات
 export async function loadDashData() {
   const me = session.user.id; const admin = isAdmin(); const fin = role() === 'finance';
-  const [projects] = await Promise.all([q(sb.from('projects').select('id,name,ref,facility,stage,priority,budget,contract_value,paid_amount,progress_actual,progress_planned,end_date,updated_at,engineer_id,engineer_name,status_note,category').eq('archived', false)), loadProfiles()]);
+  const [projects] = await Promise.all([q(sb.from('projects').select('id,name,ref,facility,stage,priority,budget,contract_value,paid_amount,progress_actual,progress_planned,end_date,updated_at,engineer_id,engineer_name,status_note,category,archived,facility_id,lat,lng').eq('archived', false)), loadProfiles()]);
   const [chs, tasks, reqs, act, pays, subs, docsExp, trs, ups] = await Promise.all([
     q(sb.from('challenges').select('id,project_id,title,severity,likelihood,score,status,owner,due_date,created_at,projects(name,engineer_id)').neq('status', 'مغلق').order('score', { ascending: false })),
     q(sb.from('tasks').select('id,project_id,title,status,due_date,assignee_id,assignee_name,priority,created_at,challenge_id,projects(name)').in('status', ['open', 'in_progress']).order('due_date', { ascending: true, nullsFirst: false })),
@@ -157,7 +157,7 @@ export async function mountProjects(root, params) {
 }
 
 async function editProject(p, done) {
-  const isNew = !p; await loadProfiles();
+  const isNew = !p; await loadProfiles(); const facs = await q(sb.from('facilities').select('id,name,kind').eq('active', true).order('sort').order('name')).catch(() => []);
   const engs = [['', '—'], ...profiles.filter(x => ['admin', 'engineer'].includes(x.role)).map(x => [x.id, x.full_name])];
   const html = `<form id="f" class="pgrid">
     ${field('اسم المشروع *', inp('name', p?.name || '', 'required'), 'wide')}
@@ -165,6 +165,8 @@ async function editProject(p, done) {
     ${field('فئة المشروع', sel('category', CATEGORIES, p?.category || 'حكومي'))}
     ${field('نوع المشروع', sel('type', PROJECT_TYPES, p?.type || PROJECT_TYPES[0]))}
     ${field('المنشأة / الموقع', inp('facility', p?.facility || ''))}
+    ${field('المنشأة على الخريطة (يرث موقعها)', sel('facility_id', [['', '— بلا منشأة —'], ...facs.map(f => [f.id, f.name])], p?.facility_id || ''))}
+    ${field('رابط موقع المشروع (خرائط Google — اختياري، يغلب على موقع المنشأة)', `<div class="btnrow"><input name="map_link" value="${esc(p?.map_link || '')}" dir="ltr" placeholder="https://maps.google.com/…" style="flex:1"><button type="button" class="btn sm" id="pLoc">${p?.lat != null ? '📍 محدد — تعديل' : '📍 تحديد على الخريطة'}</button></div>`, 'wide')}
     ${field('الجهة المستفيدة', inp('beneficiary', p?.beneficiary || ''))}
     ${field('الجهة الطالبة', inp('dept', p?.dept || ''))}
     ${isAdmin() ? field('المهندس المسؤول (حساب)', sel('engineer_id', engs, p?.engineer_id || '')) : `<input type="hidden" name="engineer_id" value="${session.user.id}">` + field('المهندس المسؤول', inp('_eng_show', session.profile?.full_name || '', 'disabled'))}
@@ -191,9 +193,10 @@ async function editProject(p, done) {
     ${field('نطاق العمل / ملاحظات', `<textarea name="notes" rows="3">${esc(p?.notes || '')}</textarea>`, 'wide')}
     <div class="btnrow end wide"><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">حفظ</button></div></form>`;
   await modal(html, { title: isNew ? 'مشروع جديد' : 'تعديل بيانات المشروع', wide: true, onOpen: (w, close) => {
+    $('#pLoc', w).onclick = async () => { const { pickLocation, parseLatLng } = await import('./map.js'); const cur = parseLatLng($('[name=map_link]', w).value) || (p?.lat != null ? { lat: p.lat, lng: p.lng } : null); const r = await pickLocation(cur, 'موقع المشروع'); if (r === undefined) return; $('[name=map_link]', w).value = r.lat != null ? `${r.lat.toFixed(6)}, ${r.lng.toFixed(6)}` : ''; $('#pLoc', w).textContent = r.lat != null ? '📍 محدد — تعديل' : '📍 تحديد على الخريطة'; };
     $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target);
       const num = v => v === '' ? null : Number(v);
-      const row = { name: f.name.trim(), ref: f.ref.trim(), category: f.category, type: f.type, facility: f.facility.trim(), beneficiary: f.beneficiary.trim(), dept: f.dept.trim(), engineer_id: f.engineer_id || null, engineer_name: f.engineer_name.trim(), funding: f.funding.trim(), priority: f.priority, budget: num(f.budget), budget_approved: num(f.budget_approved), contract_base: num(f.contract_base), contract_value: num(f.contract_base) === null ? null : num(f.contract_base) + Number(p?.contract_extra || 0), tender_submit_date: f.tender_submit_date || null, tender_date: f.tender_date || null, award_date: f.award_date || null, contractor: f.contractor.trim(), consultant: f.consultant.trim(), start_date: f.start_date || null, end_date: f.end_date || null, status_note: f.status_note || null, progress_planned: p?.progress_mode === 'schedule' ? p.progress_planned : (num(f.progress_planned) || 0), progress_actual: p?.progress_mode === 'schedule' ? p.progress_actual : (num(f.progress_actual) || 0), paid_opening: num(f.paid_opening) || 0, notes: f.notes };
+      const ll = (await import('./map.js')).parseLatLng(f.map_link); const row = { name: f.name.trim(), ref: f.ref.trim(), category: f.category, type: f.type, facility: f.facility.trim(), facility_id: f.facility_id ? +f.facility_id : null, map_link: f.map_link.trim(), lat: ll ? ll.lat : (f.map_link.trim() ? (p?.lat ?? null) : null), lng: ll ? ll.lng : (f.map_link.trim() ? (p?.lng ?? null) : null), beneficiary: f.beneficiary.trim(), dept: f.dept.trim(), engineer_id: f.engineer_id || null, engineer_name: f.engineer_name.trim(), funding: f.funding.trim(), priority: f.priority, budget: num(f.budget), budget_approved: num(f.budget_approved), contract_base: num(f.contract_base), contract_value: num(f.contract_base) === null ? null : num(f.contract_base) + Number(p?.contract_extra || 0), tender_submit_date: f.tender_submit_date || null, tender_date: f.tender_date || null, award_date: f.award_date || null, contractor: f.contractor.trim(), consultant: f.consultant.trim(), start_date: f.start_date || null, end_date: f.end_date || null, status_note: f.status_note || null, progress_planned: p?.progress_mode === 'schedule' ? p.progress_planned : (num(f.progress_planned) || 0), progress_actual: p?.progress_mode === 'schedule' ? p.progress_actual : (num(f.progress_actual) || 0), paid_opening: num(f.paid_opening) || 0, notes: f.notes };
       try { let id = p?.id; if (isNew) { row.created_by = session.user.id; const r = await q(sb.from('projects').insert(row).select('id').single()); id = r.id; await sb.from('project_stage_log').insert({ project_id: id, from_stage: null, to_stage: 'request', note: 'إنشاء المشروع', by_user: session.user.id }); } else await q(sb.from('projects').update(row).eq('id', p.id)); toast('تم الحفظ'); close(); done && done(id); } catch (er) { err(er); } };
   } });
 }

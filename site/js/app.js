@@ -5,7 +5,7 @@ import { skeleton, markRoute, watch } from './fx.js';
 
 const app = $('#app');
 const NAV = [
-  ['today', 'يومي', 'sun'], ['dashboard', 'لوحة المؤشرات', 'dash'], ['projects', 'المشاريع', 'folder'],
+  ['today', 'يومي', 'sun'], ['dashboard', 'لوحة المؤشرات', 'dash'], ['projects', 'المشاريع', 'folder'], ['map', 'الخريطة', 'map'],
   ['sec', 'المتابعة'],
   ['tasks', 'المهام', 'check'], ['requests', 'الطلبات', 'inbox'], ['challenges', 'التحديات والمخاطر', 'alert'], ['treports', 'التقارير الفنية والمحاضر', 'file'], ['leaves', 'الإجازات والتغطية', 'clock'],
   ['sec', 'المستندات والمالية'],
@@ -118,6 +118,7 @@ async function route() {
     else if (parts[0] === 'performance') { const pf = await import('./perf.js'); if (parts[1]) await pf.mountPerson(m, parts[1], params); else await pf.mountPerformance(m, params); }
     else if (parts[0] === 'me') { const { mountMyWork } = await import('./perf.js'); await mountMyWork(m, params); }
     else if (parts[0] === 'open') { const k = parts[1], id = parts[2]; history.replaceState(null, '', location.pathname + location.search + '#/today'); setNav('today'); const { mountToday } = await import('./today.js'); await mountToday(m, new URLSearchParams()); const { openQuick } = await import('./quick.js'); openQuick({ q: { k, id: /^\d+$/.test(id) ? +id : id }, link: '#/today' }, () => route()); }
+    else if (parts[0] === 'map') { const { mountMap } = await import('./map.js'); await mountMap(m, params); }
     else if (parts[0] === 'briefs') { const br = await import('./briefs.js'); if (parts[1]) await br.mountBrief(m, +parts[1], params); else await br.mountBriefs(m, params); }
     else if (parts[0] === 'leaves') { const { mountLeaves } = await import('./leaves.js'); await mountLeaves(m, params); }
     else if (parts[0] === 'settings') { const { mountSettings } = await import('./notif.js'); await mountSettings(m); }

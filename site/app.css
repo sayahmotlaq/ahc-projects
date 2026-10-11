@@ -898,3 +898,31 @@ table.bq tr.freerow td .spec{color:var(--grey);font-size:12px;line-height:1.65;m
 .mnseen summary{cursor:pointer;margin:4px 0 6px}
 .mnr.sent{background:var(--surface2)} .mnr.sent.replied{background:#F1F8F3}
 .mnr .mst{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:none} .mnr .mst .btn{padding:2px 8px;font-size:11px}
+
+/* ===== الخريطة ===== */
+.lmap{width:100%;height:60vh;min-height:360px;border-radius:var(--r);border:1px solid var(--line);background:#E9EEF2;overflow:hidden;z-index:0}
+.lmap.big{height:calc(100vh - 230px)}
+.pickmap .lmap{z-index:0}
+.leaflet-container{font-family:Tajawal,system-ui,sans-serif;direction:rtl}
+.leaflet-container .leaflet-tooltip{font-family:inherit;direction:rtl;text-align:right;border-radius:8px;border:1px solid var(--line);box-shadow:var(--shadow)}
+.leaflet-popup-content-wrapper{border-radius:12px;font-family:inherit;direction:rtl;text-align:right}
+.pmw{background:none;border:0}
+.pm{width:36px;height:36px;border-radius:50%;background:var(--c);border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.25);display:grid;place-items:center;color:#fff;font-weight:800;font-size:13px;position:relative}
+.pm.urgent::after{content:"";position:absolute;inset:-3px;border-radius:50%;border:3px solid var(--c);animation:pmPulse 1.6s ease-out infinite}
+.pm.me::after{content:"";position:absolute;inset:-3px;border-radius:50%;border:3px solid var(--c);animation:pmPulse 2.6s ease-out infinite}
+@keyframes pmPulse{0%{transform:scale(1);opacity:.9}100%{transform:scale(2.1);opacity:0}}
+.mapfilters{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.mf{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:12.5px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 12px;cursor:pointer;color:var(--text)}
+.mf i{width:10px;height:10px;border-radius:50%;display:inline-block} .mf b{color:var(--muted);font-weight:700} .mf.on{background:var(--navy);color:#fff;border-color:var(--navy)} .mf.on b{color:#fff}
+.pmlist{display:flex;flex-direction:column;gap:4px;min-width:240px} .pmlist>b{margin-bottom:4px;color:var(--navy)}
+.pmlist a{display:grid;grid-template-columns:auto 1fr;gap:2px 8px;align-items:center;padding:6px 8px;border-radius:8px;color:inherit;text-decoration:none;border:1px solid var(--line2)} .pmlist a:hover{background:var(--bg)}
+.pmlist a i{width:10px;height:10px;border-radius:50%;grid-row:span 2} .pmlist a span{font-weight:700;font-size:13px} .pmlist a small{color:var(--muted);font-size:11.5px}
+@media (prefers-reduced-motion:reduce){.pm::after{animation:none}}
+
+/* ===== حركة الفريق ===== */
+.feed .fl{display:flex;flex-direction:column;gap:6px;max-height:420px;overflow:auto;padding-inline-end:4px}
+.fi{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-radius:12px;background:var(--surface2);border:1px solid var(--line2);cursor:pointer} .fi:hover{border-color:var(--lblue)}
+.fi .av{width:30px;height:30px;border-radius:50%;background:var(--navy);color:#fff;font-size:11px;font-weight:800;display:grid;place-items:center;flex:none}
+.fi .fb{flex:1;min-width:0} .fi .fh{font-size:12.5px;line-height:1.5;color:var(--muted)} .fi .fh b{color:var(--text)} .fi .fh small{margin-inline-start:8px;color:var(--faint)}
+.fi .ft{font-size:13.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;color:var(--text);margin-top:2px}
+.ft .mn{color:var(--blue);font-weight:800;background:#EEF4F9;border-radius:6px;padding:0 4px}

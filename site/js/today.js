@@ -74,9 +74,12 @@ export async function mountToday(root, params) {
   week.sort((a, b) => a[0].localeCompare(b[0]));
   const nDone = mineToday.length, nTodo = todayItems.length + dueToday.filter(t => !todayItems.some(i => i.link.includes(t.project_id) && i.ic === 'check')).length;
   const lead = closing ? (nDone ? `أنجزت اليوم ${acts(nDone)} موثقة باسمك${nTodo ? `، وبقي ${acts(nTodo)} لغدٍ` : '، ولم يبقَ عليك شيء معلق'}.` : `لم يُسجَّل لك إجراء اليوم${nTodo ? `، وينتظرك ${acts(nTodo)}` : ''}.`) : (nTodo ? `عليك اليوم ${acts(nTodo)}${nDone ? `، وأنجزت حتى الآن ${acts(nDone)}` : ''}.` : (nDone ? `أنجزت حتى الآن ${acts(nDone)}، ولا شيء معلق عليك.` : 'لا شيء معلق عليك الآن.'));
+  // حركة الفريق: آخر التعليقات والمتابعات للجميع كسلسلة واحدة
+  const feedHtml = await teamFeed(D, 12).catch(e => { console.error(e); return ''; });
   root.innerHTML = `<div class="today">
     <div class="hero ${closing ? 'pm' : 'am'}"><div><div class="muted small">${now.toLocaleDateString('ar-SA-u-ca-gregory-nu-latn', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div><h1>${esc(greet)}</h1><p>${esc(lead)}</p></div><div class="btnrow">${canEdit() ? `<a class="btn" href="#/treport/new">${ico('file')} تقرير فني</a>` : ''}<a class="btn primary" href="#/dashboard">${ico('dash')} لوحة المؤشرات</a></div></div>
     ${msgsCard}
+    ${feedHtml}
     ${pulseHtml}
     <div class="two">
       <div class="stack">
@@ -92,7 +95,35 @@ export async function mountToday(root, params) {
       </div>
     </div></div>`;
   import('./messages.js').then(m => m.bindMessagesCard(root)).catch(() => { });
+  bindFeed(root, D, () => mountToday(root, params));
   $$('[data-mnclose]', root).forEach(b => b.onclick = async e => { e.stopPropagation(); const id = +b.dataset.mnclose; await sb.from('mentions').update({ closed_at: new Date().toISOString() }).eq('id', id); const row = b.closest('.mnr'); row.remove(); const card = row && $('.mentions', root); });
   $$('.mnr', root).forEach(el => el.onclick = async () => { if (el.classList.contains('sent')) { const { openQuick } = await import('./quick.js'); const ref = el.dataset.ref; return openQuick({ q: { k: el.dataset.k, id: /^\d+$/.test(ref) ? +ref : ref }, link: '#/today' }, () => mountToday(root, params)); } const id = +el.dataset.mn; if (!el.classList.contains('seen')) { el.classList.add('seen'); sb.from('mentions').update({ seen_at: new Date().toISOString() }).eq('id', id).then(() => { }); } const { openQuick } = await import('./quick.js'); const ref = el.dataset.ref; openQuick({ q: { k: el.dataset.k, id: /^\d+$/.test(ref) ? +ref : ref }, link: '#/today' }, () => mountToday(root, params)); });
   bindInbox(root, todayItems, () => { const h = $('.inbox h2 .badge', root); const n = root.querySelectorAll('.qi').length; if (h) h.textContent = n; if (!n) { const box = $('.inbox', root); if (box && !box.querySelector('p.muted')) box.insertAdjacentHTML('beforeend', '<p class="muted">أنجزت كل ما ينتظرك 👌</p>'); } });
+}
+
+// ---------- حركة الفريق (سلسلة التعليقات والمتابعات لكل الفريق)
+const FK = { task: ['مهمة', 'tasks', 'title'], request: ['طلب', 'requests', 'title'], challenge: ['تحدٍ', 'challenges', 'title'], submittal: ['اعتماد', 'submittals', 'title'], payment: ['مستخلص', 'payments', 'no'], change: ['أمر تغيير', 'change_orders', 'title'], treport: ['تقرير', 'tech_reports', 'title'], leave: ['إجازة', 'leaves', 'kind'], boq: ['جدول كميات', 'boqs', 'name'] };
+const FEED_N = 12;
+let feedProfiles = [];
+async function teamFeed(D, limit = FEED_N, offset = 0) {
+  const rows = await q(sb.from('v_thread').select('*').order('at', { ascending: false }).range(offset, offset + limit - 1));
+  if (!rows.length) return offset ? '' : `<div class="pcard feed"><h2>حركة الفريق <span class="badge skel">0</span></h2><p class="muted small m0">لا تعليقات بعد. كل متابعة يكتبها أي زميل على مهمة أو طلب أو تقرير تظهر هنا للجميع.</p></div>`;
+  if (!feedProfiles.length) feedProfiles = await q(sb.from('profiles').select('id,full_name')).catch(() => []);
+  const pn = id => feedProfiles.find(x => x.id === id)?.full_name || '—';
+  // عناوين العناصر دفعة واحدة لكل نوع
+  const titles = {};
+  await Promise.all(Object.entries(FK).map(async ([k, [, tbl, col]]) => { const ids = [...new Set(rows.filter(r => r.kind === k).map(r => r.ref_id))]; if (!ids.length) return; const t = await q(sb.from(tbl).select('id,' + col).in('id', ids)).catch(() => []); t.forEach(x => titles[k + ':' + x.id] = col === 'no' ? 'رقم ' + x[col] : col === 'kind' ? '' : (x[col] || '')); }));
+  const mns = await q(sb.from('mentions').select('uid,user_id').in('uid', rows.map(r => r.uid))).catch(() => []);
+  const names = feedProfiles.map(p => (p.full_name || '').trim()).filter(Boolean).sort((a, b) => b.length - a.length);
+  const hi = t => names.length ? t.replace(new RegExp('@(' + names.map(n => esc(n).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')', 'g'), '<b class="mn">@$1</b>') : t;
+  const item = r => { const [lbl] = FK[r.kind] || [r.kind]; const title = titles[r.kind + ':' + r.ref_id]; const prj = D.projects.find(p => p.id === r.project_id)?.name || ''; const mn = mns.filter(m => m.uid === r.uid).map(m => pn(m.user_id)); const who = pn(r.by_user);
+    return `<div class="fi" data-k="${r.kind}" data-ref="${esc(r.ref_id)}" data-pid="${r.project_id || ''}"><span class="av">${esc(who.split(' ').filter(Boolean).slice(0, 2).map(x => x[0]).join(''))}</span><div class="fb"><div class="fh"><b>${esc(who)}</b> ${mn.length ? `أشار إلى <b>${esc(mn.join('، '))}</b> في` : r.status_after ? 'غيّر حالة' : 'علّق على'} ${lbl}${title ? ` «${esc(String(title).slice(0, 60))}»` : ''}${prj ? ` <span class="muted">— ${esc(prj)}</span>` : ''}<small>${ago(r.at)}</small></div><div class="ft">${hi(esc(r.body || ''))}</div></div></div>`; };
+  return offset ? rows.map(item).join('') : `<div class="pcard feed"><h2>حركة الفريق <span class="badge full">${rows.length}${rows.length >= limit ? '+' : ''}</span><span class="sp"></span><button class="btn sm ghost" id="feedRef" title="تحديث">↻</button></h2><div class="fl">${rows.map(item).join('')}</div><div class="btnrow mt8"><button class="btn sm" id="feedMore" data-off="${rows.length}">عرض الأقدم</button></div></div>`;
+}
+function bindFeed(root, D, refresh) {
+  const box = $('.feed', root); if (!box) return;
+  const bindItems = () => $$('.fi', box).forEach(el => el.onclick = async () => { const { openQuick } = await import('./quick.js'); const ref = el.dataset.ref; openQuick({ q: { k: el.dataset.k, id: /^\d+$/.test(ref) ? +ref : ref, pid: el.dataset.pid || null }, link: '#/today' }, refresh); });
+  bindItems();
+  const rf = $('#feedRef', box); if (rf) rf.onclick = refresh;
+  const more = $('#feedMore', box); if (more) more.onclick = async () => { const off = +more.dataset.off; more.disabled = true; const html = await teamFeed(D, FEED_N, off).catch(() => ''); if (!html) { more.textContent = 'لا أقدم'; return; } $('.fl', box).insertAdjacentHTML('beforeend', html); more.dataset.off = off + FEED_N; more.disabled = false; bindItems(); };
 }
