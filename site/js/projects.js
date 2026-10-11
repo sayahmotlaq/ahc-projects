@@ -171,9 +171,9 @@ async function editProject(p, done) {
     ${field('اسم مدير المشروع', inp('engineer_name', p?.engineer_name || (!isAdmin() && isNew ? session.profile?.full_name || '' : ''), 'placeholder="يُستخدم إن لم يكن له حساب بعد"'))}
     ${field('البرنامج المالي', inp('funding', p?.funding || ''))}
     ${field('الأولوية', sel('priority', [['low', 'منخفضة'], ['normal', 'عادية'], ['high', 'مهمة'], ['urgent', 'عاجلة']], p?.priority || 'normal'))}
-    ${field('الميزانية التقديرية (ر.س)', money_inp('budget', p?.budget || ''))}
-    ${field('الميزانية المعتمدة (ر.س)', money_inp('budget_approved', p?.budget_approved || ''))}
-    ${field('قيمة العقد الأصلية (ر.س)', money_inp('contract_base', p?.contract_base ?? (p?.contract_value ? Number(p.contract_value) - Number(p.contract_extra || 0) : '')))}
+    ${field('الميزانية التقديرية (ر.س، قبل الضريبة)', money_inp('budget', p?.budget || ''))}
+    ${field('الميزانية المعتمدة (ر.س، قبل الضريبة)', money_inp('budget_approved', p?.budget_approved || ''))}
+    ${field('قيمة العقد الأصلية (ر.س، قبل الضريبة)', money_inp('contract_base', p?.contract_base ?? (p?.contract_value ? Number(p.contract_value) - Number(p.contract_extra || 0) : '')))}
     ${field('الإضافي المعتمد (من أوامر التغيير)', inp('_extra', money(p?.contract_extra || 0), 'disabled'))}
     ${field('تاريخ الرفع للطرح', inp('tender_submit_date', p?.tender_submit_date || '', 'type="date"'))}
     ${field('تاريخ الطرح', inp('tender_date', p?.tender_date || '', 'type="date"'))}

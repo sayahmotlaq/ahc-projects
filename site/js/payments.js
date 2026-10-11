@@ -78,7 +78,7 @@ async function payForm(pm, project, existing, done) {
     ${field('الفترة من', inp('period_from', v.period_from || '', `type="date" ${dis}`))}
     ${field('الفترة إلى', inp('period_to', v.period_to || '', `type="date" ${dis}`))}
     ${field('الأعمال المنفذة تراكمياً حتى نهاية الفترة (ر.س)', money_inp('cumulative_work', v.cumulative_work ?? 0, dis))}
-    ${field('قيمة أعمال هذا المستخلص (ر.س) *', money_inp('work_amount', v.work_amount ?? 0, `required ${dis}`))}
+    ${field('قيمة أعمال هذا المستخلص (ر.س، قبل الضريبة) *', money_inp('work_amount', v.work_amount ?? 0, `required ${dis}`))}
     ${field('نسبة حجز الضمان %', inp('retention_pct', v.retention_pct ?? 10, `type="number" min="0" max="100" step="0.5" ${dis}`))}
     ${field('ضريبة القيمة المضافة %', inp('vat_pct', v.vat_pct ?? 15, `type="number" min="0" max="100" step="0.5" ${dis}`))}
     ${field('استرداد الدفعة المقدمة (ر.س)', money_inp('advance_recovery', v.advance_recovery ?? 0, dis))}

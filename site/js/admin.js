@@ -58,7 +58,7 @@ async function quality(t) {
   const [projects, profiles, pays, trs, subs, tasks, chs, docs, dwgs, revs] = await Promise.all([
     q(sb.from('projects').select('id,name,stage,category,type,engineer_id,engineer_name,contract_value,budget,start_date,end_date,contractor,progress_actual,progress_planned,award_date,tender_date,updated_at').eq('archived', false)),
     q(sb.from('profiles').select('id,full_name,role,title,created_at')),
-    q(sb.from('payments').select('id,project_id,no,kind,status,period_from,period_to,payment_order_no,work_amount')),
+    q(sb.from('payments').select('id,project_id,no,kind,status,period_from,period_to,payment_order_no,work_amount,retention_pct,vat_pct')),
     q(sb.from('tech_reports').select('id,project_id,title,status,created_at')),
     q(sb.from('submittals').select('id,project_id,no,title,status,spec_ref,spec_title,due_on')),
     q(sb.from('tasks').select('id,project_id,title,status,due_date,assignee_id,assignee_name')),
@@ -74,6 +74,8 @@ async function quality(t) {
   const P = (arr, link) => arr.map(p => ({ t: p.name, l: `#/project/${p.id}${link || ''}` }));
   const checks = [
     ['bad', 'مشاريع متعاقد عليها بلا قيمة عقد', 'تشوّه قيمة المحفظة ونسب الصرف', P(contracted.filter(p => !Number(p.contract_value)))],
+    ['bad', 'قيمة عقد تبدو شاملة الضريبة', 'قيمة العقد تساوي قيمة أعمال مستخلص × 1.15 — القاعدة: كل المبالغ قبل الضريبة', P(projects.filter(p => pays.some(x => x.project_id === p.id && Number(x.work_amount) > 0 && Math.abs(Number(x.work_amount) * (1 + Number(x.vat_pct || 15) / 100) - Number(p.contract_value)) < 1)), '/payments')],
+    ['warn', 'مستخلصات بنسبة حجز ضمان غير معتادة (> 20٪)', 'غالباً خطأ إدخال', P(projects.filter(p => pays.some(x => x.project_id === p.id && Number(x.retention_pct) > 20)), '/payments')],
     ['bad', 'مشاريع تحت التنفيذ بلا تاريخ انتهاء تعاقدي', 'لا يمكن حساب التأخر', P(exec.filter(p => !p.end_date))],
     ['bad', 'مشاريع تحت التنفيذ بلا تاريخ مباشرة', '', P(exec.filter(p => !p.start_date))],
     ['bad', 'مشاريع قائمة بلا حساب مهندس مسؤول', 'لا تصله إشعاراته ولا تُحسب مؤشراته', P(act.filter(p => !p.engineer_id), '')],

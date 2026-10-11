@@ -896,3 +896,5 @@ table.bq tr.freerow td .spec{color:var(--grey);font-size:12px;line-height:1.65;m
 .mnr.seen{background:var(--surface2);opacity:.85} .mnr:hover{border-color:var(--lblue)}
 .mnr .mt{flex:1;min-width:0;font-size:13px;line-height:1.5} .mnr .mt small{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mnseen summary{cursor:pointer;margin:4px 0 6px}
+.mnr.sent{background:var(--surface2)} .mnr.sent.replied{background:#F1F8F3}
+.mnr .mst{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:none} .mnr .mst .btn{padding:2px 8px;font-size:11px}
