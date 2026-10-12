@@ -926,3 +926,15 @@ table.bq tr.freerow td .spec{color:var(--grey);font-size:12px;line-height:1.65;m
 .fi .fb{flex:1;min-width:0} .fi .fh{font-size:12.5px;line-height:1.5;color:var(--muted)} .fi .fh b{color:var(--text)} .fi .fh small{margin-inline-start:8px;color:var(--faint)}
 .fi .ft{font-size:13.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;color:var(--text);margin-top:2px}
 .ft .mn{color:var(--blue);font-weight:800;background:#EEF4F9;border-radius:6px;padding:0 4px}
+
+/* ===== تنسيق الشاشات الكبيرة ولوحة الإشعارات (update65) ===== */
+/* لوحة الإشعارات على الحاسب: الجرس في أقصى اليسار، فتمتد اللوحة إلى اليمين داخل الشاشة بدل خروجها */
+@media screen and (min-width:901px){ .npanel{left:0;right:auto;top:46px;width:380px} }
+#nlist{max-height:70vh;overflow:auto}
+.nitem b,.nitem small{display:block;white-space:normal;word-break:break-word}
+/* شريط الأعلى بعرض المحتوى نفسه حتى لا يبتعد الجرس والمستخدم عن الصفحة على الشاشات العريضة */
+.topbar{max-width:1360px}
+/* على الشاشات العريضة جداً نوسّط المحتوى والشريط معاً */
+@media screen and (min-width:1900px){ main#main,.topbar{max-width:1480px;margin-inline:auto} .mainwrap{padding:0 40px 40px} }
+/* تبويبات المشروع على الجوال: تمرير أفقي سلس بلا قص */
+.tabs{-webkit-overflow-scrolling:touch;scrollbar-width:none} .tabs::-webkit-scrollbar{display:none}
