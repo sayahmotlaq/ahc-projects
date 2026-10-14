@@ -45,6 +45,7 @@ export async function mountTSD(root) {
   const bad = fm.latest.filter(l => ['down', 'partial'].includes(l.status));
   root.innerHTML = `<div class="tsdhero"><div><small>تجمع الأحساء الصحي</small><h1>إدارة الخدمات الفنية</h1><p>ثمانية أقسام تعمل كمنظومة واحدة: كل طلب يصل للقسم المختص، وكل إحالة بين الأقسام مرئية، وكل عمل يسير وفق دليل إجراءاته.</p>
       <div class="btnrow">${canFile() ? '<button class="btn primary" id="tNew">＋ بلاغ أو طلب</button>' : ''}<a class="btn" href="#/ops/list">كل الأعمال</a><a class="btn" href="#/tsd/report">التقرير الشهري</a><a class="btn" href="#/map?l=ops">على الخريطة</a></div></div>
+      ${netSvg(us, fl)}
       <div class="tsdk">${[[all.open, 'عمل مفتوح'], [all.late, 'متأخر عن مهلته', all.late ? 'r' : ''], [all.urgent, 'طارئ أو عاجل', all.urgent ? 'a' : ''], [all.doneM, 'أُنجز هذا الشهر', 'g'], [all.sla == null ? '—' : all.sla + '٪', 'ضمن المهلة'], [all.rating || '—', 'رضا أصحاب الطلبات']].map(([b, l, c]) => `<div class="${c || ''}"><b>${b}</b><span>${l}</span></div>`).join('')}</div></div>
     <div class="tsdunits">${us.map(u => { const s = stats(O.items.filter(i => i.unit === u.code)); const sysBad = bad.filter(l => fm.sys.find(x => x.code === l.system_code)?.owner === u.code).length;
       return `<a class="tsdu" href="#/dept/${u.code}" style="--c:#${u.color}"><div class="tsdu-h"><b>${esc(u.short)}</b>${u.head ? `<small>${esc(u.head)}</small>` : ''}</div>
@@ -58,6 +59,7 @@ export async function mountTSD(root) {
     </div>
     <div class="pcard"><h2>أحدث النشاط في الأقسام</h2>${recent.length ? `<div class="oact">${recent.map(l => { const i = O.I[l.item_id]; return `<button class="oact-i" data-oi="${l.item_id}"><span class="dot" style="--c:${i ? ucolor(i.unit) : '#999'}"></span><b>${esc(pname(l.by_user) || (l.kind === 'handoff' ? 'إحالة' : 'تحديث'))}</b><span>${esc(l.body.slice(0, 140))}</span><small>${esc(i?.ref || '')} · ${dateAr(l.at)}</small></button>`; }).join('')}</div>` : '<p class="muted">لا نشاط بعد.</p>'}</div>`;
   const re = () => mountTSD(root);
+  bindNet(root);
   $('#tNew', root) && ($('#tNew', root).onclick = () => newItem({}, r => openItem(r.id, re)));
   bindRows(root, re);
   $$('[data-flow]', root).forEach(b => b.onclick = () => { const [a, z] = b.dataset.flow.split('>'); const l = O.items.filter(i => i.unit === z && isOpen(i) && O.I[i.parent_id]?.unit === a);
@@ -363,4 +365,33 @@ export async function mountTSDReport(root, params) {
     ws2.columns.forEach((c, i) => c.width = [14, 14, 18, 40, 24, 20, 10, 14, 12, 12, 50, 8][i]);
     download(new Blob([await wb.xlsx.writeBuffer()], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `تقرير-الخدمات-الفنية-${m}.xlsx`);
   };
+}
+
+// ---------- «الإدارة الحية»: الأقسام حول مدير الإدارة، وخطوط التسليم المعرّفة في الدليل خافتة، والإحالات الجارية تتدفق بنقاط متحركة
+function netSvg(us, fl) {
+  const W = 480, H = 330, cx = W / 2, cy = H / 2 - 4, rx = 190, ry = 122;
+  const P = {}; us.forEach((u, i) => { const a = (-90 + i * 360 / us.length) * Math.PI / 180; P[u.code] = { x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a), u }; });
+  const curve = (a, b, bend = .32) => { const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2; const qx = mx + (cx - mx) * bend, qy = my + (cy - my) * bend; return `M${a.x.toFixed(1)},${a.y.toFixed(1)} Q${qx.toFixed(1)},${qy.toFixed(1)} ${b.x.toFixed(1)},${b.y.toFixed(1)}`; };
+  const pairs = new Set(); (O.G.handoffs || []).forEach(h => { if (P[h.from_unit] && P[h.to_unit] && h.from_unit !== h.to_unit) pairs.add([h.from_unit, h.to_unit].sort().join('|')); });
+  const live = fl.filter(f => P[f.from] && P[f.to]);
+  const st = Object.fromEntries(us.map(u => [u.code, stats(O.items.filter(i => i.unit === u.code))]));
+  const motion = !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  return `<div class="tnet" aria-label="خريطة الأقسام والإحالات الجارية بينها"><svg viewBox="0 0 ${W} ${H}" role="img">
+    <defs><radialGradient id="tnc" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#27A8DF" stop-opacity=".55"/><stop offset="1" stop-color="#27A8DF" stop-opacity="0"/></radialGradient></defs>
+    <circle cx="${cx}" cy="${cy}" r="86" fill="url(#tnc)" class="tglow"/>
+    ${us.map(u => `<path class="tspoke" data-a="${u.code}" d="M${cx},${cy} L${P[u.code].x.toFixed(1)},${P[u.code].y.toFixed(1)}"/>`).join('')}
+    ${[...pairs].map(k => { const [a, b] = k.split('|'); return `<path class="tlink" data-a="${a}" data-b="${b}" d="${curve(P[a], P[b])}"/>`; }).join('')}
+    ${live.map((f, i) => { const d = curve(P[f.from], P[f.to], .45), n = f.items.length, c = '#' + P[f.from].u.color; return `<path class="tflow" data-a="${f.from}" data-b="${f.to}" d="${d}" style="stroke:${c};stroke-width:${(1.6 + Math.min(n, 5) * .7).toFixed(1)}"/>${motion ? [0, 1, 2].slice(0, Math.min(3, n)).map(j => `<circle r="3.2" fill="#fff" class="tdot" data-a="${f.from}" data-b="${f.to}"><animateMotion dur="${(2.6 + i * .2).toFixed(1)}s" begin="${(j * .9 + i * .3).toFixed(1)}s" repeatCount="indefinite" path="${d}" keyPoints="0;1" keyTimes="0;1" calcMode="spline" keySplines=".45 0 .55 1"/></circle>`).join('') : ''}`; }).join('')}
+    <g class="tcenter"><circle cx="${cx}" cy="${cy}" r="30"/><text x="${cx}" y="${cy - 2}">مدير</text><text x="${cx}" y="${cy + 13}">الإدارة</text></g>
+    ${us.map(u => { const p = P[u.code], s = st[u.code], hot = s.late || s.urgent; const below = p.y > cy - 10; return `<g class="tnode ${hot ? 'hot' : ''}" data-u="${u.code}" transform="translate(${p.x.toFixed(1)},${p.y.toFixed(1)})" style="--c:#${u.color}" tabindex="0" role="link" aria-label="${esc(u.short)}: ${s.open} مفتوح${s.late ? '، ' + s.late + ' متأخر' : ''}">
+      ${hot ? '<circle class="tring" r="21"/>' : ''}<circle class="tdisc" r="21"/><text class="tnum" y="5">${s.open}</text>
+      <text class="tlbl" y="${below ? 38 : -30}">${esc(u.short)}</text>${s.late ? `<g class="tlate" transform="translate(16,-16)"><circle r="8"/><text y="3.5">${s.late}</text></g>` : ''}</g>`; }).join('')}
+  </svg><div class="tnet-key"><span><i class="k1"></i>تسليم معرّف في الدليل</span><span><i class="k2"></i>إحالة جارية الآن</span><span><i class="k3"></i>متأخر أو عاجل</span></div></div>`;
+}
+function bindNet(root) {
+  const svg = root.querySelector('.tnet svg'); if (!svg) return;
+  const focus = u => { svg.classList.toggle('focus', !!u); svg.querySelectorAll('[data-a]').forEach(e => e.classList.toggle('hi', !!u && (e.dataset.a === u || e.dataset.b === u)));
+    svg.querySelectorAll('.tnode').forEach(n => { const c = n.dataset.u; n.classList.toggle('hi', !!u && (c === u || [...svg.querySelectorAll(`.tlink.hi,.tflow.hi`)].some(e => e.dataset.a === c || e.dataset.b === c))); }); };
+  svg.querySelectorAll('.tnode').forEach(n => { n.addEventListener('mouseenter', () => focus(n.dataset.u)); n.addEventListener('mouseleave', () => focus(null)); n.addEventListener('focus', () => focus(n.dataset.u)); n.addEventListener('blur', () => focus(null));
+    const go = () => { location.hash = '#/dept/' + n.dataset.u; }; n.addEventListener('click', go); n.addEventListener('keydown', e => { if (e.key === 'Enter') go(); }); });
 }

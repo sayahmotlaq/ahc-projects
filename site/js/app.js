@@ -33,7 +33,7 @@ function shell(inner) {
   let opened = []; try { opened = JSON.parse(localStorage.getItem('ahc_open') || '[]'); } catch (e) { }
   const links = () => { const top = TOP.filter(n => allow(n[3])), sys = SYS.filter(n => allow(n[3])), deps = allow('ops') ? DEPTS : [];
     return top.map(link).join('') + (deps.length ? '<div class="sec">الأقسام</div>' + deps.map(([c, nm, col]) => { const sub = SUBS(c).filter(x => allow(x[3]));
-      return `<div class="ngrp ${opened.includes(c) ? 'open' : ''}" data-grp="${c}" style="--c:#${col}"><a href="#/dept/${c}" data-nav="dept/${c}">${icon('dot:' + col)}<span>${nm}</span><span class="cnt" data-cnt="dept/${c}"></span><i class="nchev" data-tg="${c}" title="عرض صفحات القسم">‹</i></a><div class="nsub">${sub.map(link).join('')}</div></div>`; }).join('') : '')
+      return `<div class="ngrp ${opened.includes(c) ? 'open' : ''}" data-grp="${c}" style="--c:#${col}"><a href="#/dept/${c}" data-nav="dept/${c}">${icon('dot:' + col)}<span>${nm}</span><span class="cnt" data-cnt="dept/${c}"></span><i class="nchev" data-tg="${c}" title="عرض صفحات القسم">${ico('chev')}</i></a><div class="nsub">${sub.map(link).join('')}</div></div>`; }).join('') : '')
       + '<div class="sec">النظام</div>' + sys.map(link).join(''); };
   const mini = (() => { try { return localStorage.getItem('ahc_mini') === '1'; } catch (e) { return false; } })();
   app.innerHTML = `<div class="app2 ${mini ? 'mini' : ''}" id="app2">

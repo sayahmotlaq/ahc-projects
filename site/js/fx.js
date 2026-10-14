@@ -32,7 +32,7 @@ function growBars(root) {
   bars.forEach(i => { i.style.transition = ''; i.style.width = i.dataset.w; });
 }
 // ظهور متدرج لأول عناصر القوائم
-const STAGGER = '.chlist > .chc, .inbox .it, .kpis > .kpi, .stagecell, .tl .e, .steps .step, .plist tr, table.lst tbody tr';
+const STAGGER = '.tsdunits > .tsdu, .ocat > .ocard, .chlist > .chc, .inbox .it, .kpis > .kpi, .stagecell, .tl .e, .steps .step, .plist tr, table.lst tbody tr';
 function stagger(root) {
   qa(root, STAGGER).forEach(el => { if (el.classList.contains('fx-in')) return; const i = [...el.parentElement.children].indexOf(el); if (i > 14) return; el.classList.add('fx-in'); el.style.animationDelay = (i * 28) + 'ms'; });
 }
@@ -58,13 +58,20 @@ function cardify(root) {
   });
 }
 
+// الأسهم النصية (‹ للانتقال و→ للرجوع) تنقلب في العربية؛ نستبدلها بأيقونات مرسومة ثابتة الاتجاه
+const ARR = d => `<span class="garr ${d}" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="${d === 'fwd' ? 'm15 6-6 6 6 6' : 'm9 6 6 6-6 6'}"/></svg></span>`;
+function arrows(root) {
+  qa(root, 'a, button').forEach(el => { if (el._arr || el.closest('.tnet')) return; const f = el.firstChild, l = el.lastChild;
+    if (l && l.nodeType === 3 && /\s?‹\s*$/.test(l.textContent)) { el._arr = 1; l.textContent = l.textContent.replace(/\s?‹\s*$/, ' '); el.insertAdjacentHTML('beforeend', ARR('fwd')); }
+    else if (f && f.nodeType === 3 && /^\s*→\s/.test(f.textContent)) { el._arr = 1; f.textContent = f.textContent.replace(/^\s*→\s/, ''); el.insertAdjacentHTML('afterbegin', ARR('back')); } });
+}
 // نقطة الدخول: تُستدعى على كل جزء يُضاف للصفحة
 export function enhance(root) {
   if (!root || root.nodeType !== 1) return;
-  emptyStates(root); cardify(root);
+  emptyStates(root); cardify(root); arrows(root);
   if (reduced()) return;
   const fresh = Date.now() - routeAt < 2500;
-  if (fresh) qa(root, '.kpi b').forEach(countUp);
+  if (fresh) qa(root, '.kpi b, .fmk>b, .tsdk b, .tsdu-n b, .fmrep-k b, .ostats b').forEach(countUp);
   growBars(root);
   stagger(root);
 }

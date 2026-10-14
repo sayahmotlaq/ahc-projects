@@ -21,7 +21,7 @@ export function modal(html, { title = '', wide = false, onOpen } = {}) {
     const wrap = document.createElement('div'); wrap.className = 'mwrap';
     wrap.innerHTML = `<div class="modal ${wide ? 'wide' : ''}"><div class="mhead"><h3>${esc(title)}</h3><button class="x" data-x>✕</button></div><div class="mbody">${html}</div></div>`;
     document.body.appendChild(wrap);
-    const close = v => { wrap.remove(); resolve(v); };
+    let done = false; const close = v => { if (done) return; done = true; resolve(v); if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return wrap.remove(); wrap.classList.add('closing'); setTimeout(() => wrap.remove(), 150); };
     wrap.addEventListener('click', e => { if (e.target === wrap || e.target.hasAttribute('data-x')) close(null); });
     wrap.close = close; onOpen && onOpen(wrap, close);
   });
@@ -66,6 +66,7 @@ export const ICONS = {
   users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14a5 5 0 0 1 6 5"/>',
   fold: '<path d="M9 6l6 6-6 6"/>',
   logout: '<path d="M10 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h5M14 8l4 4-4 4M18 12H9"/>',
+  chev: '<path d="m15 6-6 6 6 6"/>', back: '<path d="m9 6 6 6-6 6"/>',
   plus: '<path d="M12 5v14M5 12h14"/>', clip: '<path d="m16 7-7.5 7.5a2.1 2.1 0 0 0 3 3L19 10a4.2 4.2 0 0 0-6-6L5.5 11.5a6.4 6.4 0 0 0 9 9L20 15"/>',
   download: '<path d="M12 4v11M7 10l5 5 5-5M4 20h16"/>', camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>', image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 17-6-6-9 9"/>',
   print: '<path d="M6 9V3h12v6M6 18H4V9h16v9h-2M6 14h12v7H6z"/>', edit: '<path d="M4 20h4l11-11-4-4L4 16z"/>', alert: '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/>', clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',

@@ -1225,3 +1225,41 @@ button.fmc:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(18,36,47,
 .dsteps li::before{content:counter(s);position:absolute;inset-inline-end:10px;top:8px;width:24px;height:24px;border-radius:50%;background:var(--c);color:#fff;display:grid;place-items:center;font-weight:800;font-size:12px}
 .dsteps b{font-size:13.5px;color:var(--text);padding-inline-end:30px} .dsteps span{font-size:12.5px;color:var(--muted);line-height:1.8}
 .dready{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;font-size:12.5px} .dready a,.dready .ok{border:1px dashed var(--line);border-radius:999px;padding:5px 12px;text-decoration:none;font-weight:700} .dready .ok{border-style:solid;color:#2E8B57;background:#E7F5EC}
+/* ===== حزمة 79: «الإدارة الحية» والحركة التفاعلية ===== */
+.tsdhero{grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);align-items:center;padding:22px 24px 18px}
+.tsdhero .tsdk{grid-column:1/-1;grid-template-columns:repeat(6,1fr)}
+.tnet{position:relative;z-index:1;margin:-6px 0 -4px} .tnet svg{width:100%;height:auto;display:block;overflow:visible;font-family:inherit}
+.tspoke{stroke:rgba(255,255,255,.1);stroke-width:1} .tlink{fill:none;stroke:rgba(255,255,255,.16);stroke-width:1.2;stroke-dasharray:3 5}
+.tflow{fill:none;stroke-linecap:round;opacity:.85;stroke-dasharray:6 8;animation:tflow 1.2s linear infinite} @keyframes tflow{to{stroke-dashoffset:-28}}
+.tdot{filter:drop-shadow(0 0 4px #fff)}
+.tglow{animation:tglow 5s ease-in-out infinite} @keyframes tglow{50%{opacity:.55}}
+.tcenter circle{fill:rgba(255,255,255,.12);stroke:#27A8DF;stroke-width:2} .tcenter text{fill:#fff;font-size:11.5px;font-weight:800;text-anchor:middle}
+.tnode{cursor:pointer;outline:none} .tnode .tdisc{fill:#0E2F4A;stroke:var(--c);stroke-width:3.5;transition:transform .2s,stroke-width .2s} .tnode .tnum{fill:#fff;font-size:14px;font-weight:800;text-anchor:middle;pointer-events:none}
+.tnode .tlbl{fill:#D6E6F2;font-size:12px;font-weight:700;text-anchor:middle;pointer-events:none;paint-order:stroke;stroke:#0E2F4A;stroke-width:3px}
+.tnode .tring{fill:none;stroke:#FF8A7A;stroke-width:2;transform-origin:center;transform-box:fill-box;animation:tring 2.2s ease-out infinite} @keyframes tring{0%{transform:scale(1);opacity:.9}100%{transform:scale(1.9);opacity:0}}
+.tnode .tlate circle{fill:#C0392B;stroke:#0E2F4A;stroke-width:2} .tnode .tlate text{fill:#fff;font-size:9.5px;font-weight:800;text-anchor:middle}
+.tnode:hover .tdisc,.tnode:focus .tdisc{transform:scale(1.14);stroke-width:5} .tnode:focus-visible .tdisc{stroke:#fff}
+.tnet svg.focus .tlink,.tnet svg.focus .tflow,.tnet svg.focus .tspoke,.tnet svg.focus .tdot{opacity:.12;transition:opacity .2s} .tnet svg.focus .tnode{opacity:.35;transition:opacity .2s}
+.tnet svg.focus .hi{opacity:1!important} .tnet svg.focus .tlink.hi{stroke:rgba(255,255,255,.7);stroke-dasharray:none} .tnet svg.focus .tnode.hi{opacity:1}
+.tnet-key{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;font-size:11px;color:#9FC3DA} .tnet-key i{display:inline-block;width:16px;height:0;border-top:2px dashed rgba(255,255,255,.35);vertical-align:middle;margin-inline-end:5px}
+.tnet-key .k2{border-top:3px solid #27A8DF} .tnet-key .k3{width:9px;height:9px;border:2px solid #FF8A7A;border-radius:50%}
+@media (max-width:900px){.tsdhero{grid-template-columns:1fr} .tsdhero .tsdk{grid-template-columns:repeat(3,1fr)}}
+@media (max-width:600px){.tsdhero .tsdk{grid-template-columns:repeat(2,1fr)} .tnet{margin:0 -10px}}
+/* النوافذ: إغلاق منساب */
+.mwrap.closing{animation:fadeout .16s ease forwards} .mwrap.closing .modal{animation:popout .16s ease forwards}
+@keyframes fadeout{to{opacity:0}} @keyframes popout{to{opacity:0;transform:translateY(10px) scale(.985)}}
+/* القائمة: صفحات القسم تنسدل */
+.ngrp .nsub{display:block;max-height:0;opacity:0;overflow:hidden;margin-top:0;margin-bottom:0;transition:max-height .32s cubic-bezier(.2,.8,.2,1),opacity .2s,margin .2s}
+.ngrp.open .nsub{max-height:640px;opacity:1;margin-top:2px;margin-bottom:6px}
+.nchev svg{width:14px;height:14px;transition:transform .25s cubic-bezier(.2,.8,.2,1)} .ngrp.open .nchev,.ngrp.open .nchev svg{transform:none} .ngrp.open .nchev svg{transform:rotate(-90deg)}
+/* أسهم مرسومة بدل الرموز */
+.garr{display:inline-flex;vertical-align:-2px;margin-inline-start:2px;transition:transform .2s} .garr svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+a:hover>.garr.fwd{transform:translateX(-3px)} a:hover>.garr.back,.btn:hover>.garr.back{transform:translateX(3px)} .garr.back{margin-inline:0 4px}
+/* لوحة الأعمال: سحب وإفلات */
+.oboard .oi[draggable=true]{cursor:grab} .oboard .oi.dragging{opacity:.35;transform:scale(.98)} .obcol.over{background:color-mix(in srgb,var(--c) 12%,var(--surface2));border-style:dashed;box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--c) 40%,transparent)}
+.obcol.over h3::after{content:" — أفلت هنا";color:var(--c);font-weight:700}
+/* بطاقة تحدّثت للتو: ومضة بلون حالتها */
+.oi.just{animation:just 1.6s ease-out} @keyframes just{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--c) 70%,transparent),0 0 0 3px var(--c)}100%{box-shadow:0 0 0 14px transparent,0 0 0 0 transparent}}
+@media (prefers-reduced-motion:reduce){.tflow,.tglow,.tring,.oi.just,.mwrap.closing,.mwrap.closing .modal{animation:none!important} .ngrp .nsub{transition:none}}
+.oboard .oi-h{flex-wrap:wrap;align-items:flex-start} .oboard .oi-h b{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.5} .oboard .oi-ref{flex-basis:100%;order:3}
+.oboard .oi-a{font-size:11.5px} .oboard{grid-template-columns:repeat(5,minmax(250px,1fr))}

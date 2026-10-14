@@ -39,7 +39,7 @@ export async function loadOps() {
     import('./gov.js').then(m => m.govData()),
     q(sb.from('fac_locations').select('*').eq('active', true).order('facility_id').order('sort').order('code')).catch(() => []),
   ]);
-  O = { kinds, K: Object.fromEntries(kinds.map(k => [k.code, k])), items, I: Object.fromEntries(items.map(i => [i.id, i])), fac, F: Object.fromEntries(fac.map(f => [f.id, f])), people, P: Object.fromEntries(people.map(p => [p.id, p])), G, locs, Loc: Object.fromEntries(locs.map(l => [l.id, l])) };
+  const just = O?.just; O = { just, kinds, K: Object.fromEntries(kinds.map(k => [k.code, k])), items, I: Object.fromEntries(items.map(i => [i.id, i])), fac, F: Object.fromEntries(fac.map(f => [f.id, f])), people, P: Object.fromEntries(people.map(p => [p.id, p])), G, locs, Loc: Object.fromEntries(locs.map(l => [l.id, l])) };
   return O;
 }
 export const uname = c => O?.G?.U?.[c]?.short || c || '—';
@@ -74,18 +74,19 @@ const children = id => O.items.filter(x => x.parent_id === id);
 // ---------- صف العمل
 export function itemRow(i, { showUnit = true } = {}) {
   const k = kindOf(i), f = O.F[i.facility_id], ch = children(i.id), par = i.parent_id ? O.I[i.parent_id] : null;
-  return `<button class="oi ${isLate(i) ? 'late' : ''} ${i.status}" data-oi="${i.id}" style="--c:${PR[i.priority]?.c}">
+  const just = O.just && O.just.id === i.id && Date.now() - O.just.at < 5000;
+  return `<button class="oi ${isLate(i) ? 'late' : ''} ${i.status} ${just ? 'just' : ''}" data-oi="${i.id}" style="--c:${just ? ST[i.status]?.c : PR[i.priority]?.c}">
     <span class="oi-h"><span class="oi-k" title="${esc(k.name)}">${k.icon}</span><b>${esc(i.title)}</b><small class="oi-ref">${esc(i.ref || '#' + i.id)}</small></span>
     <span class="oi-m">${esc(f?.name || '—')}${i.location ? ' · ' + esc(i.location) : ''}${i.asset ? ' · ' + esc(i.asset) : ''}</span>
     ${isOpen(i) ? `<span class="oi-a">${i.last_action ? `↻ ${esc(snip(i.last_action))} <small>${ago(i.last_action_at)}</small>` : '<span class="muted">لم يُسجَّل إجراء بعد</span>'}</span>` : ''}
     <span class="oi-f">${stPill(i.status)}${prPill(i.priority)}${slaChip(i)}${showUnit ? uchip(i.unit) : ''}${i.assignee_id || i.assignee_name ? `<span class="muted small">👤 ${esc(pname(i.assignee_id) || i.assignee_name)}</span>` : ''}${par ? `<span class="olink" title="محال من ${esc(uname(par.unit))}">↰ ${esc(uname(par.unit))}</span>` : ''}${ch.length ? `<span class="olink" title="أعمال محالة لأقسام أخرى">⇠ ${ch.map(c => esc(uname(c.unit))).join('، ')}</span>` : ''}${i.fm_obs_id ? '<span class="olink">🏥 متابعة الأنظمة</span>' : ''}</span></button>`;
 }
-export const bindRows = (root, re) => $$('[data-oi]', root).forEach(b => b.onclick = () => openItem(+b.dataset.oi, re));
+export const bindRows = (root, re) => $$('[data-oi]', root).forEach(b => { b.onclick = () => openItem(+b.dataset.oi, re); if (b.tagName !== 'BUTTON') b.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openItem(+b.dataset.oi, re); } }; });
 
 // ---------- لوحة كانبان
 export function boardHtml(items) {
   const cols = ['new', 'accepted', 'in_progress', 'on_hold', 'verify'];
-  return `<div class="oboard">${cols.map(s => { const l = items.filter(i => i.status === s).sort((a, b) => a.priority.localeCompare(b.priority) || isLate(b) - isLate(a)); return `<section class="obcol" style="--c:${ST[s].c}"><h3>${ST[s].ar} <span>${l.length}</span></h3><div>${l.map(i => itemRow(i)).join('') || '<p class="muted small">—</p>'}</div></section>`; }).join('')}</div>`;
+  return `<div class="oboard">${cols.map(s => { const l = items.filter(i => i.status === s).sort((a, b) => a.priority.localeCompare(b.priority) || isLate(b) - isLate(a)); return `<section class="obcol" data-st="${s}" style="--c:${ST[s].c}"><h3>${ST[s].ar} <span>${l.length}</span></h3><div>${l.map(i => itemRow(i).replace(/^\s*<button /, '<div role="button" tabindex="0" ').replace(/<\/button>\s*$/, '</div>')).join('') || '<p class="muted small">—</p>'}</div></section>`; }).join('')}</div>`;
 }
 
 // ---------- طلب المعالجة أو الإجراء المتخذ (إلزامي مع كل تحديث)
@@ -223,7 +224,7 @@ export async function openItem(id, re) {
     { title: `${k.name} — ${i.ref || ''}`, wide: true, onOpen: (w, close) => {
       mountAttachBox(w, 'ops:' + i.id, { canAdd: true });
       const reopen = async () => { changed.v = true; await loadOps(); close(); openItem(i.id, re); };
-      const upd = async patch => { try { await q(sb.from('ops_items').update(patch).eq('id', i.id)); await reopen(); } catch (e) { err(e); } };
+      const upd = async patch => { try { await q(sb.from('ops_items').update(patch).eq('id', i.id)); O.just = { id: i.id, at: Date.now() }; await reopen(); } catch (e) { err(e); } };
       $$('[data-oi]', w).forEach(b => b.onclick = () => { close(); openItem(+b.dataset.oi, re); });
       $$('a[href^="#/"]:not([data-peek])', w).forEach(a => a.addEventListener('click', () => close()));
       $$('[data-gate]', w).forEach(b => b.onclick = async () => { const g = gates.find(x => x.k === b.dataset.gate);
@@ -277,7 +278,7 @@ export async function openItem(id, re) {
 
 // ---------- قائمة بمرشحات (تُستخدم في المركز وفي صفحة القسم)
 export function listView(t, items, { params = new URLSearchParams(), showUnit = true, re, units = true } = {}) {
-  const st = { q: params.get('q') || '', u: params.get('u') || '', f: params.get('f') || '', s: params.get('s') || 'open', p: '', who: params.get('who') || '', late: params.get('late') === '1', view: params.get('v') || 'list' };
+  const st = { q: params.get('q') || '', u: params.get('u') || '', f: params.get('f') || '', s: params.get('s') || 'open', p: '', who: params.get('who') || '', late: params.get('late') === '1', view: params.get('v') || (() => { try { return sessionStorage.getItem('ops_view') || 'list'; } catch (e) { return 'list'; } })() };
   t.innerHTML = `<div class="filters ofilt"><input id="lq" placeholder="بحث بالعنوان أو الرقم أو الموقع…" value="${esc(st.q)}">
     ${units ? sel('lu', [['', 'كل الأقسام'], ...O.G.units.filter(u => u.kind === 'unit').map(u => [u.code, u.short])], st.u) : ''}
     ${sel('lf', [['', 'كل المنشآت'], ...O.fac.map(f => [f.id, f.name])], st.f)}
@@ -295,7 +296,7 @@ export function listView(t, items, { params = new URLSearchParams(), showUnit = 
     const base = items.filter(i => (!st.u || i.unit === st.u) && (!st.f || i.facility_id === +st.f));
     $('#lS', t).innerHTML = ['new', 'accepted', 'in_progress', 'on_hold', 'verify'].map(s => `<span style="--c:${ST[s].c}"><b>${base.filter(i => i.status === s).length}</b>${ST[s].ar}</span>`).join('') + `<span style="--c:#C0392B"><b>${base.filter(isLate).length}</b>متأخرة</span><span style="--c:#2E8B57"><b>${base.filter(i => i.status === 'done' && i.closed_at && i.closed_at.slice(0, 7) === new Date().toISOString().slice(0, 7)).length}</b>أُنجزت هذا الشهر</span>`;
     $('#lL', t).innerHTML = st.view === 'board' ? boardHtml(l.filter(isOpen)) : (l.length ? `<div class="olist">${l.map(i => itemRow(i, { showUnit })).join('')}</div>` : '<div class="empty-boq">لا أعمال مطابقة.</div>');
-    bindRows(t, re);
+    bindRows(t, re); if (st.view === 'board') bindBoard(t, re);
   };
   $('#lq', t).oninput = e => { st.q = e.target.value.trim(); render(); };
   $('[name=lu]', t) && ($('[name=lu]', t).onchange = e => { st.u = e.target.value; render(); });
@@ -304,8 +305,28 @@ export function listView(t, items, { params = new URLSearchParams(), showUnit = 
   $('[name=lp]', t).onchange = e => { st.p = e.target.value; render(); };
   $('[name=lw]', t).onchange = e => { st.who = e.target.value; render(); };
   $('#ll', t).onchange = e => { st.late = e.target.checked; render(); };
-  $$('.oview [data-v]', t).forEach(b => b.onclick = () => { st.view = b.dataset.v; $$('.oview [data-v]', t).forEach(x => x.classList.toggle('on', x === b)); if (st.view === 'board' && st.s !== 'open') { st.s = 'open'; $('[name=ls]', t).value = 'open'; } render(); });
+  $$('.oview [data-v]', t).forEach(b => b.onclick = () => { st.view = b.dataset.v; try { sessionStorage.setItem('ops_view', st.view); } catch (e) { } $$('.oview [data-v]', t).forEach(x => x.classList.toggle('on', x === b)); if (st.view === 'board' && st.s !== 'open') { st.s = 'open'; $('[name=ls]', t).value = 'open'; } render(); });
   render();
+}
+
+// ---------- لوحة الأعمال: سحب البطاقة إلى عمود حالة آخر = تحديث الحالة بإجراء متخذ
+function bindBoard(t, re) {
+  if (!matchMedia('(pointer:fine)').matches) return;
+  let dragId = null;
+  $$('.oboard .oi', t).forEach(c => { const i = O.I[+c.dataset.oi]; if (!i || !(staffOf(i.unit) || i.assignee_id === session.user.id)) return;
+    c.draggable = true; c.title = 'اسحب البطاقة إلى عمود آخر لتغيير حالتها';
+    c.addEventListener('dragstart', e => { dragId = i.id; c.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(i.id)); });
+    c.addEventListener('dragend', () => { c.classList.remove('dragging'); $$('.obcol.over', t).forEach(x => x.classList.remove('over')); }); });
+  $$('.obcol', t).forEach(col => {
+    col.addEventListener('dragover', e => { if (dragId == null) return; e.preventDefault(); col.classList.add('over'); });
+    col.addEventListener('dragleave', e => { if (!col.contains(e.relatedTarget)) col.classList.remove('over'); });
+    col.addEventListener('drop', async e => { e.preventDefault(); col.classList.remove('over'); const id = dragId; dragId = null; const i = O.I[id], to = col.dataset.st; if (!i || i.status === to) return;
+      const k = O.K[i.kind] || {}; const cf = ['verify', 'done'].includes(to) && Array.isArray(k.close_fields) ? k.close_fields : [];
+      if (cf.length) { toast('أكمل بيانات الإنجاز من نافذة العمل'); return openItem(id, re); }
+      const lab = { accepted: 'ملاحظة الاستلام *', in_progress: 'ما الذي بدأ؟ *', on_hold: 'سبب التعليق *', verify: 'ما الذي أُنجز؟ *', new: 'سبب الإعادة إلى «جديد» *' }[to] || 'الإجراء المتخذ *';
+      const a = await askAction(`${ST[i.status].ar} ← ${ST[to].ar}`, lab); if (!a) return;
+      try { await q(sb.from('ops_items').update({ status: to, last_action: a.a }).eq('id', id)); O.just = { id, at: Date.now() }; toast(`${i.ref}: ${ST[to].ar}`); await loadOps(); re && re(); } catch (er) { err(er); } });
+  });
 }
 
 // ---------- مركز البلاغات والطلبات (#/ops/<tab>)
