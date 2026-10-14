@@ -66,8 +66,8 @@ export function go(code) {
 function crumb(n) {
   const parts = [`<a data-go="home">المرجع</a>`];
   const path = n.type === 'item' ? [n.ref.div, n.ref.sec] : n.type === 'sec' ? [n.ref.div] : [];
-  path.forEach(p => parts.push(`<span class="sep">›</span><a data-go="${esc(p.code)}"><span class="cd">${esc(p.code)}</span> — ${esc(p.ar)}</a>`));
-  parts.push(`<span class="sep">›</span><span><span class="cd">${esc(n.ref.code)}</span> — ${esc(n.ref.ar)}</span>`);
+  path.forEach(p => parts.push(`<span class="sep">‹</span><a data-go="${esc(p.code)}"><span class="cd">${esc(p.code)}</span> — ${esc(p.ar)}</a>`));
+  parts.push(`<span class="sep">‹</span><span><span class="cd">${esc(n.ref.code)}</span> — ${esc(n.ref.ar)}</span>`);
   return `<div class="crumb">${parts.join('')}</div>`;
 }
 function priceRange(it) { const ps = it.variants.filter(v => v.active !== false).map(v => Number(v.price)).filter(p => p > 0); if (!ps.length) return '—'; const a = Math.min(...ps), b = Math.max(...ps); return a === b ? money(a) : money(a) + ' – ' + money(b); }
@@ -165,7 +165,7 @@ function wireSearch() {
     if (!box) { box = document.createElement('div'); box.className = 'results'; tree.prepend(box); }
     if (!scored.length) { box.innerHTML = '<div class="empty">لا نتائج — جرّب مصطلحاً آخر أو الرقم</div>'; return; }
     box.innerHTML = scored.slice(0, 80).map(({ n, type }) => {
-      const path = type === 'item' ? `${n.div.ar} › ${n.sec.ar}` : type === 'sec' ? n.div.ar : '';
+      const path = type === 'item' ? `${n.div.ar} ‹ ${n.sec.ar}` : type === 'sec' ? n.div.ar : '';
       const badge = type === 'item' ? (n.status === 'full' ? '<span class="badge full">مفصّل</span>' : `<span class="badge skel">${n.variants.length} خيار</span>`) : `<span class="badge skel">${type === 'div' ? 'شعبة' : 'قسم'}</span>`;
       return `<div class="res" data-go="${esc(n.code)}"><div class="nm"><span class="code">${esc(n.code)}</span> ${esc(n.ar)} <span class="en">${esc(n.en || '')}</span> ${badge}</div><div class="path">${esc(path || '—')}</div></div>`;
     }).join('');

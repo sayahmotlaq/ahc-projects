@@ -74,7 +74,7 @@ function viewStart(t) {
   const vals = [['التعاون', 'الاحتياج لا يملكه قسم؛ من يستطيع البدء يبدأ ثم يُسوّى الاختصاص.'], ['المرونة', 'القواعد تخدم المريض والتشغيل لا العكس؛ الاستثناء يُسجَّل ويُراجع ولا يُمنع.'], ['الوضوح', 'لكل احتياج قناة واحدة، وقسم مسؤول، ومهلة معلومة، وموعد تسليم.'], ['المسؤولية', 'ما يُستلم يُسجَّل، وما يُسجَّل يُتابع، وما يُتابع يُغلق بمحضر.']];
   const units = G.units.filter(u => u.kind === 'unit');
   t.innerHTML = `<div class="gstart">
-    <div class="ghero"><div><h2>كيف تعمل إدارة الخدمات الفنية معاً؟</h2><p>سبعة أقسام تخدم المنشآت نفسها. هذه الصفحة تجيب عن «متى يدخل كل قسم، وكيف ينتقل العمل بينها، ومن يعتمد ماذا» بطريقة يمكن الرجوع إليها في ثوانٍ.</p><div class="btnrow"><a class="btn primary" href="#/gov/router">عندي احتياج… لمن أوجهه؟</a><a class="btn" href="#/gov/map">خريطة العلاقات</a><a class="btn" href="#/gov/matrix">من يعتمد ماذا</a></div></div>
+    <div class="ghero"><div><h2>كيف تعمل إدارة الخدمات الفنية معاً؟</h2><p>${(n => ({ 7: 'سبعة', 8: 'ثمانية', 9: 'تسعة', 10: 'عشرة' })[n] || n)(G.units.filter(u => u.kind === 'unit' && u.active !== false).length)} أقسام تخدم المنشآت نفسها. هذه الصفحة تجيب عن «متى يدخل كل قسم، وكيف ينتقل العمل بينها، ومن يعتمد ماذا» بطريقة يمكن الرجوع إليها في ثوانٍ.</p><div class="btnrow"><a class="btn primary" href="#/gov/router">عندي احتياج… لمن أوجهه؟</a><a class="btn" href="#/gov/map">خريطة العلاقات</a><a class="btn" href="#/gov/matrix">من يعتمد ماذا</a></div></div>
       <div class="gvals">${vals.map(([h, d]) => `<div><b>${h}</b><span>${d}</span></div>`).join('')}</div></div>
     <div class="gunits">${units.map(u => `<a class="gunit" href="#/gov/map?u=${u.code}" style="--c:#${u.color}"><i></i><b>${esc(u.short)}</b><small>${esc(u.mission)}</small></a>`).join('')}</div>
     <h2 class="gh2">أسئلة «كيف…؟» <span class="muted small">— كل إجابة تقود إلى إجرائها أو قاعدتها</span>${isAdmin() ? '<button class="btn sm" id="faqNew">＋ سؤال</button>' : ''}</h2>
@@ -114,21 +114,21 @@ function editHandoff(h, done) { const opts = G.units.map(u => [u.code, u.short])
 // ---------- موجّه الطلبات
 function viewRouter(t) {
   const nodes = Object.fromEntries(G.router.map(n => [n.key, n])); let path = [];
-  const render = key => { const n = nodes[key]; if (!n) return; const crumbs = path.map((p, i) => `<span class="gcrumb">${esc(p.a)}</span>`).join('<span class="muted">›</span>');
+  const render = key => { const n = nodes[key]; if (!n) return; const crumbs = path.map((p, i) => `<span class="gcrumb">${esc(p.a)}</span>`).join('<span class="muted">‹</span>');
     t.innerHTML = `<div class="grouter"><div class="grq"><div class="muted small">${crumbs || 'ثلاث خطوات على الأكثر'}</div><h2>${esc(n.q)}</h2><div class="gopts">${n.opts.map((o, i) => `<button class="gopt" data-i="${i}">${esc(o.t)}</button>`).join('')}</div>${path.length ? '<button class="btn sm ghost" id="rBack">رجوع</button>' : ''}</div>${isAdmin() ? `<p class="small muted">مدير النظام: <button class="btn sm" id="rEdit">تعديل هذه الخطوة (JSON)</button></p>` : ''}</div>`;
     $$('.gopt', t).forEach(b => b.onclick = () => { const o = n.opts[+b.dataset.i]; path.push({ q: n.q, a: o.t }); if (o.next) render(o.next); else outcome(o.out); });
     $('#rBack', t) && ($('#rBack', t).onclick = () => { path.pop(); render(path.length ? nodes[pathKey()] : 'start'); });
     $('#rEdit', t) && ($('#rEdit', t).onclick = () => editRow('gov_router', n, [['q', 'السؤال', 'text'], ['opts', 'الخيارات (JSON)', 'json']], () => load(true).then(() => mountGov(t.closest('#main') || document.body, 'router')), 'key'));
   };
   const pathKey = () => { let k = 'start'; for (const p of path) { const n = nodes[k]; const o = n.opts.find(x => x.t === p.a); if (!o || !o.next) break; k = o.next; } return k; };
-  const outcome = o => { const u = G.U[o.unit], p = G.P[o.proc]; t.innerHTML = `<div class="grouter"><div class="gres" style="--c:#${u?.color || '6B7A88'}"><div class="muted small">${path.map(x => esc(x.a)).join(' › ')}</div><span class="uchip big" style="--c:#${u?.color || '6B7A88'}">${esc(u?.short || o.unit)}</span><h2>${esc(o.title)}</h2><p>${esc(o.text)}</p>${p ? `<div class="gresproc"><b>الإجراء:</b> <a href="#/gov/sop/${p.code}">${esc(p.code)} — ${esc(p.title)}</a><br><small class="muted">${esc(p.kpi)}</small></div>` : ''}<div class="btnrow mt10"><button class="btn" id="rAgain">سؤال آخر</button>${p ? `<a class="btn primary" href="#/gov/sop/${p.code}">افتح خطوات الإجراء</a>` : ''}</div></div></div>`; $('#rAgain', t).onclick = () => { path = []; render('start'); }; };
+  const outcome = o => { const u = G.U[o.unit], p = G.P[o.proc]; t.innerHTML = `<div class="grouter"><div class="gres" style="--c:#${u?.color || '6B7A88'}"><div class="muted small">${path.map(x => esc(x.a)).join(' ‹ ')}</div><span class="uchip big" style="--c:#${u?.color || '6B7A88'}">${esc(u?.short || o.unit)}</span><h2>${esc(o.title)}</h2><p>${esc(o.text)}</p>${p ? `<div class="gresproc"><b>الإجراء:</b> <a href="#/gov/sop/${p.code}">${esc(p.code)} — ${esc(p.title)}</a><br><small class="muted">${esc(p.kpi)}</small></div>` : ''}<div class="btnrow mt10"><button class="btn" id="rAgain">سؤال آخر</button>${p ? `<a class="btn primary" href="#/gov/sop/${p.code}">افتح خطوات الإجراء</a>` : ''}</div></div></div>`; $('#rAgain', t).onclick = () => { path = []; render('start'); }; };
   render('start');
 }
 
 // ---------- مصفوفة الصلاحيات
 function viewMatrix(t, params) {
   let scope = (params?.get?.('scope')) || 'units'; let fu = '';
-  const render = () => { const cols = scope === 'units' ? ['EXEC', 'DIR', 'PRJ', 'FAC', 'MNT', 'BME', 'MED', 'GEN', 'IT'] : Object.keys(ROLES_PRJ); const name = c => scope === 'units' ? un(c) : ROLES_PRJ[c];
+  const render = () => { const cols = scope === 'units' ? G.units.filter(u => (u.kind === 'mgmt' || u.kind === 'unit') && u.active !== false).map(u => u.code) : Object.keys(ROLES_PRJ); const name = c => scope === 'units' ? un(c) : ROLES_PRJ[c];
     const rows = G.acts.filter(a => a.scope === scope && (!fu || a.raci?.[fu])); const groups = [...new Set(rows.map(r => r.grp))];
     t.innerHTML = `<div class="toolbar"><div class="subtabs"><a href="#" data-sc="units" class="${scope === 'units' ? 'on' : ''}">بين الأقسام</a><a href="#" data-sc="prj" class="${scope === 'prj' ? 'on' : ''}">داخل قسم المشاريع (الأدوار)</a></div><span class="sp"></span><select id="mfu"><option value="">كل الأعمدة</option>${cols.map(c => `<option value="${c}" ${fu === c ? 'selected' : ''}>ما يخص ${esc(name(c))}</option>`).join('')}</select><button class="btn sm" id="mXl">Excel</button>${isAdmin() ? '<button class="btn sm primary" id="aNew">＋ نشاط</button>' : ''}</div>
       <div class="glegend">${Object.entries(CODES).map(([k, [v]]) => `<span class="rc ${k}">${k}</span> ${v}`).join(' &nbsp; ')}<span class="muted small"> — انقر على خلية لتغييرها (مدير النظام)</span></div>
@@ -146,7 +146,7 @@ function viewMatrix(t, params) {
 
 // ---------- الإجراءات
 // الإجراءات: مشتركة بين الأقسام (G-) + دليل إجراءات لكل قسم (المشاريع P-، المرافق F-، الصيانة M-، …)
-const MAN_PREFIX = { PRJ: 'P', FAC: 'F', MNT: 'M', BME: 'B', MED: 'E', GEN: 'S', IT: 'T' };
+const MAN_PREFIX = { PRJ: 'P', FAC: 'F', MNT: 'M', SAF: 'H', BME: 'B', MED: 'E', GEN: 'S', IT: 'T' };
 const isShared = p => /^G-/.test(p.code);
 function viewSops(t, params) {
   const depts = G.units.filter(u => u.kind === 'unit' && u.active !== false);
@@ -162,7 +162,7 @@ function viewSops(t, params) {
     const blocks = [];
     if (!fil || fil === 'G') if (shared.length || fil === 'G') blocks.push(`<h2 class="gh2"><span class="uchip" style="--c:#123B5C">الإجراءات المشتركة بين الأقسام</span> <span class="muted small">${shared.length} إجراء · تحكم انتقال العمل من قسم إلى آخر</span></h2><div class="gprocs">${shared.map(card).join('') || '<div class="empty-boq">لا نتائج</div>'}</div>`);
     if (fil !== 'G') depts.filter(u => !fil || fil === u.code).forEach(u => { const list = mine(u.code); if (!list.length && s) return;
-      blocks.push(`<h2 class="gh2" style="--c:#${uc(u.code)}"><span class="uchip" style="--c:#${uc(u.code)}">دليل إجراءات ${esc(u.name)}</span> <span class="muted small">${list.length ? list.length + ' إجراء · ' + esc(MAN_PREFIX[u.code] || '') + '-' : ''}</span></h2>${list.length ? `<div class="gprocs">${list.map(card).join('')}</div>` : `<div class="gman-nil">لم يُعدّ دليل إجراءات هذا القسم بعد. ${(n => n ? `ويملك القسم حالياً ${n === 1 ? 'إجراءً مشتركاً واحداً' : n === 2 ? 'إجراءين مشتركين' : n + ' إجراءات مشتركة'} مع بقية الأقسام.` : '')(shared.filter(p => p.owner === u.code).length)}</div>`}`); });
+      blocks.push(`<h2 class="gh2" style="--c:#${uc(u.code)}"><span class="uchip" style="--c:#${uc(u.code)}">دليل إجراءات ${esc(u.name)}</span> <span class="muted small">${list.length ? `${list.length} إجراء · <bdi>${esc(list[0].code)}</bdi> إلى <bdi>${esc(list[list.length - 1].code)}</bdi>` : ''}</span></h2>${list.length ? `<div class="gprocs">${list.map(card).join('')}</div>` : `<div class="gman-nil">لم يُعدّ دليل إجراءات هذا القسم بعد. ${(n => n ? `ويملك القسم حالياً ${n === 1 ? 'إجراءً مشتركاً واحداً' : n === 2 ? 'إجراءين مشتركين' : n + ' إجراءات مشتركة'} مع بقية الأقسام.` : '')(shared.filter(p => p.owner === u.code).length)}</div>`}`); });
     $('#sl', t).innerHTML = blocks.join('') || '<div class="empty-boq">لا نتائج</div>';
   };
   $('#sq', t).oninput = render; render();

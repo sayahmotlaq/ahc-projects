@@ -66,7 +66,7 @@ export async function mountTReportEditor(root, id, params) {
   const items = Array.isArray(r.items) ? r.items.map(x => ({ ...x })) : [];
   const meeting = () => $('#kind').value === 'meeting';
 
-  root.innerHTML = `<div class="phead"><div class="crumb"><a href="#/treports">التقارير الفنية</a><span class="sep">›</span><span>${id ? 'تعديل تقرير' : 'تقرير جديد'}</span></div></div>
+  root.innerHTML = `<div class="phead"><div class="crumb"><a href="#/treports">التقارير الفنية</a><span class="sep">‹</span><span>${id ? 'تعديل تقرير' : 'تقرير جديد'}</span></div></div>
   <form id="trf" class="pcard trform">
     <div class="pgrid">
       ${field('المشروع *', sel('project_id', projects.map(p => [p.id, p.name]), r.project_id, 'required'))}
@@ -146,7 +146,7 @@ export async function mountTReport(root, id) {
   if (r.review_note) blocks.push(`<div class="rsec"><h3>ملاحظة المراجعة</h3><div class="pre ${r.status === 'returned' ? 'bad' : ''}">${esc(r.review_note)}</div></div>`);
   if (tasks.length) blocks.push(`<div class="rsec"><h3>المهام المرتبطة بالتقرير</h3><ul class="rlist">${tasks.map(t => `<li><a href="#/project/${r.project_id}/tasks">${esc(t.title)}</a> <span class="muted">— ${esc(pname(t.assignee_id) !== '—' ? pname(t.assignee_id) : t.assignee_name || '')} · ${TS[t.status]} · ${dateAr(t.due_date)}</span></li>`).join('')}</ul></div>`);
   blocks.push(`<footer class="rfoot"><div>صدر من منصة إدارة مشاريع تجمع الأحساء الصحي — ${esc(today())}</div><div class="sig"><div>المهندس: ${esc(pname(r.created_by))}<br><br>التوقيع: ..............</div><div>رئيس قسم المشاريع<br><br>التوقيع: ..............</div></div></footer>`);
-  root.innerHTML = `<div class="phead noprint"><div class="crumb"><a href="#/treports">التقارير الفنية</a><span class="sep">›</span><a href="#/project/${r.project_id}/treports">${esc(r.projects?.name || '')}</a><span class="sep">›</span><span>${esc(r.title)}</span></div>
+  root.innerHTML = `<div class="phead noprint"><div class="crumb"><a href="#/treports">التقارير الفنية</a><span class="sep">‹</span><a href="#/project/${r.project_id}/treports">${esc(r.projects?.name || '')}</a><span class="sep">‹</span><span>${esc(r.title)}</span></div>
     <div class="btnrow wrap">${trBadge(r.status)}<span class="sp"></span>${editable ? `<a class="btn" href="#/treport/${id}/edit">تعديل</a>` : ''}${r.status === 'draft' && mine(r) ? '<button class="btn primary" id="pub">نشر التقرير</button>' : ''}${r.status === 'returned' && mine(r) ? '<button class="btn primary" id="pub">إعادة النشر بعد التعديل</button>' : ''}${admin && r.status === 'published' ? '<button class="btn primary" id="rev">✓ تمت المراجعة</button><button class="btn" id="ret">إعادة للمهندس</button>' : ''}${admin ? '<button class="btn" id="mkTask">＋ مهمة من التقرير</button>' : ''}<button class="btn" id="pdf">${ico('download')} PDF</button><button class="btn" id="prn">${ico('print')} طباعة</button></div></div>
   <div class="rep" id="rep"></div>
   <div class="pcard noprint">${attachBox('المرفقات')}</div>
