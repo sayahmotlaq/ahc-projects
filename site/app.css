@@ -1263,3 +1263,7 @@ a:hover>.garr.fwd{transform:translateX(-3px)} a:hover>.garr.back,.btn:hover>.gar
 @media (prefers-reduced-motion:reduce){.tflow,.tglow,.tring,.oi.just,.mwrap.closing,.mwrap.closing .modal{animation:none!important} .ngrp .nsub{transition:none}}
 .oboard .oi-h{flex-wrap:wrap;align-items:flex-start} .oboard .oi-h b{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.5} .oboard .oi-ref{flex-basis:100%;order:3}
 .oboard .oi-a{font-size:11.5px} .oboard{grid-template-columns:repeat(5,minmax(250px,1fr))}
+/* ربط الإجراء بالمنصة (حزمة 82) */
+.gimpl{display:flex;flex-direction:column;gap:8px;background:#F3FAFE;border:1px solid #BFE3F5;border-inline-start:4px solid #27A8DF;border-radius:12px;padding:10px 12px;margin:12px 0}
+.gimpl.none{background:var(--surface2);border-color:var(--line);border-inline-start-color:var(--faint)} .gimpl-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap} .gimpl-h b{color:#0E7AB0} .gimpl-l{display:flex;flex-wrap:wrap;gap:6px}
+.gimpl-b{font-size:10.5px;font-weight:800;color:#0E7AB0;background:#E6F4FB;border-radius:6px;padding:1px 7px;margin-inline-start:6px} .gimpl-b.off{color:var(--muted);background:var(--surface2)}

@@ -279,7 +279,7 @@ export async function openItem(id, re) {
 
 // ---------- قائمة بمرشحات (تُستخدم في المركز وفي صفحة القسم)
 export function listView(t, items, { params = new URLSearchParams(), showUnit = true, re, units = true } = {}) {
-  const st = { q: params.get('q') || '', u: params.get('u') || '', f: params.get('f') || '', s: params.get('s') || 'open', p: '', who: params.get('who') || (role() === 'facility' && myFacs().length ? 'fac' : ''), late: params.get('late') === '1', view: params.get('v') || (() => { try { return sessionStorage.getItem('ops_view') || 'list'; } catch (e) { return 'list'; } })() };
+  const st = { q: params.get('q') || '', u: params.get('u') || '', f: params.get('f') || '', s: params.get('s') || 'open', p: '', who: params.get('who') || (role() === 'facility' && myFacs().length ? 'fac' : ''), late: params.get('late') === '1', proc: params.get('proc') || '', view: params.get('v') || (() => { try { return sessionStorage.getItem('ops_view') || 'list'; } catch (e) { return 'list'; } })() };
   t.innerHTML = `<div class="filters ofilt"><input id="lq" placeholder="بحث بالعنوان أو الرقم أو الموقع…" value="${esc(st.q)}">
     ${units ? sel('lu', [['', 'كل الأقسام'], ...O.G.units.filter(u => u.kind === 'unit').map(u => [u.code, u.short])], st.u) : ''}
     ${sel('lf', [['', 'كل المنشآت'], ...O.fac.map(f => [f.id, f.name])], st.f)}
@@ -290,7 +290,7 @@ export function listView(t, items, { params = new URLSearchParams(), showUnit = 
     <div class="oview"><button data-v="list" class="${st.view === 'list' ? 'on' : ''}">قائمة</button><button data-v="board" class="${st.view === 'board' ? 'on' : ''}">لوحة</button></div></div><div class="ostats" id="lS"></div><div id="lL"></div>`;
   const render = () => {
     const nq = st.q.toLowerCase();
-    let l = items.filter(i => (!st.u || i.unit === st.u) && (!st.f || i.facility_id === +st.f) && (st.s === 'open' ? isOpen(i) : !st.s || i.status === st.s) && (!st.p || i.priority === st.p)
+    let l = items.filter(i => (!st.proc || i.proc === st.proc) && (!st.u || i.unit === st.u) && (!st.f || i.facility_id === +st.f) && (st.s === 'open' ? isOpen(i) : !st.s || i.status === st.s) && (!st.p || i.priority === st.p)
       && (!st.who || (st.who === 'me' ? i.assignee_id === session.user.id : st.who === 'fac' ? myFacs().includes(i.facility_id) : (i.created_by === session.user.id || i.requester_id === session.user.id))) && (!st.late || isLate(i))
       && (!nq || `${i.title} ${i.ref} ${i.location} ${i.asset} ${i.details} ${O.F[i.facility_id]?.name || ''}`.toLowerCase().includes(nq)));
     l.sort((a, b) => isOpen(b) - isOpen(a) || isLate(b) - isLate(a) || a.priority.localeCompare(b.priority) || b.id - a.id);

@@ -158,6 +158,11 @@ function viewMatrix(t, params) {
 // الإجراءات: مشتركة بين الأقسام (G-) + دليل إجراءات لكل قسم (المشاريع P-، المرافق F-، الصيانة M-، …)
 const MAN_PREFIX = { PRJ: 'P', FAC: 'F', MNT: 'M', SAF: 'H', BME: 'B', MED: 'E', GEN: 'S', IT: 'T' };
 const isShared = p => /^G-/.test(p.code);
+async function markImpl(t) {
+  try { if (!KINDS) KINDS = await q(sb.from('ops_kinds').select('code,name,icon,unit,proc,intake,active').eq('active', true)).catch(() => []);
+    $$('a.gproc[href^="#/gov/sop/"]', t).forEach(a => { const c = a.getAttribute('href').split('/').pop(); const n = KINDS.filter(k => k.proc === c).length + (IMPL[c] || []).length;
+      a.querySelector('.gpc')?.insertAdjacentHTML('beforeend', n ? `<span class="gimpl-b" title="له تطبيق في المنصة">مطبّق</span>` : `<span class="gimpl-b off" title="لم يُربط بشاشة أو نموذج بعد">ورقي</span>`); }); } catch (e) { }
+}
 function viewSops(t, params) {
   const depts = G.units.filter(u => u.kind === 'unit' && u.active !== false);
   let fil = params?.get?.('u') || '';
@@ -174,20 +179,59 @@ function viewSops(t, params) {
     if (fil !== 'G') depts.filter(u => !fil || fil === u.code).forEach(u => { const list = mine(u.code); if (!list.length && s) return;
       blocks.push(`<h2 class="gh2" style="--c:#${uc(u.code)}"><span class="uchip" style="--c:#${uc(u.code)}">دليل إجراءات ${esc(u.name)}</span> <span class="muted small">${list.length ? `${list.length} إجراء · <bdi>${esc(list[0].code)}</bdi> إلى <bdi>${esc(list[list.length - 1].code)}</bdi>` : ''}</span></h2>${list.length ? `<div class="gprocs">${list.map(card).join('')}</div>` : `<div class="gman-nil">لم يُعدّ دليل إجراءات هذا القسم بعد. ${(n => n ? `ويملك القسم حالياً ${n === 1 ? 'إجراءً مشتركاً واحداً' : n === 2 ? 'إجراءين مشتركين' : n + ' إجراءات مشتركة'} مع بقية الأقسام.` : '')(shared.filter(p => p.owner === u.code).length)}</div>`}`); });
     $('#sl', t).innerHTML = blocks.join('') || '<div class="empty-boq">لا نتائج</div>';
+    markImpl($('#sl', t));
   };
   $('#sq', t).oninput = render; render();
   $('#pNew', t) && ($('#pNew', t).onclick = () => editProc(null, () => load(true).then(() => mountGov(t.closest('#main') || document.body, 'sop'))));
+}
+// ---------- أين يُنفَّذ الإجراء في المنصة: النماذج (من ops_kinds.proc) والشاشات، والأعمال الجارية عليه وعلى كل خطوة
+const IMPL = {
+  'G-01': [['#/ops/new', 'مركز البلاغات والطلبات'], ['#/ops/list', 'الاستقبال الموحد — كل الأعمال']], 'G-02': [['#/projects', 'المشاريع']], 'G-04': [['#/projects', 'المشاريع (الاستلام الابتدائي)']],
+  'G-06': [['#/dept/MNT/plans', 'الأعمال المخططة — الصيانة']], 'G-11': [['#/tsd', 'لوحة الإدارة — نافذ الآن']],
+  'F-02': [['#/fm/round', 'الجولة الشهرية لمتابعة الأنظمة'], ['#/fm', 'متابعة أنظمة المنشآت']], 'F-03': [['#/dept/FAC/locations', 'سجل المواقع والغرف']], 'F-04': [['#/tsd/report', 'التقرير الشهري للإدارة'], ['#/fm/report', 'تقرير حالة الأنظمة']],
+  'M-03': [['#/dept/MNT/plans', 'الأعمال المخططة — الصيانة'], ['#/fm', 'متابعة الأنظمة الحرجة']], 'M-04': [['#/dept/MNT/assets', 'أصول الصيانة']],
+  'H-04': [['#/dept/SAF/assets', 'أصول وسجلات الأمن والسلامة']], 'H-05': [['#/dept/SAF/assets', 'أصول الأمن (الكاميرات وضبط الدخول)']], 'H-06': [['#/fm', 'متابعة الأنظمة — اشتراطات الدفاع المدني']],
+  'B-01': [['#/dept/BME/assets', 'سجل الأجهزة الطبية']], 'B-02': [['#/dept/BME/plans', 'الأعمال المخططة — الصيانة الطبية']], 'B-03': [['#/dept/BME/assets', 'الأجهزة وعقود خدمتها']], 'E-05': [['#/dept/BME/assets', 'سجل الأجهزة (توصيات الإحلال)']],
+  'S-01': [['#/dept/GEN/plans', 'الأعمال المخططة — الخدمات العامة']], 'S-02': [['#/dept/GEN/plans', 'الأعمال المخططة — النفايات']], 'S-03': [['#/dept/GEN/plans', 'الأعمال المخططة — مكافحة الحشرات']],
+  'T-04': [['#/dept/IT/plans', 'الأعمال المخططة — النسخ الاحتياطي']], 'T-02': [['#/projects', 'المشاريع']],
+  'P-01': [['#/projects', 'المشاريع — مشروع جديد']], 'P-02': [['#/projects', 'جداول الكميات (في المشروع)'], ['#/ref', 'المرجع الفني']], 'P-03': [['#/projects', 'حزمة الطرح (في المشروع)']], 'P-04': [['#/projects', 'الجدول الزمني (في المشروع)']],
+  'P-05': [['#/treports', 'التقارير الفنية والمحاضر']], 'P-06': [['#/submittals', 'الاعتمادات']], 'P-07': [['#/payments', 'المستخلصات']], 'P-08': [['#/projects', 'أوامر التغيير (في المشروع)']], 'P-09': [['#/challenges', 'التحديات والمخاطر']],
+  'P-10': [['#/tasks', 'المهام'], ['#/requests', 'طلبات المشاريع']], 'P-11': [['#/documents', 'المستندات الرسمية']], 'P-12': [['#/treports', 'محاضر الاجتماعات']], 'P-13': [['#/projects', 'الإغلاق (في المشروع)']], 'P-14': [['#/projects', 'الضمان (في المشروع)']],
+  'P-15': [['#/report', 'التقارير'], ['#/briefs', 'العروض التنفيذية']], 'P-16': [['#/admin/quality', 'فاحص جودة البيانات']],
+  // إجراءات تُنفَّذ بنماذج إجراءات أخرى
+  'G-09': [['k:it'], ['#/projects', 'المشاريع']], 'H-07': [['k:permit'], ['k:saf']], 'E-03': [['k:mspec']], 'S-04': [['k:gen']], 'T-03': [['k:it'], ['#/dept/BME/assets', 'سجل الأجهزة الطبية']],
+};
+let KINDS = null;
+async function implBox(t, p) {
+  const box = $('#gimpl', t); if (!box) return;
+  try {
+    if (!KINDS) KINDS = await q(sb.from('ops_kinds').select('code,name,icon,unit,proc,intake,active').eq('active', true)).catch(() => []);
+    const ks = [...KINDS.filter(k => k.proc === p.code), ...(IMPL[p.code] || []).filter(m => m[0].startsWith('k:')).map(m => KINDS.find(k => k.code === m[0].slice(2))).filter(Boolean)];
+    const items = await q(sb.from('ops_items').select('id,step,status').eq('proc', p.code).in('status', ['new', 'accepted', 'in_progress', 'on_hold', 'verify']).limit(1000)).catch(() => []);
+    const steps = {}; items.forEach(i => steps[i.step || 1] = (steps[i.step || 1] || 0) + 1);
+    // المشاريع على خطوات إجراءات المشاريع (من مرحلة كل مشروع)
+    if (/^P-0[135]|^P-1[34]$/.test(p.code)) { try { const { GOV } = await import('./govlink.js'); const ps = await q(sb.from('projects').select('stage').eq('archived', false)); ps.forEach(x => { const [c, st] = GOV.project(x); if (c === p.code && st !== 'done') steps[st] = (steps[st] || 0) + 1; }); } catch (e) { } }
+    const mods = (IMPL[p.code] || []).filter(m => !m[0].startsWith('k:'));
+    if (!ks.length && !mods.length) { box.innerHTML = '<div class="gimpl none"><b>لم يُربط بعد بشاشة أو نموذج في المنصة</b><span class="muted small">يُنفَّذ حالياً ورقياً أو خارج المنصة.</span></div>'; return; }
+    const total = Object.values(steps).reduce((a, b) => a + b, 0);
+    box.innerHTML = `<div class="gimpl"><div class="gimpl-h"><b>يُنفَّذ في المنصة</b>${total ? `<span class="badge info">${total} جارٍ الآن</span>` : '<span class="muted small">لا أعمال جارية عليه الآن</span>'}</div>
+      <div class="gimpl-l">${ks.map(k => `<button class="btn sm ${k.intake ? '' : 'ghost'}" data-nk="${k.code}">${esc(k.icon)} ${esc(k.name)}</button>`).join('')}${mods.map(([h, l]) => `<a class="btn sm ghost" href="${h}">${esc(l)}</a>`).join('')}${ks.length || total ? `<a class="btn sm ghost" href="#/ops/list?proc=${p.code}">الأعمال على هذا الإجراء</a>` : ''}</div></div>`;
+    $$('[data-nk]', box).forEach(b => b.onclick = async () => { const o = await import('./ops.js'); o.newItem({ kind: b.dataset.nk }, r => o.openItem(r.id)); });
+    $$('.gsteps .gstep', t).forEach((el, i) => { const n = steps[i + 1]; if (n) el.querySelector('.gsh')?.insertAdjacentHTML('beforeend', `<span class="badge info" title="أعمال متوقفة عند هذه الخطوة الآن">${n} هنا الآن</span>`); });
+  } catch (e) { box.innerHTML = ''; }
 }
 function viewProc(t, code) {
   const p = G.P[code]; if (!p) return t.innerHTML = '<div class="empty-boq">الإجراء غير موجود</div>';
   const lanes = [...new Set(p.steps.map(s => s.unit))];
   t.innerHTML = `<div class="toolbar"><a class="btn sm ghost" href="#/gov/sop">→ الإجراءات</a><h2 class="m0">${esc(p.code)} — ${esc(p.title)}</h2><span class="badge ${p.status === 'approved' ? 'full' : 'skel'}">${p.status === 'approved' ? 'معتمد' : 'مسودة'} v${esc(p.version || '1.0')}</span><span class="sp"></span><button class="btn sm" onclick="print()">${ico('print')} طباعة</button>${isAdmin() ? `<button class="btn sm" id="pEd">تعديل</button>${p.status !== 'approved' ? '<button class="btn sm primary" id="pApp">اعتماد</button>' : ''}` : ''}</div>
     <div class="gpgrid"><div class="gkv"><span>المالك</span><b>${chip(p.owner)}</b></div><div class="gkv"><span>الأقسام المشاركة</span><b>${(p.units || []).map(chip).join('')}</b></div><div class="gkv wide"><span>الهدف</span><b>${esc(p.goal)}</b></div><div class="gkv"><span>متى يبدأ</span><b>${esc(p.trigger)}</b></div><div class="gkv"><span>المدخلات</span><b>${esc(p.inputs)}</b></div><div class="gkv"><span>المخرجات</span><b>${esc(p.outputs)}</b></div><div class="gkv"><span>مؤشر الأداء</span><b>${esc(p.kpi)}</b></div></div>
+    <div id="gimpl"></div>
     <h3 class="sub-h">الخطوات <span class="muted small">— لون كل خطوة بلون القسم المسؤول عنها</span></h3>
     ${flowHtml(p)}
     <div class="gswim"><div class="glanes">${lanes.map(u => `<div class="glane" style="--c:#${uc(u)}"><span>${esc(un(u))}</span></div>`).join('')}</div><div class="gsteps">${p.steps.map(stepHtml).join('')}</div></div>
     ${p.notes ? `<div class="notice mt12"><b>ملاحظات:</b> ${linkify(p.notes)}</div>` : ''}
     <p class="muted small mt12">${p.approved_by ? `اعتُمد بواسطة ${esc(p.approved_by)} في ${dateAr(p.approved_at)}` : 'مسودة بانتظار الاعتماد'} · آخر تحديث ${dateAr(p.updated_at)}</p>`;
+  implBox(t, p);
   $('#pEd', t) && ($('#pEd', t).onclick = () => editProc(p, () => load(true).then(() => mountGov(t.closest('#main') || document.body, 'sop', code))));
   $('#pApp', t) && ($('#pApp', t).onclick = async () => { if (!await confirm('اعتماد هذا الإجراء بإصداره الحالي؟', 'اعتماد')) return; await q(sb.from('gov_processes').update({ status: 'approved', approved_by: session.profile?.full_name || '', approved_at: new Date().toISOString().slice(0, 10) }).eq('code', code)); toast('اعتُمد'); await load(true); mountGov(t.closest('#main') || document.body, 'sop', code); });
 }
