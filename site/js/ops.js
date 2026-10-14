@@ -31,14 +31,15 @@ export const canFile = () => canRead() || ['facility', 'tech', 'requester'].incl
 export let O = null;
 export async function loadOps() {
   const since = new Date(Date.now() - 90 * 864e5).toISOString();
-  const [kinds, items, fac, people, G] = await Promise.all([
+  const [kinds, items, fac, people, G, locs] = await Promise.all([
     q(sb.from('ops_kinds').select('*').order('sort')),
     q(sb.from('ops_items').select('*').or(`status.in.(new,accepted,in_progress,on_hold,verify),updated_at.gte.${since}`).order('id', { ascending: false }).limit(2000)),
     q(sb.from('facilities').select('id,name,kind,sort,active').eq('active', true).order('sort').order('name')),
     role() === 'requester' ? Promise.resolve([]) : q(sb.from('profiles').select('id,full_name,role,unit,title,phone').not('role', 'in', '(pending,disabled)')),
     import('./gov.js').then(m => m.govData()),
+    q(sb.from('fac_locations').select('*').eq('active', true).order('facility_id').order('sort').order('code')).catch(() => []),
   ]);
-  O = { kinds, K: Object.fromEntries(kinds.map(k => [k.code, k])), items, I: Object.fromEntries(items.map(i => [i.id, i])), fac, F: Object.fromEntries(fac.map(f => [f.id, f])), people, P: Object.fromEntries(people.map(p => [p.id, p])), G };
+  O = { kinds, K: Object.fromEntries(kinds.map(k => [k.code, k])), items, I: Object.fromEntries(items.map(i => [i.id, i])), fac, F: Object.fromEntries(fac.map(f => [f.id, f])), people, P: Object.fromEntries(people.map(p => [p.id, p])), G, locs, Loc: Object.fromEntries(locs.map(l => [l.id, l])) };
   return O;
 }
 export const uname = c => O?.G?.U?.[c]?.short || c || '—';
@@ -56,6 +57,18 @@ export function slaChip(i) {
   return ms < 0 ? `<span class="osla bad" title="تجاوز المهلة">⏱ متأخر ${dur(ms)}</span>` : `<span class="osla ${ms < 6 * 36e5 ? 'warn' : ''}" title="المتبقي من المهلة">⏱ متبقٍ ${dur(ms)}</span>`;
 }
 const kindOf = i => O.K[i.kind] || { name: i.kind, icon: '•' };
+export const LST = { operational: { ar: 'تشغيلية', c: '#2E8B57' }, closed: { ar: 'مغلقة للصيانة', c: '#C0392B' }, restricted: { ar: 'تشغيل مقيد', c: '#C99A1E' }, out: { ar: 'خارج الخدمة', c: '#7A8794' } };
+export const locPill = l => l ? `<span class="opill" style="--c:${LST[l.status]?.c}">${LST[l.status]?.ar}</span>` : '';
+export const locLabel = l => l ? [l.code, l.name].filter(Boolean).join(' — ') : '';
+const fmtDT = v => { if (!v) return ''; const d = new Date(v); return isNaN(d) ? String(v) : d.toLocaleString('ar-SA-u-ca-gregory-nu-latn', { dateStyle: 'medium', timeStyle: 'short' }); };
+// العمل التشغيلي النشط (إغلاق نافذ، تصريح جارٍ، تعطيل حريق، إيقاف مخطط) — يراه الجميع لأنه يمس أكثر من قسم
+export const activeCritical = () => O.items.filter(i => ['closure', 'permit', 'impair', 'shutdown'].includes(O.K[i.kind]?.effect) && isOpen(i) && i.status !== 'new' || (O.K[i.kind]?.effect === 'shutdown' && ['new', 'accepted'].includes(i.status)));
+export function criticalHtml(list) {
+  if (!list.length) return '<p class="muted">لا إغلاقات أو تصاريح أو تعطيلات نافذة الآن.</p>';
+  const now = Date.now();
+  return `<div class="ocrit">${list.map(i => { const k = O.K[i.kind], f = O.F[i.facility_id], fr = i.data?.from, to = i.data?.to, over = to && new Date(to) < now && i.status !== 'done';
+    return `<button class="ocrit-i ${over ? 'over' : ''}" data-oi="${i.id}" style="--c:${ucolor(i.unit)}"><span class="oi-k">${k.icon}</span><span><b>${esc(k.short || k.name)}: ${esc(i.title)}</b><small>${esc(f?.name || '')}${i.location ? ' · ' + esc(i.location) : ''}</small><small>${fr ? esc(fmtDT(fr)) : ''}${to ? ' ← ' + esc(fmtDT(to)) : ''}${over ? ' · <em>تجاوز موعد الإعادة</em>' : ''}</small></span>${stPill(i.status)}</button>`; }).join('')}</div>`;
+}
 const children = id => O.items.filter(x => x.parent_id === id);
 
 // ---------- صف العمل
@@ -82,19 +95,19 @@ export async function askAction(title, label = 'المعالجة أو الإجر
 }
 
 // ---------- كتالوج الطلبات: «ماذا تحتاج؟»
-export const catalogHtml = (only) => {
-  const ks = O.kinds.filter(k => k.active !== false && k.intake && (!only || only.includes(k.unit)));
+export const catalogHtml = (only, staffKinds = false) => {
+  const ks = O.kinds.filter(k => k.active !== false && (k.intake || (staffKinds && isStaff())) && (!only || only.includes(k.unit))).sort((a, b) => b.intake - a.intake || a.sort - b.sort);
   return `<div class="ocat">${ks.map(k => `<button class="ocard" data-kind="${k.code}" style="--c:${ucolor(k.unit)}"><span class="ocard-i">${k.icon}</span><b>${esc(k.name)}</b><small>${esc(k.descr)}</small><span class="ocard-f">${uchip(k.unit)}${k.proc ? `<span class="muted small">📘 ${esc(k.proc)}</span>` : ''}</span></button>`).join('')}</div>`;
 };
 export async function pickKind(title = 'ماذا تحتاج؟', exclude) {
-  return modal(`<p class="muted small m0">اختر نوع الطلب؛ يصل مباشرة إلى القسم المختص ويُعالج وفق إجرائه في الدليل.</p>${catalogHtml(exclude ? Object.keys(O.G.U).filter(u => u !== exclude) : null)}`,
+  return modal(`<p class="muted small m0">اختر نوع الطلب؛ يصل مباشرة إلى القسم المختص ويُعالج وفق إجرائه في الدليل.</p>${catalogHtml(exclude ? Object.keys(O.G.U).filter(u => u !== exclude) : null, true)}`,
     { title, wide: true, onOpen: (w, c) => $$('[data-kind]', w).forEach(b => b.onclick = () => c(b.dataset.kind)) });
 }
 
 // ---------- نموذج بلاغ أو طلب أو عمل
 function fieldHtml(f, v) {
   const name = 'd_' + f.k, req = f.req ? 'required' : '';
-  const ctl = f.t === 'select' ? sel(name, [['', '—'], ...(f.o || [])], v ?? '', req) : f.t === 'textarea' ? `<textarea name="${name}" rows="2" ${req}>${esc(v ?? '')}</textarea>` : inp(name, v ?? '', `type="${f.t === 'number' ? 'number' : f.t === 'date' ? 'date' : f.t === 'datetime-local' ? 'datetime-local' : 'text'}" ${req}`);
+  const ctl = f.t === 'datetime-local' && v ? inp(name, String(v).slice(0, 16), `type="datetime-local" ${req}`) : f.t === 'select' ? sel(name, [['', '—'], ...(f.o || [])], v ?? '', req) : f.t === 'textarea' ? `<textarea name="${name}" rows="2" ${req}>${esc(v ?? '')}</textarea>` : inp(name, v ?? '', `type="${f.t === 'number' ? 'number' : f.t === 'date' ? 'date' : f.t === 'datetime-local' ? 'datetime-local' : 'text'}" ${req}`);
   return field(f.l + (f.req ? ' *' : ''), ctl, f.t === 'textarea' ? 'wide' : '');
 }
 // الأولوية المقترحة من أثر البلاغ (R-17)
@@ -117,7 +130,7 @@ export async function newItem(preset = {}, done) {
     <div class="okhead wide" style="--c:${ucolor(k.unit)}"><span class="ocard-i">${k.icon}</span><div><b>${esc(k.name)}</b><small>${esc(k.descr)}</small></div><span class="sp"></span>${uchip(k.unit)}${k.proc ? govChip(k.proc, 'يُعالج وفق') : ''}</div>
     ${par ? `<div class="notice wide">إحالة من <b>${esc(par.ref)}</b> — ${esc(par.title)} (${esc(uname(par.unit))}). يُربط العملان وتصل حالة هذا العمل إلى فريق ${esc(uname(par.unit))}.</div>` : ''}
     ${field('المنشأة *', sel('facility_id', [['', '— اختر —'], ...O.fac.map(f => [f.id, f.name])], v.facility_id || '', 'required'))}
-    ${field('الموقع: المبنى / الدور / الغرفة', inp('location', v.location || '', 'placeholder="مثال: مبنى الطوارئ — الأرضي — غرفة 12"'))}
+    ${field('الموقع: الغرفة أو المنطقة' + (k.effect === 'closure' ? ' *' : ''), inp('location', v.location || (v.location_id ? locLabel(O.Loc[v.location_id]) : ''), `list="locList" autocomplete="off" placeholder="اكتب رقم الغرفة أو اسمها، أو وصف الموقع" ${k.effect === 'closure' ? 'required' : ''}`) + '<datalist id="locList"></datalist><small class="muted" id="locHint"></small>')}
     ${field('العنوان *', inp('title', v.title || '', 'required placeholder="وصف مختصر للمشكلة أو الطلب"'), 'wide')}
     ${fields.map(f => fieldHtml(f, v.data?.[f.k])).join('')}
     ${field('التفاصيل', `<textarea name="details" rows="3" placeholder="ماذا حدث؟ متى؟ ما الأثر؟">${esc(v.details || '')}</textarea>`, 'wide')}
@@ -130,9 +143,14 @@ export async function newItem(preset = {}, done) {
       const form = $('#f', w);
       const sug = () => { const d = {}; fields.forEach(f => d[f.k] = form['d_' + f.k]?.value || ''); const p = suggestPrio(kind, d); $('#psug', w).innerHTML = p ? `المقترح من الأثر: <a href="#" data-p="${p}">${PR[p].ar}</a>` : ''; const a = $('[data-p]', w); if (a) a.onclick = e => { e.preventDefault(); form.querySelector(`[name=priority][value=${p}]`).checked = true; }; };
       fields.forEach(f => form['d_' + f.k] && (form['d_' + f.k].onchange = sug)); sug();
+      const locsOf = () => O.locs.filter(l => l.facility_id === +form.facility_id.value);
+      const fillLoc = () => { const L = locsOf(); $('#locList', w).innerHTML = L.map(l => `<option value="${esc(locLabel(l))}">${esc([l.building, l.floor, LST[l.status]?.ar].filter(Boolean).join(' · '))}</option>`).join(''); $('#locHint', w).textContent = L.length ? `${L.length} موقعاً مسجلاً في هذه المنشأة — اختر من القائمة ليُربط العمل بسجل الموقع (R-16)` : (form.facility_id.value ? 'لا مواقع مسجلة لهذه المنشأة بعد؛ اكتب وصف الموقع' : ''); };
+      form.facility_id.onchange = fillLoc; fillLoc();
       form.onsubmit = async e => { e.preventDefault(); const x = formData(form); const data = {}; fields.forEach(f => { if (x['d_' + f.k] !== '' && x['d_' + f.k] != null) data[f.k] = f.t === 'number' ? +x['d_' + f.k] : x['d_' + f.k]; });
         const phone = staff && (x.requester_name || '').trim();
-        const row = { kind, unit: k.unit, facility_id: +x.facility_id, location: x.location.trim(), asset: (x.asset || '').trim(), title: x.title.trim(), details: x.details.trim(), priority: x.priority || 'p3', data,
+        const loc = locsOf().find(l => locLabel(l) === x.location.trim() || l.code === x.location.trim());
+        if (k.effect === 'closure' && !loc && locsOf().length) return toast('اختر الموقع من سجل مواقع المنشأة حتى تُحدَّث حالته عند الإغلاق والفتح', 'bad');
+        const row = { kind, unit: k.unit, facility_id: +x.facility_id, location: loc ? locLabel(loc) : x.location.trim(), location_id: loc?.id || null, asset: (x.asset || '').trim(), title: x.title.trim(), details: x.details.trim(), priority: x.priority || 'p3', data,
           source: par ? 'item' : phone ? 'phone' : (v.source || 'portal'), parent_id: v.parent_id || null, fm_obs_id: v.fm_obs_id || null, project_id: v.project_id || null,
           ...(phone ? { requester_name: x.requester_name.trim(), requester_phone: (x.requester_phone || '').trim() } : {}), ...(v.last_action ? { last_action: v.last_action } : {}), created_by: session.user.id };
         const btn = form.querySelector('.btn.primary'); btn.disabled = true;
@@ -160,17 +178,24 @@ export async function openItem(id, re) {
   const mineReq = i.requester_id === session.user.id || i.created_by === session.user.id;
   const open = isOpen(i);
   const flow = { new: [['accepted', 'استلام', 'primary']], accepted: [['in_progress', 'بدء التنفيذ', 'primary'], ['on_hold', 'تعليق']], in_progress: [['verify', 'أُنجز — بانتظار تأكيد صاحب الطلب', 'primary'], ['done', 'إغلاق مباشر'], ['on_hold', 'تعليق']], on_hold: [['in_progress', 'استئناف', 'primary']], verify: [['done', 'إغلاق', 'primary'], ['in_progress', 'إعادة للتنفيذ']], done: [['in_progress', 'إعادة فتح']], cancelled: [['new', 'إعادة فتح']] }[i.status] || [];
-  const dataKv = (Array.isArray(k.fields) ? k.fields : []).filter(x => i.data?.[x.k] != null && i.data[x.k] !== '').map(x => [x.l, esc(String(i.data[x.k]))]);
+  const dataKv = (Array.isArray(k.fields) ? k.fields : []).filter(x => i.data?.[x.k] != null && i.data[x.k] !== '').map(x => [x.l, esc(x.t === 'datetime-local' ? fmtDT(i.data[x.k]) : String(i.data[x.k]))]);
+  const loc = i.location_id ? O.Loc[i.location_id] : null;
+  const gates = Array.isArray(k.gates) ? k.gates : [], checks = Array.isArray(k.checklist) ? k.checklist : [];
+  const gHtml = gates.length ? `<h3 class="sub-h">الاعتمادات المطلوبة من الأقسام</h3><div class="ogates">${gates.map(g => { const a = i.data?.gates?.[g.k];
+      return `<div class="ogate ${a ? 'ok' : ''}" style="--c:${ucolor(g.unit)}"><span class="ogate-i">${a ? '✓' : '⏳'}</span><div><b>${esc(g.l)}</b><small>${uchip(g.unit)} ${a ? `${esc(a.name || '')} · ${fmtDT(a.at)}${a.note ? ' — ' + esc(a.note) : ''}` : `مطلوب قبل «${ST[g.before]?.ar || g.before}»`}</small></div>${!a && staffOf(g.unit) && isOpen(i) ? `<button class="btn sm primary" data-gate="${g.k}">اعتماد</button>` : ''}</div>`; }).join('')}</div>` : '';
+  const done = checks.filter(c => i.data?.check?.[c.k]).length;
+  const cHtml = checks.length ? `<h3 class="sub-h">قائمة التحقق قبل الإغلاق <small class="muted">(${done}/${checks.length})</small></h3><div class="ocheck">${checks.map(c => `<label class="${i.data?.check?.[c.k] ? 'on' : ''}"><input type="checkbox" data-chk="${c.k}" ${i.data?.check?.[c.k] ? 'checked' : ''} ${owner && isOpen(i) ? '' : 'disabled'}> ${esc(c.l)}</label>`).join('')}</div>` : '';
   const chainRow = (x, rel) => `<button type="button" class="ochain-i" data-oi="${x.id}" style="--c:${ucolor(x.unit)}"><span class="ochain-r">${rel}</span>${uchip(x.unit)}<b>${esc(x.title)}</b><small class="oi-ref">${esc(x.ref || '')}</small>${stPill(x.status)}${x.last_action ? `<small class="muted">↻ ${esc(snip(x.last_action, 70))}</small>` : ''}</button>`;
   const chain = [parent ? chainRow(parent, '↰ محال من') : '', ...kids.map(c => chainRow(c, '⇠ أُحيل إلى')), obs ? `<a class="ochain-i" href="#/fm/obs?id=${obs.id}" style="--c:#2E8B57"><span class="ochain-r">🏥 من متابعة الأنظمة</span><b>#${obs.id} ${esc(obs.title)}</b></a>` : '', i.project_id ? `<a class="ochain-i" href="#/project/${i.project_id}" style="--c:#27A8DF"><span class="ochain-r">📐 مشروع مرتبط</span><b>فتح المشروع</b></a>` : ''].filter(Boolean);
   const people = O.people.filter(p => p.unit === i.unit || (p.role === 'facility' && !p.unit && ['FAC', 'MNT', 'SAF'].includes(i.unit)) || p.id === i.assignee_id);
   const changed = { v: false };
   await modal(`${i.proc ? govBar([i.proc, i.status === 'done' ? 'done' : (i.step || 1)], ST[i.status]?.ar) : ''}
     <div class="ohead" style="--c:${PR[i.priority]?.c}"><span class="oi-k big">${k.icon}</span><div><b>${esc(i.title)}</b><span class="muted">${esc(i.ref || '')} · ${esc(k.name)} · ${esc(f?.name || '—')}${i.location ? ' · ' + esc(i.location) : ''}</span></div><span class="sp"></span>${stPill(i.status)}${prPill(i.priority)}</div>
-    <div class="oi-f mb8">${uchip(i.unit)}${slaChip(i)}${i.due_at && open ? `<span class="muted small">المهلة: ${new Date(i.due_at).toLocaleString('ar-SA-u-ca-gregory-nu-latn', { dateStyle: 'medium', timeStyle: 'short' })}</span>` : ''}</div>
+    <div class="oi-f mb8">${uchip(i.unit)}${loc ? `<span class="small">📍 ${esc(locLabel(loc))}</span>${locPill(loc)}` : ''}${slaChip(i)}${i.due_at && open ? `<span class="muted small">المهلة: ${new Date(i.due_at).toLocaleString('ar-SA-u-ca-gregory-nu-latn', { dateStyle: 'medium', timeStyle: 'short' })}</span>` : ''}</div>
     ${i.details ? `<p class="pre">${esc(i.details)}</p>` : ''}
     <div class="fmlast ${open && i.last_action_at && Date.now() - new Date(i.last_action_at) > 3 * 864e5 ? 'stale' : ''}"><span>آخر إجراء متخذ</span>${i.last_action ? `<p>${esc(i.last_action)}</p><small>${pname(i.last_action_by) ? esc(pname(i.last_action_by)) + ' · ' : ''}${ago(i.last_action_at)}</small>` : '<p class="muted">لم يُسجَّل أي إجراء بعد.</p>'}</div>
     <div class="kvs">${[...dataKv, ['رقم الأصل', esc(i.asset || '—')], ['المكلّف', esc(pname(i.assignee_id) || i.assignee_name || '—')], ['مقدّم الطلب', esc(pname(i.requester_id) || i.requester_name || pname(i.created_by) || '—') + (i.requester_phone ? ` <span class="ltr">${esc(i.requester_phone)}</span>` : '')], ['المصدر', SRC[i.source] || '—'], ['أُنشئ', dateAr(i.created_at)], ...(i.closed_at ? [[i.status === 'cancelled' ? 'أُلغي' : 'أُغلق', dateAr(i.closed_at)]] : []), ...(i.rating ? [['تقييم صاحب الطلب', '★'.repeat(i.rating) + '☆'.repeat(5 - i.rating) + (i.feedback ? ' — ' + esc(i.feedback) : '')]] : [])].map(([a, b]) => `<div class="kv"><span>${a}</span><b>${b}</b></div>`).join('')}</div>
+    ${gHtml}${cHtml}
     ${chain.length ? `<h3 class="sub-h">سلسلة العمل بين الأقسام</h3><div class="ochain">${chain.join('')}</div>` : ''}
     ${owner && P && open ? `<div class="fmstep"><label class="fld"><span>الخطوة الحالية في ${esc(i.proc)}</span><select id="oStep">${P.steps.map((x, j) => `<option value="${j + 1}" ${i.step === j + 1 ? 'selected' : ''}>${j + 1}. ${esc(uname(x.unit))}: ${esc(x.action.slice(0, 90))}</option>`).join('')}</select></label>${(i.step || 1) < n ? '<button class="btn sm" id="oAdv">✓ أُنجزت الخطوة ← التالية</button>' : ''}</div>` : ''}
     <div class="btnrow wrap mt8">
@@ -194,6 +219,10 @@ export async function openItem(id, re) {
       const reopen = async () => { changed.v = true; await loadOps(); close(); openItem(i.id, re); };
       const upd = async patch => { try { await q(sb.from('ops_items').update(patch).eq('id', i.id)); await reopen(); } catch (e) { err(e); } };
       $$('[data-oi]', w).forEach(b => b.onclick = () => { close(); openItem(+b.dataset.oi, re); });
+      $$('[data-gate]', w).forEach(b => b.onclick = async () => { const g = gates.find(x => x.k === b.dataset.gate);
+        const r = await modal(`<form id="gf"><p class="m0">${esc(g.l)}</p><p class="muted small">يُسجَّل الاعتماد باسمك ووقته في سجل العمل، ويصل إشعار لفريق ${esc(uname(i.unit))}.</p>${field('ملاحظة أو اشتراطات (اختياري)', '<textarea name="n" rows="2"></textarea>')}<div class="btnrow end"><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">اعتماد</button></div></form>`, { title: 'اعتماد', onOpen: (w2, c) => { $('#gf', w2).onsubmit = e => { e.preventDefault(); c(formData(e.target)); }; } });
+        if (!r) return; try { const { error } = await sb.rpc('ops_gate', { p_id: i.id, p_key: g.k, p_note: (r.n || '').trim() }); if (error) throw error; toast('اعتُمد'); await reopen(); } catch (e) { err(e); } });
+      $$('[data-chk]', w).forEach(c => c.onchange = async () => { try { const cur = (await q(sb.from('ops_items').select('data').eq('id', i.id).single()))?.data || i.data || {}; const ck = { ...(cur.check || {}), [c.dataset.chk]: c.checked }; await q(sb.from('ops_items').update({ data: { ...cur, check: ck } }).eq('id', i.id)); i.data = { ...cur, check: ck }; c.closest('label').classList.toggle('on', c.checked); changed.v = true; } catch (e) { err(e); c.checked = !c.checked; } });
       $$('[data-to]', w).forEach(b => b.onclick = async () => {
         const to = b.dataset.to, lab = { accepted: 'ملاحظة الاستلام (مثل: موعد الزيارة أو المكلّف) *', in_progress: i.status === 'done' || i.status === 'cancelled' ? 'سبب إعادة الفتح *' : 'ما الذي بدأ؟ *', on_hold: 'سبب التعليق (قطعة غيار، مقاول، اعتماد…) *', verify: 'ما الذي أُنجز؟ (يصل لصاحب الطلب ليؤكده) *', done: 'المعالجة النهائية *', cancelled: 'سبب الإلغاء *' }[to];
         const a = await askAction(ST[to].ar, lab); if (!a) return;
