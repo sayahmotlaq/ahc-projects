@@ -1,7 +1,9 @@
 // ===== الحوكمة: إدارة الخدمات الفنية بأقسامها — الهيكل والعلاقات، موجّه الطلبات، مصفوفة الصلاحيات، الإجراءات، القواعد، أسئلة «كيف» =====
 import { sb, q, session, isAdmin } from './api.js';
-import { $, $$, esc, toast, err, modal, confirm, field, inp, sel, formData, ico, dateAr } from './ui.js';
+import { $, $$, esc as esc0, toast, err, modal, confirm, field, inp, sel, formData, ico, dateAr } from './ui.js';
 
+// في السياق العربي (RTL) السهم الدال على «ثم/يؤدي إلى» هو ← ؛ أي → يُدخل يدوياً يُعرض ←
+const esc = s => esc0(String(s ?? '').replace(/→/g, '←'));
 const CODES = { A: ['يعتمد', 'A'], R: ['ينفّذ', 'R'], V: ['يراجع', 'V'], C: ['يُستشار', 'C'], I: ['يُبلَّغ', 'I'] };
 const ROLES_PRJ = { EXEC: 'الإدارة التنفيذية', DIR: 'مدير الإدارة', HEAD: 'رئيس القسم', ENG: 'مهندس المشروع', CLERK: 'المنسق الإداري' };
 const TABS = [['start', 'ابدأ من هنا'], ['map', 'الهيكل والعلاقات'], ['router', 'موجّه الطلبات'], ['matrix', 'مصفوفة الصلاحيات'], ['sop', 'الإجراءات'], ['rules', 'القواعد الحاكمة']];
@@ -16,14 +18,55 @@ async function load(force) {
 }
 const un = c => G.U[c]?.short || c, uc = c => G.U[c]?.color || '6B7A88';
 const chip = c => c ? `<span class="uchip" style="--c:#${uc(c)}">${esc(un(c))}</span>` : '';
-const refLink = code => /^G-|^P-/.test(code) ? `<a class="gref" href="#/gov/sop/${code}">${esc(code)}</a>` : /^R-/.test(code) ? `<a class="gref" href="#/gov/rules/${code}">${esc(code)}</a>` : esc(code);
+const refLink = code => /^[A-QS-Z]-\d/.test(code) ? `<a class="gref" data-peek="${esc(code)}" href="#/gov/sop/${code}">${esc(code)}</a>` : /^R-/.test(code) ? `<a class="gref" data-peek="${esc(code)}" href="#/gov/rules/${code}">${esc(code)}</a>` : esc(code);
+// نص مع تحويل أكواد الإجراءات والقواعد (G-05، P-03، R-01) إلى إحالات قابلة للنقر
+const linkify = s => esc(s).replace(/\b([A-Z]-\d{2})\b/g, m => (G?.P?.[m] || G?.R?.[m]) ? refLink(m).replace('class="gref"', 'class="gref in"') : m);
+
+const stepHtml = (s, i) => `<div class="gstep ${s.kind === 'decision' ? 'dec' : ''}" style="--c:#${uc(s.unit)}"><span class="gno"><i>${i + 1}</i></span><div class="gsb"><div class="gsh">${chip(s.unit)}${s.role ? `<small class="muted">${esc(s.role)}</small>` : ''}${s.kind === 'decision' ? '<span class="badge ovr">قرار</span>' : ''}</div><p>${linkify(s.action)}</p><div class="gsm">${s.sla ? `<span>⏱ ${esc(s.sla)}</span>` : ''}${s.where && s.where !== '—' ? `<span>📍 ${esc(s.where)}</span>` : ''}</div></div></div>`;
+const flowHtml = p => `<div class="gflow">${(p.steps || []).map((s, i) => `<span class="gfi">${i ? '<i class="gfa">←</i>' : ''}<span class="gfs ${s.kind === 'decision' ? 'dec' : ''}" style="--c:#${uc(s.unit)}"><b><i>${i + 1}</i></b>${esc(un(s.unit))}</span></span>`).join('')}</div>`;
+
+// ---------- نافذة جانبية للإحالات: تفتح الإجراء أو القاعدة فوق الصفحة الحالية دون مغادرتها
+const PEEK = { stack: [] };
+function peekBody(code) {
+  const p = G.P[code], r = G.R[code];
+  if (p) return `<div class="gpk-h" style="--c:#${uc(p.owner)}"><b>${esc(p.code)}</b>${chip(p.owner)}<span class="badge ${p.status === 'approved' ? 'full' : 'skel'}">${p.status === 'approved' ? 'معتمد' : 'مسودة'} v${esc(p.version || '1.0')}</span></div><h3>${esc(p.title)}</h3>
+    ${p.goal ? `<p class="gpk-goal">${linkify(p.goal)}</p>` : ''}${p.trigger ? `<p class="muted small"><b>متى يبدأ:</b> ${esc(p.trigger)}</p>` : ''}
+    ${flowHtml(p)}<div class="gsteps">${(p.steps || []).map(stepHtml).join('')}</div>
+    ${p.notes ? `<div class="notice mt12"><b>ملاحظات:</b> ${linkify(p.notes)}</div>` : ''}`;
+  if (r) return `<div class="gpk-h" style="--c:#${uc(r.owner)}"><b>${esc(r.code)}</b>${chip(r.owner)}${r.theme ? `<span class="muted small">${esc(r.theme)}</span>` : ''}</div><h3>${esc(r.title)}</h3>
+    <p class="gpk-goal">${linkify(r.statement)}</p>${(r.criteria || []).length ? `<ul class="gpk-ul">${r.criteria.map(c => `<li>${linkify(c)}</li>`).join('')}</ul>` : ''}${r.note ? `<p class="muted small">${linkify(r.note)}</p>` : ''}
+    ${r.process_code && G.P[r.process_code] ? `<p class="mt12">الإجراء المرتبط: ${refLink(r.process_code)} — ${esc(G.P[r.process_code].title)}</p>` : ''}`;
+  return '<div class="empty-boq">غير موجود</div>';
+}
+function renderPeek() {
+  let el = document.getElementById('gpeek');
+  const code = PEEK.stack[PEEK.stack.length - 1];
+  if (!code) { if (el) { el.classList.remove('on'); setTimeout(() => !PEEK.stack.length && el.remove(), 220); } return; }
+  if (!el) { el = document.createElement('div'); el.id = 'gpeek'; document.body.appendChild(el); requestAnimationFrame(() => el.classList.add('on')); }
+  const full = /^R-/.test(code) ? `#/gov/rules/${code}` : `#/gov/sop/${code}`;
+  el.innerHTML = `<div class="gpeek-bg" data-pk="x"></div><aside class="gpeek" role="dialog" aria-label="${esc(code)}"><div class="gpk-top">${PEEK.stack.length > 1 ? `<button class="btn sm ghost" data-pk="back" title="رجوع">→ ${esc(PEEK.stack[PEEK.stack.length - 2])}</button>` : ''}<span class="sp"></span><a class="btn sm" href="${full}" data-pk="full">فتح الصفحة كاملة</a><button class="btn sm ghost" data-pk="x" title="إغلاق (Esc)">✕</button></div><div class="gpk-body">${peekBody(code)}</div></aside>`;
+  el.classList.add('on');
+}
+export function openPeek(code) { if (!G) return; PEEK.stack.push(code); renderPeek(); }
+const closePeek = () => { PEEK.stack = []; renderPeek(); };
+if (!window.__govPeek) {
+  window.__govPeek = 1;
+  document.addEventListener('click', e => {
+    const a = e.target.closest('[data-peek]');
+    if (a && G && !e.metaKey && !e.ctrlKey && !e.shiftKey) { e.preventDefault(); if (PEEK.stack[PEEK.stack.length - 1] !== a.dataset.peek) openPeek(a.dataset.peek); return; }
+    const b = e.target.closest('[data-pk]'); if (!b) return;
+    if (b.dataset.pk === 'x') closePeek(); else if (b.dataset.pk === 'back') { PEEK.stack.pop(); renderPeek(); } else if (b.dataset.pk === 'full') { PEEK.stack = []; renderPeek(); }
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && PEEK.stack.length && !document.querySelector('.mwrap')) closePeek(); });
+  window.addEventListener('hashchange', () => { if (PEEK.stack.length) closePeek(); });
+}
 
 export async function mountGov(root, tab = 'start', id = null, params) {
   await load();
   root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">الحوكمة</h1><span class="muted small">إدارة الخدمات الفنية — من يفعل ماذا ومتى</span><span class="sp"></span>${isAdmin() ? '<span class="badge skel">التعديل متاح لمدير النظام بالنقر على العناصر</span>' : ''}</div>
     <div class="tabs gtabs">${TABS.map(([k, t]) => `<a href="#/gov/${k}" class="${tab === k ? 'on' : ''}">${t}</a>`).join('')}</div><div id="gtab"></div>`;
   const t = $('#gtab', root);
-  if (tab === 'map') viewMap(t); else if (tab === 'router') viewRouter(t); else if (tab === 'matrix') viewMatrix(t, params); else if (tab === 'sop') (id ? viewProc(t, id) : viewSops(t)); else if (tab === 'rules') viewRules(t, id); else viewStart(t);
+  if (tab === 'map') viewMap(t); else if (tab === 'router') viewRouter(t); else if (tab === 'matrix') viewMatrix(t, params); else if (tab === 'sop') (id ? viewProc(t, id) : viewSops(t, params)); else if (tab === 'rules') viewRules(t, id); else viewStart(t);
 }
 
 // ---------- ابدأ من هنا: المبادئ + أسئلة كيف
@@ -35,7 +78,7 @@ function viewStart(t) {
       <div class="gvals">${vals.map(([h, d]) => `<div><b>${h}</b><span>${d}</span></div>`).join('')}</div></div>
     <div class="gunits">${units.map(u => `<a class="gunit" href="#/gov/map?u=${u.code}" style="--c:#${u.color}"><i></i><b>${esc(u.short)}</b><small>${esc(u.mission)}</small></a>`).join('')}</div>
     <h2 class="gh2">أسئلة «كيف…؟» <span class="muted small">— كل إجابة تقود إلى إجرائها أو قاعدتها</span>${isAdmin() ? '<button class="btn sm" id="faqNew">＋ سؤال</button>' : ''}</h2>
-    <div class="gfaq">${G.faq.map(f => `<details class="gq" data-faq="${f.id}"><summary>${esc(f.q)}</summary><p>${esc(f.a)}</p><div class="glinks">${(f.links || []).map(refLink).join(' ')}${f.action === 'router' ? '<a class="btn sm" href="#/gov/router">جرّب الموجّه</a>' : f.action === 'matrix' ? '<a class="btn sm" href="#/gov/matrix">افتح المصفوفة</a>' : ''}${isAdmin() ? `<button class="btn sm ghost" data-faqed="${f.id}">تعديل</button>` : ''}</div></details>`).join('')}</div></div>`;
+    <div class="gfaq">${G.faq.map(f => `<details class="gq" data-faq="${f.id}"><summary>${esc(f.q)}</summary><p>${linkify(f.a)}</p><div class="glinks">${(f.links || []).map(refLink).join(' ')}${f.action === 'router' ? '<a class="btn sm" href="#/gov/router">جرّب الموجّه</a>' : f.action === 'matrix' ? '<a class="btn sm" href="#/gov/matrix">افتح المصفوفة</a>' : ''}${isAdmin() ? `<button class="btn sm ghost" data-faqed="${f.id}">تعديل</button>` : ''}</div></details>`).join('')}</div></div>`;
   if (isAdmin()) { const fe = f => editRow('gov_faq', f, [['q', 'السؤال', 'text'], ['a', 'الإجابة', 'textarea'], ['links', 'الروابط (أكواد مفصولة بفاصلة مثل G-04, R-07)', 'list'], ['action', 'زر إضافي', 'select', [['', '—'], ['router', 'جرّب الموجّه'], ['matrix', 'افتح المصفوفة']]], ['sort', 'الترتيب', 'number']], () => mountGov(t.closest('#main') || document.body, 'start')); $('#faqNew', t).onclick = () => fe(null); $$('[data-faqed]', t).forEach(b => b.onclick = e => { e.preventDefault(); fe(G.faq.find(x => x.id === +b.dataset.faqed)); }); }
 }
 
@@ -102,33 +145,49 @@ function viewMatrix(t, params) {
 }
 
 // ---------- الإجراءات
-function viewSops(t) {
-  const owners = [...new Set(G.procs.map(p => p.owner))];
-  t.innerHTML = `<div class="toolbar"><input id="sq" placeholder="ابحث في الإجراءات…" style="min-width:260px"><span class="sp"></span>${isAdmin() ? '<button class="btn sm primary" id="pNew">＋ إجراء</button>' : ''}</div><div id="sl"></div>`;
-  const render = () => { const s = ($('#sq', t).value || '').trim(); const ps = G.procs.filter(p => p.active !== false && (!s || (p.code + ' ' + p.title + ' ' + p.goal + ' ' + JSON.stringify(p.steps)).includes(s)));
-    $('#sl', t).innerHTML = owners.map(o => { const list = ps.filter(p => p.owner === o); if (!list.length) return ''; return `<h2 class="gh2" style="--c:#${uc(o)}"><span class="uchip" style="--c:#${uc(o)}">${esc(un(o))}</span> <span class="muted small">${list.length} إجراء</span></h2><div class="gprocs">${list.map(p => `<a class="gproc" href="#/gov/sop/${p.code}" style="--c:#${uc(p.owner)}"><div class="gpc"><b>${esc(p.code)}</b><span class="badge ${p.status === 'approved' ? 'full' : 'skel'}">${p.status === 'approved' ? 'معتمد' : 'مسودة'} v${esc(p.version || '1.0')}</span></div><h3>${esc(p.title)}</h3><p>${esc(p.goal)}</p><div class="gpu">${(p.units || []).map(chip).join('')}</div><small class="muted">${(p.steps || []).length} خطوة</small></a>`).join('')}</div>`; }).join('') || '<div class="empty-boq">لا نتائج</div>'; };
+// الإجراءات: مشتركة بين الأقسام (G-) + دليل إجراءات لكل قسم (المشاريع P-، المرافق F-، الصيانة M-، …)
+const MAN_PREFIX = { PRJ: 'P', FAC: 'F', MNT: 'M', BME: 'B', MED: 'E', GEN: 'S', IT: 'T' };
+const isShared = p => /^G-/.test(p.code);
+function viewSops(t, params) {
+  const depts = G.units.filter(u => u.kind === 'unit' && u.active !== false);
+  let fil = params?.get?.('u') || '';
+  t.innerHTML = `<div class="toolbar"><input id="sq" placeholder="ابحث في الإجراءات…" style="min-width:240px"><span class="sp"></span>${isAdmin() ? '<button class="btn sm primary" id="pNew">＋ إجراء</button>' : ''}</div><div class="gman" id="gman"></div><div id="sl"></div>`;
+  const card = p => `<a class="gproc" href="#/gov/sop/${p.code}" style="--c:#${uc(p.owner)}"><div class="gpc"><b>${esc(p.code)}</b><span class="badge ${p.status === 'approved' ? 'full' : 'skel'}">${p.status === 'approved' ? 'معتمد' : 'مسودة'} v${esc(p.version || '1.0')}</span></div><h3>${esc(p.title)}</h3><p>${esc(p.goal)}</p><div class="gpu">${(p.units || []).map(chip).join('')}</div><small class="muted">${(p.steps || []).length} خطوة</small></a>`;
+  const render = () => {
+    const s = ($('#sq', t).value || '').trim();
+    const all = G.procs.filter(p => p.active !== false), ps = all.filter(p => !s || (p.code + ' ' + p.title + ' ' + p.goal + ' ' + JSON.stringify(p.steps)).includes(s));
+    const shared = ps.filter(isShared), mine = c => ps.filter(p => !isShared(p) && p.owner === c), cnt = c => all.filter(p => !isShared(p) && p.owner === c).length;
+    $('#gman', t).innerHTML = `<button class="gmb ${!fil ? 'on' : ''}" data-u=""><b>${all.length}</b>الكل</button><button class="gmb ${fil === 'G' ? 'on' : ''}" data-u="G" style="--c:#123B5C"><b>${all.filter(isShared).length}</b>المشتركة بين الأقسام</button>${depts.map(u => `<button class="gmb ${fil === u.code ? 'on' : ''} ${cnt(u.code) ? '' : 'nil'}" data-u="${u.code}" style="--c:#${uc(u.code)}"><b>${cnt(u.code) || '—'}</b>دليل ${esc(u.short)}</button>`).join('')}`;
+    $$('#gman [data-u]', t).forEach(b => b.onclick = () => { fil = b.dataset.u; render(); });
+    const blocks = [];
+    if (!fil || fil === 'G') if (shared.length || fil === 'G') blocks.push(`<h2 class="gh2"><span class="uchip" style="--c:#123B5C">الإجراءات المشتركة بين الأقسام</span> <span class="muted small">${shared.length} إجراء · تحكم انتقال العمل من قسم إلى آخر</span></h2><div class="gprocs">${shared.map(card).join('') || '<div class="empty-boq">لا نتائج</div>'}</div>`);
+    if (fil !== 'G') depts.filter(u => !fil || fil === u.code).forEach(u => { const list = mine(u.code); if (!list.length && s) return;
+      blocks.push(`<h2 class="gh2" style="--c:#${uc(u.code)}"><span class="uchip" style="--c:#${uc(u.code)}">دليل إجراءات ${esc(u.name)}</span> <span class="muted small">${list.length ? list.length + ' إجراء · ' + esc(MAN_PREFIX[u.code] || '') + '-' : ''}</span></h2>${list.length ? `<div class="gprocs">${list.map(card).join('')}</div>` : `<div class="gman-nil">لم يُعدّ دليل إجراءات هذا القسم بعد. ${(n => n ? `ويملك القسم حالياً ${n === 1 ? 'إجراءً مشتركاً واحداً' : n === 2 ? 'إجراءين مشتركين' : n + ' إجراءات مشتركة'} مع بقية الأقسام.` : '')(shared.filter(p => p.owner === u.code).length)}</div>`}`); });
+    $('#sl', t).innerHTML = blocks.join('') || '<div class="empty-boq">لا نتائج</div>';
+  };
   $('#sq', t).oninput = render; render();
   $('#pNew', t) && ($('#pNew', t).onclick = () => editProc(null, () => load(true).then(() => mountGov(t.closest('#main') || document.body, 'sop'))));
 }
 function viewProc(t, code) {
   const p = G.P[code]; if (!p) return t.innerHTML = '<div class="empty-boq">الإجراء غير موجود</div>';
   const lanes = [...new Set(p.steps.map(s => s.unit))];
-  t.innerHTML = `<div class="toolbar"><a class="btn sm ghost" href="#/gov/sop">← الإجراءات</a><h2 class="m0">${esc(p.code)} — ${esc(p.title)}</h2><span class="badge ${p.status === 'approved' ? 'full' : 'skel'}">${p.status === 'approved' ? 'معتمد' : 'مسودة'} v${esc(p.version || '1.0')}</span><span class="sp"></span><button class="btn sm" onclick="print()">${ico('print')} طباعة</button>${isAdmin() ? `<button class="btn sm" id="pEd">تعديل</button>${p.status !== 'approved' ? '<button class="btn sm primary" id="pApp">اعتماد</button>' : ''}` : ''}</div>
+  t.innerHTML = `<div class="toolbar"><a class="btn sm ghost" href="#/gov/sop">→ الإجراءات</a><h2 class="m0">${esc(p.code)} — ${esc(p.title)}</h2><span class="badge ${p.status === 'approved' ? 'full' : 'skel'}">${p.status === 'approved' ? 'معتمد' : 'مسودة'} v${esc(p.version || '1.0')}</span><span class="sp"></span><button class="btn sm" onclick="print()">${ico('print')} طباعة</button>${isAdmin() ? `<button class="btn sm" id="pEd">تعديل</button>${p.status !== 'approved' ? '<button class="btn sm primary" id="pApp">اعتماد</button>' : ''}` : ''}</div>
     <div class="gpgrid"><div class="gkv"><span>المالك</span><b>${chip(p.owner)}</b></div><div class="gkv"><span>الأقسام المشاركة</span><b>${(p.units || []).map(chip).join('')}</b></div><div class="gkv wide"><span>الهدف</span><b>${esc(p.goal)}</b></div><div class="gkv"><span>متى يبدأ</span><b>${esc(p.trigger)}</b></div><div class="gkv"><span>المدخلات</span><b>${esc(p.inputs)}</b></div><div class="gkv"><span>المخرجات</span><b>${esc(p.outputs)}</b></div><div class="gkv"><span>مؤشر الأداء</span><b>${esc(p.kpi)}</b></div></div>
     <h3 class="sub-h">الخطوات <span class="muted small">— لون كل خطوة بلون القسم المسؤول عنها</span></h3>
-    <div class="gswim"><div class="glanes">${lanes.map(u => `<div class="glane" style="--c:#${uc(u)}"><span>${esc(un(u))}</span></div>`).join('')}</div><div class="gsteps">${p.steps.map((s, i) => `<div class="gstep ${s.kind === 'decision' ? 'dec' : ''}" style="--c:#${uc(s.unit)};--lane:${lanes.indexOf(s.unit)}"><span class="gno">${i + 1}</span><div class="gsb"><div class="gsh">${chip(s.unit)}${s.role ? `<small class="muted">${esc(s.role)}</small>` : ''}${s.kind === 'decision' ? '<span class="badge ovr">قرار</span>' : ''}</div><p>${esc(s.action)}</p><div class="gsm">${s.sla ? `<span>⏱ ${esc(s.sla)}</span>` : ''}${s.where && s.where !== '—' ? `<span>📍 ${esc(s.where)}</span>` : ''}</div></div></div>`).join('')}</div></div>
-    ${p.notes ? `<div class="notice mt12"><b>ملاحظات:</b> ${esc(p.notes)}</div>` : ''}
+    ${flowHtml(p)}
+    <div class="gswim"><div class="glanes">${lanes.map(u => `<div class="glane" style="--c:#${uc(u)}"><span>${esc(un(u))}</span></div>`).join('')}</div><div class="gsteps">${p.steps.map(stepHtml).join('')}</div></div>
+    ${p.notes ? `<div class="notice mt12"><b>ملاحظات:</b> ${linkify(p.notes)}</div>` : ''}
     <p class="muted small mt12">${p.approved_by ? `اعتُمد بواسطة ${esc(p.approved_by)} في ${dateAr(p.approved_at)}` : 'مسودة بانتظار الاعتماد'} · آخر تحديث ${dateAr(p.updated_at)}</p>`;
   $('#pEd', t) && ($('#pEd', t).onclick = () => editProc(p, () => load(true).then(() => mountGov(t.closest('#main') || document.body, 'sop', code))));
   $('#pApp', t) && ($('#pApp', t).onclick = async () => { if (!await confirm('اعتماد هذا الإجراء بإصداره الحالي؟', 'اعتماد')) return; await q(sb.from('gov_processes').update({ status: 'approved', approved_by: session.profile?.full_name || '', approved_at: new Date().toISOString().slice(0, 10) }).eq('code', code)); toast('اعتُمد'); await load(true); mountGov(t.closest('#main') || document.body, 'sop', code); });
 }
 function editProc(p, done) {
   const opts = G.units.map(u => [u.code, u.short]); const v = p || { code: '', title: '', owner: 'PRJ', units: [], goal: '', trigger: '', inputs: '', outputs: '', kpi: '', steps: [], notes: '', version: '1.0' };
-  const stepRow = (s = {}, i) => `<div class="gserow" data-i="${i}"><select name="s_unit">${opts.map(([c, n]) => `<option value="${c}" ${s.unit === c ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select><input name="s_action" placeholder="الإجراء" value="${esc(s.action || '')}"><input name="s_sla" placeholder="المهلة" value="${esc(s.sla || '')}" style="max-width:120px"><input name="s_where" placeholder="أين (شاشة/نموذج)" value="${esc(s.where || '')}" style="max-width:150px"><label class="chk"><input type="checkbox" name="s_dec" ${s.kind === 'decision' ? 'checked' : ''}> قرار</label><button type="button" class="btn sm ghost" data-rm>✕</button></div>`;
-  modal(`<form id="f" class="pgrid">${field('الكود', inp('code', v.code, p ? 'readonly' : 'required placeholder="G-13"'))}${field('الإصدار', inp('version', v.version || '1.0'))}${field('العنوان', inp('title', v.title, 'required'), 'wide')}${field('المالك', sel('owner', opts, v.owner))}${field('الأقسام المشاركة', `<div class="chips">${opts.map(([c, n]) => `<label class="chip"><input type="checkbox" name="u_${c}" ${(v.units || []).includes(c) ? 'checked' : ''}> ${esc(n)}</label>`).join('')}</div>`, 'wide')}${field('الهدف', `<textarea name="goal" rows="2">${esc(v.goal)}</textarea>`, 'wide')}${field('متى يبدأ', inp('trigger', v.trigger), 'wide')}${field('المدخلات', inp('inputs', v.inputs))}${field('المخرجات', inp('outputs', v.outputs))}${field('مؤشر الأداء', inp('kpi', v.kpi), 'wide')}<div class="fld wide"><span>الخطوات</span><div id="gse">${(v.steps || []).map(stepRow).join('')}</div><button type="button" class="btn sm" id="sAdd">＋ خطوة</button></div>${field('ملاحظات', `<textarea name="notes" rows="2">${esc(v.notes)}</textarea>`, 'wide')}<div class="btnrow end wide">${p ? '<button type="button" class="btn ghost" id="pDel" style="color:#A6503B">حذف</button>' : ''}<span class="sp"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">حفظ</button></div></form>`, { title: p ? 'تعديل إجراء' : 'إجراء جديد', wide: true, onOpen: (w, close) => {
+  const stepRow = (s = {}, i) => `<div class="gserow" data-i="${i}"><select name="s_unit">${opts.map(([c, n]) => `<option value="${c}" ${s.unit === c ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select><input name="s_role" placeholder="الدور (اختياري)" value="${esc0(s.role || '')}" style="max-width:130px"><input name="s_action" placeholder="الإجراء" value="${esc(s.action || '')}"><input name="s_sla" placeholder="المهلة" value="${esc(s.sla || '')}" style="max-width:120px"><input name="s_where" placeholder="أين (شاشة/نموذج)" value="${esc(s.where || '')}" style="max-width:150px"><label class="chk"><input type="checkbox" name="s_dec" ${s.kind === 'decision' ? 'checked' : ''}> قرار</label><button type="button" class="btn sm ghost" data-rm>✕</button></div>`;
+  modal(`<form id="f" class="pgrid">${field('الكود', inp('code', v.code, p ? 'readonly' : 'required placeholder="G-13 أو F-06 أو M-06"'))}${field('الإصدار', inp('version', v.version || '1.0'))}${field('العنوان', inp('title', v.title, 'required'), 'wide')}${field('المالك', sel('owner', opts, v.owner))}${field('الأقسام المشاركة', `<div class="chips">${opts.map(([c, n]) => `<label class="chip"><input type="checkbox" name="u_${c}" ${(v.units || []).includes(c) ? 'checked' : ''}> ${esc(n)}</label>`).join('')}</div>`, 'wide')}${field('الهدف', `<textarea name="goal" rows="2">${esc(v.goal)}</textarea>`, 'wide')}${field('متى يبدأ', inp('trigger', v.trigger), 'wide')}${field('المدخلات', inp('inputs', v.inputs))}${field('المخرجات', inp('outputs', v.outputs))}${field('مؤشر الأداء', inp('kpi', v.kpi), 'wide')}<div class="fld wide"><span>الخطوات</span><div id="gse">${(v.steps || []).map(stepRow).join('')}</div><button type="button" class="btn sm" id="sAdd">＋ خطوة</button></div>${field('ملاحظات', `<textarea name="notes" rows="2">${esc(v.notes)}</textarea>`, 'wide')}<div class="btnrow end wide">${p ? '<button type="button" class="btn ghost" id="pDel" style="color:#A6503B">حذف</button>' : ''}<span class="sp"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">حفظ</button></div></form>`, { title: p ? 'تعديل إجراء' : 'إجراء جديد', wide: true, onOpen: (w, close) => {
     const box = $('#gse', w); const bindRm = () => $$('[data-rm]', box).forEach(b => b.onclick = () => b.closest('.gserow').remove()); bindRm();
     $('#sAdd', w).onclick = () => { box.insertAdjacentHTML('beforeend', stepRow({}, box.children.length)); bindRm(); };
-    $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target); const steps = $$('.gserow', box).map(r => ({ unit: $('[name=s_unit]', r).value, action: $('[name=s_action]', r).value.trim(), sla: $('[name=s_sla]', r).value.trim(), where: $('[name=s_where]', r).value.trim(), kind: $('[name=s_dec]', r).checked ? 'decision' : 'step' })).filter(s => s.action);
+    $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target); const steps = $$('.gserow', box).map(r => ({ unit: $('[name=s_unit]', r).value, action: $('[name=s_action]', r).value.trim().replace(/→/g, '←'), sla: $('[name=s_sla]', r).value.trim(), where: $('[name=s_where]', r).value.trim(), kind: $('[name=s_dec]', r).checked ? 'decision' : 'step', role: $('[name=s_role]', r).value.trim() || undefined })).filter(s => s.action);
       const row = { title: f.title.trim(), version: f.version.trim(), owner: f.owner, units: opts.map(([c]) => c).filter(c => f['u_' + c]), goal: f.goal.trim(), trigger: f.trigger.trim(), inputs: f.inputs.trim(), outputs: f.outputs.trim(), kpi: f.kpi.trim(), steps, notes: f.notes.trim(), updated_at: new Date().toISOString() };
       try { if (p) await q(sb.from('gov_processes').update(row).eq('code', p.code)); else await q(sb.from('gov_processes').insert({ ...row, code: f.code.trim(), sort: 50 })); close(); toast('حُفظ'); done(); } catch (er) { err(er); } };
     $('#pDel', w) && ($('#pDel', w).onclick = async () => { if (!await confirm('حذف الإجراء؟', 'حذف', true)) return; await q(sb.from('gov_processes').delete().eq('code', p.code)); close(); done(); });
@@ -139,7 +198,7 @@ function editProc(p, done) {
 function viewRules(t, code) {
   const themes = [...new Set(G.rules.map(r => r.theme))];
   t.innerHTML = `<div class="toolbar"><p class="muted small m0">قواعد قصيرة تحسم «متى يدخل كل قسم» و«من يقرر»، وكل قاعدة تحيل إلى إجرائها. القيم المالية والزمنية المقترحة تحتاج اعتماداً.</p><span class="sp"></span>${isAdmin() ? '<button class="btn sm primary" id="rNew">＋ قاعدة</button>' : ''}</div>
-    ${themes.map(th => `<h2 class="gh2">${esc(th)}</h2><div class="grules">${G.rules.filter(r => r.theme === th && r.active !== false).map(r => `<div class="grule ${code === r.code ? 'hl' : ''}" id="rule-${r.code}" style="--c:#${uc(r.owner)}"><div class="grh"><b>${esc(r.code)}</b> ${chip(r.owner)}${r.process_code ? refLink(r.process_code) : ''}${isAdmin() ? `<button class="btn sm ghost" data-red="${r.code}">تعديل</button>` : ''}</div><h3>${esc(r.title)}</h3><p>${esc(r.statement)}</p>${(r.criteria || []).length ? `<ul>${r.criteria.map(c => `<li>${esc(c)}</li>`).join('')}</ul>` : ''}${r.note ? `<small class="muted">${esc(r.note)}</small>` : ''}</div>`).join('')}</div>`).join('')}`;
+    ${themes.map(th => `<h2 class="gh2">${esc(th)}</h2><div class="grules">${G.rules.filter(r => r.theme === th && r.active !== false).map(r => `<div class="grule ${code === r.code ? 'hl' : ''}" id="rule-${r.code}" style="--c:#${uc(r.owner)}"><div class="grh"><b>${esc(r.code)}</b> ${chip(r.owner)}${r.process_code ? refLink(r.process_code) : ''}${isAdmin() ? `<button class="btn sm ghost" data-red="${r.code}">تعديل</button>` : ''}</div><h3>${esc(r.title)}</h3><p>${linkify(r.statement)}</p>${(r.criteria || []).length ? `<ul>${r.criteria.map(c => `<li>${linkify(c)}</li>`).join('')}</ul>` : ''}${r.note ? `<small class="muted">${esc(r.note)}</small>` : ''}</div>`).join('')}</div>`).join('')}`;
   if (code) $('#rule-' + code, t)?.scrollIntoView({ block: 'center' });
   if (isAdmin()) { const re = r => editRow('gov_rules', r, [['code', 'الكود', 'text'], ['title', 'العنوان', 'text'], ['theme', 'المحور', 'text'], ['statement', 'نص القاعدة', 'textarea'], ['criteria', 'المعايير (سطر لكل معيار)', 'lines'], ['owner', 'القسم المالك', 'select', G.units.map(u => [u.code, u.short])], ['process_code', 'الإجراء المرتبط', 'text'], ['note', 'ملاحظة', 'text'], ['sort', 'الترتيب', 'number']], () => load(true).then(() => mountGov(t.closest('#main') || document.body, 'rules')), 'code'); $('#rNew', t).onclick = () => re(null); $$('[data-red]', t).forEach(b => b.onclick = () => re(G.R[b.dataset.red])); }
 }
