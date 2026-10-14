@@ -134,7 +134,7 @@ export async function newItem(preset = {}, done) {
     ${field('العنوان *', inp('title', v.title || '', 'required placeholder="وصف مختصر للمشكلة أو الطلب"'), 'wide')}
     ${fields.map(f => fieldHtml(f, v.data?.[f.k])).join('')}
     ${field('التفاصيل', `<textarea name="details" rows="3" placeholder="ماذا حدث؟ متى؟ ما الأثر؟">${esc(v.details || '')}</textarea>`, 'wide')}
-    ${field('رقم الأصل أو الجهاز (إن وجد)', inp('asset', v.asset || ''))}
+    ${field('الأصل أو الجهاز (إن وجد)', inp('asset', v.asset || '', 'list="assetList" autocomplete="off" placeholder="رمز الأصل أو اسمه"') + '<datalist id="assetList"></datalist><small class="muted" id="assetHint"></small>')}
     <div class="fld"><span>الصور والمرفقات</span><input type="file" name="files" multiple accept="image/*,.pdf"></div>
     <div class="fld wide"><span>الأولوية <small class="muted" id="psug"></small></span><div class="oprioseg">${Object.entries(PR).map(([p, x]) => `<label style="--c:${x.c}"><input type="radio" name="priority" value="${p}" ${v.priority === p ? 'checked' : ''}><b>${x.ar}</b><small>${x.sla}</small></label>`).join('')}</div></div>
     ${staff && !par ? `<details class="wide"><summary class="small">إدخال نيابة عن متصل (بلاغ هاتفي)</summary><div class="pgrid mt8">${field('اسم مقدّم البلاغ', inp('requester_name', v.requester_name || ''))}${field('جواله', inp('requester_phone', v.requester_phone || '', 'dir="ltr"'))}</div></details>` : ''}
@@ -145,12 +145,17 @@ export async function newItem(preset = {}, done) {
       fields.forEach(f => form['d_' + f.k] && (form['d_' + f.k].onchange = sug)); sug();
       const locsOf = () => O.locs.filter(l => l.facility_id === +form.facility_id.value);
       const fillLoc = () => { const L = locsOf(); $('#locList', w).innerHTML = L.map(l => `<option value="${esc(locLabel(l))}">${esc([l.building, l.floor, LST[l.status]?.ar].filter(Boolean).join(' · '))}</option>`).join(''); $('#locHint', w).textContent = L.length ? `${L.length} موقعاً مسجلاً في هذه المنشأة — اختر من القائمة ليُربط العمل بسجل الموقع (R-16)` : (form.facility_id.value ? 'لا مواقع مسجلة لهذه المنشأة بعد؛ اكتب وصف الموقع' : ''); };
-      form.facility_id.onchange = fillLoc; fillLoc();
+      let AS = [];
+      const fillAssets = async () => { const fid = +form.facility_id.value; if (!fid || role() === 'requester') { AS = []; return; } try { AS = await q(sb.from('assets').select('id,code,name,unit,location_id,status').eq('facility_id', fid).eq('active', true).order('code').limit(800)); } catch (e) { AS = []; }
+        const mineU = AS.filter(a => a.unit === k.unit), list = mineU.length ? mineU : AS; $('#assetList', w).innerHTML = list.map(a => `<option value="${esc(a.code)}">${esc(a.name)}</option>`).join(''); $('#assetHint', w).textContent = list.length ? `${list.length} أصلاً مسجلاً — اختر الرمز ليُربط العمل بتاريخ الأصل` : ''; };
+      form.facility_id.onchange = () => { fillLoc(); fillAssets(); }; fillLoc(); fillAssets();
+      if (v.asset_id && !v.asset) q(sb.from('assets').select('code').eq('id', v.asset_id).maybeSingle()).then(a => { if (a) form.asset.value = a.code; }).catch(() => {});
       form.onsubmit = async e => { e.preventDefault(); const x = formData(form); const data = {}; fields.forEach(f => { if (x['d_' + f.k] !== '' && x['d_' + f.k] != null) data[f.k] = f.t === 'number' ? +x['d_' + f.k] : x['d_' + f.k]; });
         const phone = staff && (x.requester_name || '').trim();
         const loc = locsOf().find(l => locLabel(l) === x.location.trim() || l.code === x.location.trim());
         if (k.effect === 'closure' && !loc && locsOf().length) return toast('اختر الموقع من سجل مواقع المنشأة حتى تُحدَّث حالته عند الإغلاق والفتح', 'bad');
-        const row = { kind, unit: k.unit, facility_id: +x.facility_id, location: loc ? locLabel(loc) : x.location.trim(), location_id: loc?.id || null, asset: (x.asset || '').trim(), title: x.title.trim(), details: x.details.trim(), priority: x.priority || 'p3', data,
+        const ast = AS.find(a => a.code === (x.asset || '').trim()) || (v.asset_id ? { id: v.asset_id } : null);
+        const row = { kind, unit: k.unit, facility_id: +x.facility_id, location: loc ? locLabel(loc) : x.location.trim(), location_id: loc?.id || (ast?.location_id ?? null), asset_id: ast?.id || null, asset: (x.asset || '').trim(), title: x.title.trim(), details: x.details.trim(), priority: x.priority || 'p3', data,
           source: par ? 'item' : phone ? 'phone' : (v.source || 'portal'), parent_id: v.parent_id || null, fm_obs_id: v.fm_obs_id || null, project_id: v.project_id || null,
           ...(phone ? { requester_name: x.requester_name.trim(), requester_phone: (x.requester_phone || '').trim() } : {}), ...(v.last_action ? { last_action: v.last_action } : {}), created_by: session.user.id };
         const btn = form.querySelector('.btn.primary'); btn.disabled = true;
@@ -180,7 +185,8 @@ export async function openItem(id, re) {
   const flow = { new: [['accepted', 'استلام', 'primary']], accepted: [['in_progress', 'بدء التنفيذ', 'primary'], ['on_hold', 'تعليق']], in_progress: [['verify', 'أُنجز — بانتظار تأكيد صاحب الطلب', 'primary'], ['done', 'إغلاق مباشر'], ['on_hold', 'تعليق']], on_hold: [['in_progress', 'استئناف', 'primary']], verify: [['done', 'إغلاق', 'primary'], ['in_progress', 'إعادة للتنفيذ']], done: [['in_progress', 'إعادة فتح']], cancelled: [['new', 'إعادة فتح']] }[i.status] || [];
   const dataKv = (Array.isArray(k.fields) ? k.fields : []).filter(x => i.data?.[x.k] != null && i.data[x.k] !== '').map(x => [x.l, esc(x.t === 'datetime-local' ? fmtDT(i.data[x.k]) : String(i.data[x.k]))]);
   const loc = i.location_id ? O.Loc[i.location_id] : null;
-  const gates = Array.isArray(k.gates) ? k.gates : [], checks = Array.isArray(k.checklist) ? k.checklist : [];
+  const gates = Array.isArray(k.gates) ? k.gates : [], checks = [...(Array.isArray(k.checklist) ? k.checklist : []), ...(Array.isArray(i.data?.plan_check) ? i.data.plan_check : [])];
+  const ast = i.asset_id ? await q(sb.from('assets').select('id,code,name,unit,status').eq('id', i.asset_id).maybeSingle()).catch(() => null) : null;
   const gHtml = gates.length ? `<h3 class="sub-h">الاعتمادات المطلوبة من الأقسام</h3><div class="ogates">${gates.map(g => { const a = i.data?.gates?.[g.k];
       return `<div class="ogate ${a ? 'ok' : ''}" style="--c:${ucolor(g.unit)}"><span class="ogate-i">${a ? '✓' : '⏳'}</span><div><b>${esc(g.l)}</b><small>${uchip(g.unit)} ${a ? `${esc(a.name || '')} · ${fmtDT(a.at)}${a.note ? ' — ' + esc(a.note) : ''}` : `مطلوب قبل «${ST[g.before]?.ar || g.before}»`}</small></div>${!a && staffOf(g.unit) && isOpen(i) ? `<button class="btn sm primary" data-gate="${g.k}">اعتماد</button>` : ''}</div>`; }).join('')}</div>` : '';
   const done = checks.filter(c => i.data?.check?.[c.k]).length;
@@ -191,7 +197,7 @@ export async function openItem(id, re) {
   const changed = { v: false };
   await modal(`${i.proc ? govBar([i.proc, i.status === 'done' ? 'done' : (i.step || 1)], ST[i.status]?.ar) : ''}
     <div class="ohead" style="--c:${PR[i.priority]?.c}"><span class="oi-k big">${k.icon}</span><div><b>${esc(i.title)}</b><span class="muted">${esc(i.ref || '')} · ${esc(k.name)} · ${esc(f?.name || '—')}${i.location ? ' · ' + esc(i.location) : ''}</span></div><span class="sp"></span>${stPill(i.status)}${prPill(i.priority)}</div>
-    <div class="oi-f mb8">${uchip(i.unit)}${loc ? `<span class="small">📍 ${esc(locLabel(loc))}</span>${locPill(loc)}` : ''}${slaChip(i)}${i.due_at && open ? `<span class="muted small">المهلة: ${new Date(i.due_at).toLocaleString('ar-SA-u-ca-gregory-nu-latn', { dateStyle: 'medium', timeStyle: 'short' })}</span>` : ''}</div>
+    <div class="oi-f mb8">${uchip(i.unit)}${ast ? `<a class="olink" href="#/dept/${ast.unit}/assets?a=${ast.id}">🏷️ ${esc(ast.code)} — ${esc(ast.name)}${ast.status === 'down' ? ' (متعطل)' : ''}</a>` : ''}${i.plan_id ? '<span class="olink">🗓️ عمل مخطط دوري</span>' : ''}${loc ? `<span class="small">📍 ${esc(locLabel(loc))}</span>${locPill(loc)}` : ''}${slaChip(i)}${i.due_at && open ? `<span class="muted small">المهلة: ${new Date(i.due_at).toLocaleString('ar-SA-u-ca-gregory-nu-latn', { dateStyle: 'medium', timeStyle: 'short' })}</span>` : ''}</div>
     ${i.details ? `<p class="pre">${esc(i.details)}</p>` : ''}
     <div class="fmlast ${open && i.last_action_at && Date.now() - new Date(i.last_action_at) > 3 * 864e5 ? 'stale' : ''}"><span>آخر إجراء متخذ</span>${i.last_action ? `<p>${esc(i.last_action)}</p><small>${pname(i.last_action_by) ? esc(pname(i.last_action_by)) + ' · ' : ''}${ago(i.last_action_at)}</small>` : '<p class="muted">لم يُسجَّل أي إجراء بعد.</p>'}</div>
     <div class="kvs">${[...dataKv, ['رقم الأصل', esc(i.asset || '—')], ['المكلّف', esc(pname(i.assignee_id) || i.assignee_name || '—')], ['مقدّم الطلب', esc(pname(i.requester_id) || i.requester_name || pname(i.created_by) || '—') + (i.requester_phone ? ` <span class="ltr">${esc(i.requester_phone)}</span>` : '')], ['المصدر', SRC[i.source] || '—'], ['أُنشئ', dateAr(i.created_at)], ...(i.closed_at ? [[i.status === 'cancelled' ? 'أُلغي' : 'أُغلق', dateAr(i.closed_at)]] : []), ...(i.rating ? [['تقييم صاحب الطلب', '★'.repeat(i.rating) + '☆'.repeat(5 - i.rating) + (i.feedback ? ' — ' + esc(i.feedback) : '')]] : [])].map(([a, b]) => `<div class="kv"><span>${a}</span><b>${b}</b></div>`).join('')}</div>
@@ -219,6 +225,7 @@ export async function openItem(id, re) {
       const reopen = async () => { changed.v = true; await loadOps(); close(); openItem(i.id, re); };
       const upd = async patch => { try { await q(sb.from('ops_items').update(patch).eq('id', i.id)); await reopen(); } catch (e) { err(e); } };
       $$('[data-oi]', w).forEach(b => b.onclick = () => { close(); openItem(+b.dataset.oi, re); });
+      $$('a[href^="#/"]:not([data-peek])', w).forEach(a => a.addEventListener('click', () => close()));
       $$('[data-gate]', w).forEach(b => b.onclick = async () => { const g = gates.find(x => x.k === b.dataset.gate);
         const r = await modal(`<form id="gf"><p class="m0">${esc(g.l)}</p><p class="muted small">يُسجَّل الاعتماد باسمك ووقته في سجل العمل، ويصل إشعار لفريق ${esc(uname(i.unit))}.</p>${field('ملاحظة أو اشتراطات (اختياري)', '<textarea name="n" rows="2"></textarea>')}<div class="btnrow end"><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">اعتماد</button></div></form>`, { title: 'اعتماد', onOpen: (w2, c) => { $('#gf', w2).onsubmit = e => { e.preventDefault(); c(formData(e.target)); }; } });
         if (!r) return; try { const { error } = await sb.rpc('ops_gate', { p_id: i.id, p_key: g.k, p_note: (r.n || '').trim() }); if (error) throw error; toast('اعتُمد'); await reopen(); } catch (e) { err(e); } });

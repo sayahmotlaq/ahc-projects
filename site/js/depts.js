@@ -3,6 +3,11 @@ import { sb, q, session, isAdmin, role, canRead } from './api.js';
 import { $, $$, esc, toast, err, modal, field, sel, formData, dateAr } from './ui.js';
 import { O, loadOps, ST, PR, OPEN, isOpen, isLate, itemRow, bindRows, listView, newItem, openItem, uchip, uname, ucolor, pname, staffOf, dur, canFile, activeCritical, criticalHtml, LST, locPill, locLabel, isStaff } from './ops.js';
 
+const ASSET_UNITS = ['MNT', 'BME', 'IT', 'MED', 'SAF', 'GEN'], PLAN_UNITS = ['MNT', 'BME', 'SAF', 'IT', 'GEN', 'FAC'];
+const AST = { in_service: { ar: 'في الخدمة', c: '#2E8B57' }, down: { ar: 'متعطل', c: '#C0392B' }, out: { ar: 'خارج الخدمة', c: '#7A8794' }, disposed: { ar: 'مُكهَّن', c: '#B5C0CB' } };
+const CRIT = { high: 'عالية', medium: 'متوسطة', low: 'منخفضة' };
+const PER = { day: 'يوم', week: 'أسبوع', month: 'شهر', year: 'سنة' };
+const perLabel = p => p.every === 1 ? { day: 'يومياً', week: 'أسبوعياً', month: 'شهرياً', year: 'سنوياً' }[p.per] : `كل ${p.every} ${{ day: 'أيام', week: 'أسابيع', month: 'أشهر', year: 'سنوات' }[p.per]}`;
 const MAN_PREFIX = { PRJ: 'P', FAC: 'F', MNT: 'M', SAF: 'H', BME: 'B', MED: 'E', GEN: 'S', IT: 'T' };
 const month = () => new Date().toISOString().slice(0, 7);
 const units = () => O.G.units.filter(u => u.kind === 'unit' && u.active !== false);
@@ -66,7 +71,8 @@ export async function mountDept(root, code, tab = 'overview', params = new URLSe
   const mine = O.items.filter(i => i.unit === code), s = stats(mine), kinds = O.kinds.filter(k => k.unit === code && k.active !== false);
   const team = O.people.filter(p => p.unit === code || (p.role === 'facility' && !p.unit && ['FAC', 'MNT', 'SAF'].includes(code)));
   const procs = O.G.procs.filter(p => p.code.startsWith((MAN_PREFIX[code] || '#') + '-')).sort((a, b) => a.code.localeCompare(b.code));
-  const tabs = [['overview', 'نظرة عامة'], ['work', `الأعمال <b class="fmcnt ${s.late ? 'bad' : ''}">${s.open}</b>`], ...(code === 'FAC' ? [['locations', `المواقع والغرف <b class="fmcnt ${O.locs.some(l => l.status !== 'operational') ? 'bad' : ''}">${O.locs.length}</b>`]] : []), ['manual', `دليل القسم <b class="fmcnt">${procs.length}</b>`], ['team', `الفريق <b class="fmcnt">${team.length}</b>`]];
+  const tabs = [['overview', 'نظرة عامة'], ['work', `الأعمال <b class="fmcnt ${s.late ? 'bad' : ''}">${s.open}</b>`], ...(code === 'FAC' ? [['locations', `المواقع والغرف <b class="fmcnt ${O.locs.some(l => l.status !== 'operational') ? 'bad' : ''}">${O.locs.length}</b>`]] : []),
+    ...(ASSET_UNITS.includes(code) ? [['assets', 'الأصول']] : []), ...(PLAN_UNITS.includes(code) ? [['plans', 'الأعمال المخططة']] : []), ['manual', `دليل القسم <b class="fmcnt">${procs.length}</b>`], ['team', `الفريق <b class="fmcnt">${team.length}</b>`]];
   root.innerHTML = `<div class="dhero" style="--c:#${u.color}"><div class="dhero-t"><small>إدارة الخدمات الفنية ‹ الأقسام</small><h1>${esc(u.name)}</h1><p>${esc(u.mission || '')}</p>${u.head ? `<span class="dhead">رئيس القسم: <b>${esc(u.head)}</b></span>` : ''}</div>
       <div class="dhero-a">${kinds.filter(k => k.intake || isStaff()).map(k => `<button class="btn ${k.intake && !staffOf(code) ? 'primary' : ''}" data-nk="${k.code}" title="${esc(k.descr)}">${k.icon} ${esc(k.name)}</button>`).join('')}${code === 'PRJ' && canRead() ? '<a class="btn" href="#/dashboard">لوحة المشاريع</a><a class="btn" href="#/projects">المشاريع</a>' : ''}</div></div>
     <nav class="fmtabs">${tabs.map(([k, v]) => `<a href="#/dept/${code}/${k}" class="${tab === k ? 'on' : ''}">${v}</a>`).join('')}</nav><div id="dBody"></div>`;
@@ -76,6 +82,8 @@ export async function mountDept(root, code, tab = 'overview', params = new URLSe
   if (tab === 'work') return listView(t, mine, { params, showUnit: false, units: false, re });
   if (tab === 'manual') return viewManual(t, code, procs);
   if (tab === 'locations' && code === 'FAC') return viewLocations(t, params, re);
+  if (tab === 'assets') return viewAssets(t, code, params, re);
+  if (tab === 'plans') return viewPlans(t, code, params, re);
   if (tab === 'team') return viewTeam(t, code, team, mine, re);
   // نظرة عامة
   const fm = await fmState();
@@ -178,5 +186,113 @@ async function locCard(id, done, re) {
       $('#cStat', w) && ($('#cStat', w).onclick = async () => {
         const r = await modal(`<form id="sf">${field('الحالة', `<select name="s">${Object.entries(LST).map(([k, v]) => `<option value="${k}" ${k === l.status ? 'selected' : ''}>${v.ar}</option>`).join('')}</select>`)}${field('السبب *', '<textarea name="n" rows="2" required></textarea>')}<p class="muted small">الأفضل أن يكون الإغلاق عبر نموذج «إغلاق موقع» حتى يمر بالاعتمادات وقائمة إعادة الفتح.</p><div class="btnrow end"><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">حفظ</button></div></form>`, { title: 'حالة الموقع', onOpen: (w2, c2) => { $('#sf', w2).onsubmit = e => { e.preventDefault(); c2(formData(e.target)); }; } });
         if (!r) return; try { await q(sb.from('fac_locations').update({ status: r.s, status_note: r.n.trim(), status_since: new Date().toISOString(), status_item: null }).eq('id', l.id)); toast('حُدّثت الحالة'); c(); await reloadLocs(); done(); } catch (e) { err(e); } });
+    } });
+}
+
+// ---------- سجل الأصول للقسم
+async function viewAssets(t, code, params, re) {
+  const can = staffOf(code);
+  let list = await q(sb.from('assets').select('*').eq('unit', code).eq('active', true).order('code').limit(3000)).catch(() => []);
+  const st = { f: params.get('f') || '', s: '', q: '' };
+  const render = () => {
+    const L = list.filter(a => (!st.f || a.facility_id === +st.f) && (!st.s || a.status === st.s) && (!st.q || `${a.code} ${a.name} ${a.category} ${a.maker} ${a.model} ${a.serial}`.includes(st.q)));
+    const base = list.filter(a => !st.f || a.facility_id === +st.f);
+    t.innerHTML = `<div class="filters"><input id="aq" placeholder="بحث بالرمز أو الاسم أو الموديل أو الرقم التسلسلي…" value="${esc(st.q)}">${sel('af', [['', 'كل المنشآت'], ...O.fac.map(f => [f.id, f.name])], st.f)}<span class="sp"></span>${can ? '<button class="btn" id="aBulk">إضافة مجمّعة</button><button class="btn primary" id="aAdd">＋ أصل</button>' : ''}</div>
+      <div class="ostats">${Object.entries(AST).map(([k, v]) => `<span style="--c:${v.c};cursor:pointer" data-st="${k}" class="${st.s === k ? 'on' : ''}"><b>${base.filter(a => a.status === k).length}</b>${v.ar}</span>`).join('')}<span style="--c:#A06200"><b>${base.filter(a => a.warranty_end && a.warranty_end >= new Date().toISOString().slice(0, 10)).length}</b>تحت الضمان</span></div>
+      ${L.length ? `<div class="tblwrap"><table class="lst"><thead><tr><th>الرمز</th><th>الأصل</th><th>المنشأة والموقع</th><th>الشركة والموديل</th><th>الأهمية</th><th>الحالة</th><th>الضمان</th></tr></thead><tbody>${L.slice(0, 600).map(a => `<tr data-a="${a.id}" style="cursor:pointer"><td class="ltr"><b>${esc(a.code)}</b></td><td>${esc(a.name)}<div class="muted small">${esc(a.category || '')}</div></td><td>${esc(O.F[a.facility_id]?.name || '—')}<div class="muted small">${esc(locLabel(O.Loc[a.location_id]) || '')}</div></td><td>${esc([a.maker, a.model].filter(Boolean).join(' · ') || '—')}<div class="muted small ltr">${esc(a.serial || '')}</div></td><td>${CRIT[a.criticality] || ''}</td><td><span class="opill" style="--c:${AST[a.status].c}">${AST[a.status].ar}</span></td><td>${a.warranty_end ? dateAr(a.warranty_end) : '—'}</td></tr>`).join('')}</tbody></table></div>${L.length > 600 ? `<p class="muted small">يُعرض أول 600 من ${L.length} — استخدم البحث.</p>` : ''}`
+        : `<div class="empty-boq">${list.length ? 'لا أصول مطابقة.' : `لا أصول مسجلة لقسم ${esc(uname(code))} بعد. سجّل الأصول (يدوياً أو بلصق قائمة من Excel) ليُبنى تاريخ كل أصل من بلاغاته وأعماله المخططة.`}</div>`}`;
+    $('#aq', t).oninput = e => { st.q = e.target.value.trim(); const c = e.target.selectionStart; render(); const i = $('#aq', t); i.focus(); i.setSelectionRange(c, c); };
+    $('[name=af]', t).onchange = e => { st.f = e.target.value; render(); };
+    $$('[data-st]', t).forEach(b => b.onclick = () => { st.s = st.s === b.dataset.st ? '' : b.dataset.st; render(); });
+    $$('[data-a]', t).forEach(r => r.onclick = () => assetCard(+r.dataset.a));
+    $('#aAdd', t) && ($('#aAdd', t).onclick = () => assetForm(null));
+    $('#aBulk', t) && ($('#aBulk', t).onclick = bulk);
+  };
+  const reload = async () => { list = await q(sb.from('assets').select('*').eq('unit', code).eq('active', true).order('code').limit(3000)); render(); };
+  async function assetForm(a) {
+    const v = a || { unit: code, facility_id: +st.f || '', criticality: 'medium', status: 'in_service' };
+    await modal(`<form id="af2" class="pgrid">${field('الرمز *', `<input name="code" value="${esc(v.code || '')}" required dir="ltr" placeholder="${code}-0001">`)}${field('الاسم *', `<input name="name" value="${esc(v.name || '')}" required>`)}
+      ${field('الفئة', `<input name="category" value="${esc(v.category || '')}">`)}${field('المنشأة', sel('facility_id', [['', '—'], ...O.fac.map(f => [f.id, f.name])], v.facility_id || ''))}
+      ${field('الموقع (رمز الغرفة)', `<input name="loc" value="${esc(O.Loc[v.location_id]?.code || '')}" list="aloc" dir="ltr"><datalist id="aloc">${O.locs.map(l => `<option value="${esc(l.code)}">${esc(l.name)}</option>`).join('')}</datalist>`)}
+      ${field('الشركة المصنّعة', `<input name="maker" value="${esc(v.maker || '')}">`)}${field('الموديل', `<input name="model" value="${esc(v.model || '')}">`)}${field('الرقم التسلسلي', `<input name="serial" value="${esc(v.serial || '')}" dir="ltr">`)}
+      ${field('تاريخ التركيب', `<input type="date" name="install_date" value="${esc(v.install_date || '')}">`)}${field('نهاية الضمان', `<input type="date" name="warranty_end" value="${esc(v.warranty_end || '')}">`)}
+      ${field('الأهمية', sel('criticality', Object.entries(CRIT), v.criticality))}${field('الحالة', sel('status', Object.entries(AST).map(([k, x]) => [k, x.ar]), v.status))}
+      ${field('ملاحظات', `<textarea name="notes" rows="2">${esc(v.notes || '')}</textarea>`, 'wide')}
+      <div class="btnrow end wide"><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">حفظ</button></div></form>`,
+      { title: a ? 'تعديل أصل' : 'أصل جديد — ' + uname(code), wide: true, onOpen: (w, c) => { $('#af2', w).onsubmit = async e => { e.preventDefault(); const x = formData(e.target);
+        const loc = O.locs.find(l => l.code === x.loc.trim() && (!x.facility_id || l.facility_id === +x.facility_id));
+        const row = { unit: code, code: x.code.trim(), name: x.name.trim(), category: x.category.trim(), facility_id: x.facility_id ? +x.facility_id : null, location_id: loc?.id || null, maker: x.maker.trim(), model: x.model.trim(), serial: x.serial.trim(), install_date: x.install_date || null, warranty_end: x.warranty_end || null, criticality: x.criticality, status: x.status, notes: x.notes.trim() };
+        try { if (a) await q(sb.from('assets').update(row).eq('id', a.id)); else await q(sb.from('assets').insert(row)); toast('حُفظ'); c(); await reload(); } catch (e2) { err(e2); } }; } });
+  }
+  async function bulk() {
+    await modal(`<form id="bf"><p class="muted small m0">سطر لكل أصل، الحقول مفصولة بـ | أو Tab (يمكن اللصق من Excel):<br><b dir="ltr">الرمز | الاسم | الفئة | الشركة | الموديل | الرقم التسلسلي | رمز الغرفة</b></p>${field('المنشأة *', sel('f', [['', '— اختر —'], ...O.fac.map(f => [f.id, f.name])], st.f, 'required'))}<textarea name="t" rows="10" dir="auto"></textarea><div class="btnrow end"><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">إضافة</button></div></form>`,
+      { title: 'إضافة أصول مجمّعة — ' + uname(code), wide: true, onOpen: (w, c) => { $('#bf', w).onsubmit = async e => { e.preventDefault(); const fid = +e.target.f.value;
+        const rows = e.target.t.value.split(/\n/).map(x => x.split(/\t|\|/).map(y => y.trim())).filter(a => a[0] && a[1]).map(([cd, name, category = '', maker = '', model = '', serial = '', lc = '']) => ({ unit: code, code: cd, name, category, maker, model, serial, facility_id: fid, location_id: O.locs.find(l => l.facility_id === fid && l.code === lc)?.id || null }));
+        if (!rows.length) return toast('لا أسطر صالحة (الرمز والاسم مطلوبان)', 'bad');
+        try { await q(sb.from('assets').upsert(rows, { onConflict: 'code' })); toast(`أُضيف ${rows.length} أصلاً`); c(); await reload(); } catch (e2) { err(e2); } }; } });
+  }
+  async function assetCard(id) {
+    const a = list.find(x => x.id === id); if (!a) return;
+    const [hist, plans] = await Promise.all([q(sb.from('ops_items').select('*').eq('asset_id', id).order('id', { ascending: false }).limit(60)).catch(() => []), q(sb.from('ops_plans').select('*').eq('asset_id', id)).catch(() => [])]);
+    const faults = hist.filter(i => i.source !== 'ppm' && i.kind !== 'ppm');
+    const down = faults.reduce((m, i) => m + (i.resolved_at || i.closed_at ? new Date(i.resolved_at || i.closed_at) - new Date(i.created_at) : 0), 0);
+    await modal(`<div class="ohead" style="--c:${AST[a.status].c}"><span class="oi-k big">🏷️</span><div><b>${esc(a.code)} — ${esc(a.name)}</b><span class="muted">${esc(O.F[a.facility_id]?.name || '')}${a.location_id ? ' · ' + esc(locLabel(O.Loc[a.location_id])) : ''}</span></div><span class="sp"></span><span class="opill" style="--c:${AST[a.status].c}">${AST[a.status].ar}</span></div>
+      <div class="kvs">${[['الفئة', a.category], ['الشركة والموديل', [a.maker, a.model].filter(Boolean).join(' · ')], ['الرقم التسلسلي', a.serial], ['الأهمية', CRIT[a.criticality]], ['التركيب', a.install_date ? dateAr(a.install_date) : ''], ['نهاية الضمان', a.warranty_end ? dateAr(a.warranty_end) : ''], ['أعطال مسجلة', faults.length], ['مجموع زمن التوقف', down ? dur(down) : '—']].map(([k, v]) => `<div class="kv"><span>${k}</span><b>${esc(v || '—')}</b></div>`).join('')}</div>
+      <div class="btnrow wrap mt8"><button class="btn primary" id="cF">＋ بلاغ عطل على الأصل</button>${can ? '<button class="btn" id="cP">🗓️ خطة دورية للأصل</button><button class="btn" id="cE">تعديل</button>' : ''}</div>
+      ${plans.length ? `<h3 class="sub-h">الأعمال المخططة</h3><div class="dplans">${plans.map(p => `<div><b>${esc(p.title)}</b><span>${perLabel(p)} · القادم ${dateAr(p.next_due)}</span></div>`).join('')}</div>` : ''}
+      <h3 class="sub-h">تاريخ الأصل (${hist.length})</h3>${hist.length ? `<div class="olist">${hist.map(i => itemRow(i)).join('')}</div>` : '<p class="muted small">لا أعمال مسجلة على هذا الأصل بعد.</p>'}`,
+      { title: 'الأصل', wide: true, onOpen: (w, c) => {
+        $$('[data-oi]', w).forEach(b => b.onclick = () => { c(); openItem(+b.dataset.oi, re); });
+        const fk = O.kinds.find(k => k.unit === code && k.intake)?.code || 'mnt';
+        $('#cF', w).onclick = () => { c(); newItem({ kind: fk, facility_id: a.facility_id, location_id: a.location_id, asset_id: a.id, asset: a.code, title: '' }, r => openItem(r.id, re)); };
+        $('#cP', w) && ($('#cP', w).onclick = () => { c(); planForm(code, { asset_id: a.id, facility_id: a.facility_id, location_id: a.location_id, title: (code === 'BME' ? 'صيانة وقائية ومعايرة — ' : 'صيانة وقائية — ') + a.name }, () => {}); });
+        $('#cE', w) && ($('#cE', w).onclick = () => { c(); assetForm(a); });
+      } });
+  }
+  render();
+  const aid = +(params.get('a') || 0); if (aid) assetCard(aid);
+}
+
+// ---------- الأعمال المخططة الدورية للقسم
+async function viewPlans(t, code, params, re) {
+  const can = staffOf(code);
+  const load = () => q(sb.from('ops_plans').select('*').eq('unit', code).order('next_due')).catch(() => []);
+  let plans = await load();
+  const today = new Date().toISOString().slice(0, 10);
+  const render = () => {
+    const up = []; const lim = new Date(Date.now() + 60 * 864e5).toISOString().slice(0, 10);
+    plans.filter(p => p.active).forEach(p => { let d = p.next_due, n = 0; while (d <= lim && n < 30) { up.push({ p, d }); const x = new Date(d); if (p.per === 'day') x.setDate(x.getDate() + p.every); else if (p.per === 'week') x.setDate(x.getDate() + 7 * p.every); else if (p.per === 'month') x.setMonth(x.getMonth() + p.every); else x.setFullYear(x.getFullYear() + p.every); d = x.toISOString().slice(0, 10); n++; } });
+    up.sort((a, b) => a.d.localeCompare(b.d));
+    const open = O.items.filter(i => i.unit === code && i.plan_id && isOpen(i));
+    t.innerHTML = `<div class="toolbar"><p class="muted small m0" style="flex:1">كل خطة تولّد أمر عمل تلقائياً قبل موعدها بمهلة التحضير (صباح كل يوم)، ولا يُغلق الأمر إلا بإكمال بنود الخطة. ثم يُحسب الموعد التالي.</p>${can ? '<button class="btn" id="pGen">توليد المستحق الآن</button><button class="btn primary" id="pAdd">＋ خطة دورية</button>' : ''}</div>
+      <div class="fm2col"><div class="pcard"><h2>الخطط (${plans.length})</h2>${plans.length ? `<div class="dplans">${plans.map(p => `<button data-p="${p.id}" class="${p.active ? '' : 'off'} ${p.next_due < today ? 'late' : ''}"><b>${esc(p.title)}</b><span>${perLabel(p)} · ${esc(O.F[p.facility_id]?.name || 'كل المنشآت')}${p.proc ? ' · 📘 ' + esc(p.proc) : ''}</span><span>الموعد القادم: <b>${dateAr(p.next_due)}</b>${(p.checklist || []).length ? ` · ${p.checklist.length} بنود` : ''}${p.active ? '' : ' · موقوفة'}</span></button>`).join('')}</div>` : '<p class="muted">لا خطط بعد. أضف خطط الصيانة الوقائية والاختبارات الدورية والمعايرة (مثل اختبار المولدات الشهري، فحص الإطفاء الربعي، معايرة الأجهزة الطبية).</p>'}</div>
+      <div class="pcard"><h2>المستحق خلال 60 يوماً (${up.length})</h2>${up.length ? `<div class="dup">${up.slice(0, 40).map(x => `<div class="${x.d < today ? 'late' : ''}"><b>${dateAr(x.d)}</b><span>${esc(x.p.title)}</span></div>`).join('')}</div>` : '<p class="muted">لا شيء.</p>'}
+        <h3 class="sub-h">أوامر مخططة مفتوحة (${open.length})</h3>${open.length ? `<div class="olist">${open.slice(0, 8).map(i => itemRow(i, { showUnit: false })).join('')}</div>` : '<p class="muted small">لا شيء.</p>'}</div></div>`;
+    bindRows(t, re);
+    $('#pAdd', t) && ($('#pAdd', t).onclick = () => planForm(code, {}, async () => { plans = await load(); render(); }));
+    $('#pGen', t) && ($('#pGen', t).onclick = async () => { try { const { data, error } = await sb.rpc('ops_generate'); if (error) throw error; toast(data ? `وُلّد ${data} أمر عمل` : 'لا أعمال مستحقة الآن'); await loadOps(); plans = await load(); render(); } catch (e) { err(e); } });
+    $$('[data-p]', t).forEach(b => b.onclick = () => { const p = plans.find(x => x.id === +b.dataset.p); if (can) planForm(code, p, async () => { plans = await load(); render(); }); });
+  };
+  render();
+}
+async function planForm(code, p0 = {}, done) {
+  const v = { every: 1, per: 'month', lead_days: 7, priority: 'p4', next_due: new Date().toISOString().slice(0, 10), active: true, checklist: [], ...p0 };
+  const procs = O.G.procs.filter(p => p.code.startsWith((MAN_PREFIX[code] || '#') + '-') || ['G-06'].includes(p.code)).map(p => [p.code, p.code + ' — ' + p.title]);
+  let assets = []; try { assets = await q(sb.from('assets').select('id,code,name,facility_id').eq('unit', code).eq('active', true).order('code').limit(2000)); } catch (e) { }
+  await modal(`<form id="pf" class="pgrid">${field('العنوان *', `<input name="title" value="${esc(v.title || '')}" required placeholder="مثال: اختبار تحميل مولدات الطوارئ">`, 'wide')}
+    ${field('الإجراء الحاكم', sel('proc', [['', '—'], ...procs], v.proc || (code === 'BME' ? 'B-02' : code === 'MNT' ? 'M-03' : '')))}${field('المنشأة', sel('facility_id', [['', '—'], ...O.fac.map(f => [f.id, f.name])], v.facility_id || ''))}
+    ${field('الأصل (اختياري)', `<input name="asset" list="pa" value="${esc(assets.find(a => a.id === v.asset_id)?.code || '')}" dir="ltr"><datalist id="pa">${assets.map(a => `<option value="${esc(a.code)}">${esc(a.name)}</option>`).join('')}</datalist>`)}
+    ${field('التكرار', `<div class="row2"><input type="number" name="every" min="1" value="${v.every}" style="width:80px">${sel('per', Object.entries(PER), v.per)}</div>`)}
+    ${field('الموعد القادم *', `<input type="date" name="next_due" value="${esc(v.next_due)}" required>`)}${field('مهلة التحضير (أيام قبل الموعد)', `<input type="number" name="lead_days" min="0" value="${v.lead_days}">`)}
+    ${field('بنود الفحص (سطر لكل بند؛ يلزم إكمالها قبل إغلاق الأمر)', `<textarea name="checklist" rows="4">${esc((v.checklist || []).map(c => c.l).join('\n'))}</textarea>`, 'wide')}
+    ${field('ملاحظات', `<input name="notes" value="${esc(v.notes || '')}">`, 'wide')}
+    <label class="chk wide"><input type="checkbox" name="active" ${v.active ? 'checked' : ''}> الخطة فعّالة</label>
+    <div class="btnrow end wide">${v.id ? '<button type="button" class="btn danger" id="pDel">حذف</button><span class="sp"></span>' : ''}<button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">حفظ</button></div></form>`,
+    { title: v.id ? 'تعديل خطة' : 'خطة دورية — ' + uname(code), wide: true, onOpen: (w, c) => {
+      $('#pDel', w) && ($('#pDel', w).onclick = async () => { try { await q(sb.from('ops_plans').delete().eq('id', v.id)); toast('حُذفت'); c(); done(); } catch (e) { err(e); } });
+      $('#pf', w).onsubmit = async e => { e.preventDefault(); const x = formData(e.target); const a = assets.find(z => z.code === (x.asset || '').trim());
+        const row = { title: x.title.trim(), unit: code, kind: 'ppm', proc: x.proc || '', facility_id: x.facility_id ? +x.facility_id : (a?.facility_id || null), asset_id: a?.id || null, location_id: v.location_id || null, every: +x.every || 1, per: x.per, next_due: x.next_due, lead_days: +x.lead_days || 0, notes: x.notes.trim(), active: !!x.active,
+          checklist: x.checklist.split('\n').map(l => l.trim()).filter(Boolean).map((l, i) => ({ k: 'p' + (i + 1), l })) };
+        try { if (v.id) await q(sb.from('ops_plans').update(row).eq('id', v.id)); else await q(sb.from('ops_plans').insert(row)); toast('حُفظت الخطة'); c(); done(); } catch (e2) { err(e2); } };
     } });
 }
