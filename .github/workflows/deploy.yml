@@ -78,6 +78,7 @@ jobs:
         run: |
           K=$([ "$(date -u +%H)" -lt 9 ] && echo morning || echo evening)
           printf "select public.daily_digest('%s') as digest_sent;\n" "$K" | psql "${{ steps.db.outputs.url }}" -v ON_ERROR_STOP=1 2>&1 | tee -a "$RUNNER_TEMP/seed.txt"; test ${PIPESTATUS[1]} -eq 0
+          if [ "$K" = morning ]; then printf "select public.fm_daily(7) as fm_digest_sent;\n" | psql "${{ steps.db.outputs.url }}" -v ON_ERROR_STOP=1 2>&1 | tee -a "$RUNNER_TEMP/seed.txt"; fi
       - name: Publish seed log
         if: always()
         continue-on-error: true
@@ -107,6 +108,7 @@ jobs:
           sed -i "s#href=\"app.css\"#href=\"app.css?v=$V\"#; s#src=\"js/app.js\"#src=\"js/app.js?v=$V\"#; s#src=\"config.js\"#src=\"config.js?v=$V\"#" site/index.html
           sed -i "s#href=\"share.css\"#href=\"share.css?v=$V\"#; s#src=\"js/share_view.js\"#src=\"js/share_view.js?v=$V\"#; s#src=\"config.js\"#src=\"config.js?v=$V\"#" site/r.html
           sed -i "s#href=\"share.css\"#href=\"share.css?v=$V\"#; s#src=\"js/brief_view.js\"#src=\"js/brief_view.js?v=$V\"#; s#src=\"config.js\"#src=\"config.js?v=$V\"#" site/b.html
+          sed -i "s#href=\"app.css\"#href=\"app.css?v=$V\"#; s#src=\"js/fmr_view.js\"#src=\"js/fmr_view.js?v=$V\"#; s#src=\"config.js\"#src=\"config.js?v=$V\"#" site/fmr.html
           grep -c "?v=$V" site/js/app.js site/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
