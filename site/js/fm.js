@@ -254,7 +254,8 @@ function viewObs(t, params, re) {
 async function obsDetail(id, re) {
   let o = D.obs.find(x => x.id === id) || await q(sb.from('fm_obs').select('*').eq('id', id).maybeSingle());
   if (!o) return toast('الملاحظة غير موجودة', 'bad');
-  const log = await q(sb.from('fm_obs_log').select('*').eq('obs_id', id).order('id'));
+  const [log, wos] = await Promise.all([q(sb.from('fm_obs_log').select('*').eq('obs_id', id).order('id')), q(sb.from('ops_items').select('id,ref,title,status,unit,last_action').eq('fm_obs_id', id).order('id')).catch(() => [])]);
+  const WST = { new: 'جديد', accepted: 'مستلم', in_progress: 'قيد التنفيذ', on_hold: 'معلّق', verify: 'بانتظار التأكيد', done: 'مكتمل', cancelled: 'ملغى' };
   const f = D.F[o.facility_id], s = D.S[o.system_code], p = G.P[o.proc], n = p?.steps?.length || 0;
   const w0 = canW(), closed = o.status === 'closed';
   const next = { open: ['in_progress', 'بدء المعالجة'], in_progress: ['verify', 'طلب التحقق'], verify: ['closed', 'إغلاق الملاحظة'], closed: ['in_progress', 'إعادة فتح'] }[o.status];
@@ -266,6 +267,8 @@ async function obsDetail(id, re) {
     <div class="kvs">${[['الخطورة', pill(o.severity, s)], ['القسم المسؤول', uchip(o.owner) || '—'], ['المكلّف', esc(pname(o.assignee_id) || o.assignee_name || '—')], ['الموعد', o.due_date ? `<span class="${late(o) ? 'bad' : ''}">${dateAr(o.due_date)}${late(o) ? ' (متأخرة)' : ''}</span>` : '—'], ['المصدر', { round: 'الجولة الشهرية', manual: 'إدخال مباشر', import: 'مستوردة من ملف Excel' }[o.source] || '—'], ['أُنشئت', dateAr(o.created_at)], ...(o.project_id ? [['المشروع', `<a href="#/project/${o.project_id}">فتح المشروع</a>`]] : []), ...(closed ? [['أُغلقت', dateAr(o.closed_at) + (o.close_note ? ' — ' + esc(o.close_note) : '')]] : [])].map(([k, v]) => `<div class="kv"><span>${k}</span><b>${v}</b></div>`).join('')}</div>
     ${w0 && p && !closed ? `<div class="fmstep"><label class="fld"><span>الخطوة الحالية في ${esc(o.proc)}</span><select id="oStep">${p.steps.map((x, i) => `<option value="${i + 1}" ${o.step === i + 1 ? 'selected' : ''}>${i + 1}. ${esc(uname(x.unit))}: ${esc(x.action.slice(0, 90))}</option>`).join('')}</select></label>${(o.step || 1) < n ? '<button class="btn sm" id="oAdv">✓ أُنجزت الخطوة ← التالية</button>' : ''}</div>` : ''}
     <div class="btnrow wrap mt8">${w0 ? `<button class="btn" id="oEdit">تعديل</button>${next ? `<button class="btn ${next[0] === 'closed' ? 'primary' : ''}" id="oNext">${next[1]}</button>` : ''}` : ''}${isAdmin() ? '<button class="btn ghost" id="oDel" style="color:#A6503B">حذف</button>' : ''}</div>
+    <div class="toolbar m0 mt12"><h3 class="sub-h m0">أوامر العمل والإحالات للأقسام (${wos.length})</h3><span class="sp"></span>${!closed && (w0 || role() === 'tech') ? '<button class="btn sm primary" id="oWo">＋ أمر عمل للقسم المسؤول</button>' : ''}</div>
+    ${wos.length ? `<div class="ochain">${wos.map(x => `<a class="ochain-i" href="#/ops/list?id=${x.id}" style="--c:#${G.U[x.unit]?.color || '6B7A88'}">${uchip(x.unit)}<b>${esc(x.title)}</b><small class="oi-ref">${esc(x.ref || '')}</small><span class="opill">${WST[x.status] || x.status}</span>${x.last_action ? `<small class="muted">↻ ${esc(snip(x.last_action, 70))}</small>` : ''}</a>`).join('')}</div>` : '<p class="muted small">لا أوامر عمل بعد. أمر العمل يصل لفريق القسم بأولوية ومهلة ويُتابع حتى الإغلاق، وحالته تظهر هنا.</p>'}
     ${attachBox('الصور والمرفقات')}
     <h3 class="sub-h">سجل المتابعة</h3><div class="fmlog">${log.length ? log.map(l => `<div class="fml ${l.kind}"><b>${esc(pname(l.by_user) || (l.kind === 'change' ? 'تحديث' : '—'))}</b><span class="muted small">${dateAr(l.at)}</span><p>${esc(l.body)}</p></div>`).join('') : '<p class="muted small">لا متابعات بعد.</p>'}</div>
     <div class="fmlogadd"><textarea id="oNote" rows="2" placeholder="أضف متابعة: ما تم، وما التالي… (تُسجَّل كآخر إجراء متخذ)"></textarea><button class="btn primary" id="oAdd">إضافة</button></div>`,
@@ -275,6 +278,9 @@ async function obsDetail(id, re) {
       $('#oStep', w) && ($('#oStep', w).onchange = async e => { const to = +e.target.value; const a = await askAction(`الانتقال إلى الخطوة ${to}`); if (!a) { e.target.value = o.step || 1; return; } upd({ step: to, last_action: a, ...(o.status === 'open' ? { status: 'in_progress' } : {}) }); });
       $('#oAdv', w) && ($('#oAdv', w).onclick = async () => { const a = await askAction(`إنجاز الخطوة ${o.step || 1} والانتقال للتالية`, 'ما الذي أُنجز في هذه الخطوة؟ *'); if (!a) return; upd({ step: (o.step || 1) + 1, last_action: a, ...(o.status === 'open' ? { status: 'in_progress' } : {}) }); });
       $('#oEdit', w) && ($('#oEdit', w).onclick = () => { close(); obsForm(o, {}, re); });
+      $('#oWo', w) && ($('#oWo', w).onclick = async () => { close(); const { newItem } = await import('./ops.js');
+        const KMAP = { MNT: 'mnt', BME: 'bme', IT: 'it', GEN: 'gen', SAF: 'saf', FAC: 'fac', MED: 'med', PRJ: 'prj' };
+        newItem({ kind: KMAP[o.owner] || 'mnt', fm_obs_id: o.id, facility_id: o.facility_id, title: o.title, details: o.details || '', source: 'fm', priority: o.severity === 'down' ? (s?.critical ? 'p1' : 'p2') : o.severity === 'partial' ? 'p2' : 'p3' }, () => obsDetail(o.id, re)); });
       $('#oNext', w) && ($('#oNext', w).onclick = async () => {
         if (next[0] === 'closed') { const note = await askAction('إغلاق الملاحظة', 'كيف عولجت؟ *', 'الإغلاق يعني أن المشكلة عولجت وتحقق منها. اكتب المعالجة النهائية ونتيجة التحقق.'); if (!note) return; return upd({ status: 'closed', close_note: note, last_action: note, step: n || o.step }); }
         const a = await askAction(next[1], next[0] === 'verify' ? 'ما الذي عولج ويحتاج تحققاً؟ *' : next[0] === 'in_progress' && o.status === 'closed' ? 'سبب إعادة الفتح *' : 'المعالجة أو الإجراء المتخذ *'); if (!a) return;

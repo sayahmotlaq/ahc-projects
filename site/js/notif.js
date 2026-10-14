@@ -2,8 +2,8 @@
 import { sb, q, session } from './api.js';
 import { $, $$, esc, dateAr, toast, err, ico, confirm } from './ui.js';
 
-export const N_KINDS = { fm: 'متابعة أنظمة المنشآت', task: 'المهام', request: 'الطلبات', treport: 'التقارير الفنية', comment: 'التعليقات', mention: 'الإشارات (@)', payment: 'المستخلصات', submittal: 'الاعتمادات', challenge: 'التحديات العالية', stage: 'تغيير المراحل', stale: 'مشاريع بلا تحديث' };
-const ICON = { fm: '🏥', mention: '👋', digest: '☀️', exec: '🏛️', milestone: '🚩', task: '✅', request: '📨', treport: '📋', comment: '💬', payment: '💰', submittal: '📐', challenge: '⚠️', stage: '🚩', stale: '⏳', leave: '🏖️', msg: '📣', comment: '💬', info: 'ℹ️' };
+export const N_KINDS = { ops: 'البلاغات وأعمال الأقسام', fm: 'متابعة أنظمة المنشآت', task: 'المهام', request: 'الطلبات', treport: 'التقارير الفنية', comment: 'التعليقات', mention: 'الإشارات (@)', payment: 'المستخلصات', submittal: 'الاعتمادات', challenge: 'التحديات العالية', stage: 'تغيير المراحل', stale: 'مشاريع بلا تحديث' };
+const ICON = { ops: '🛠️', fm: '🏥', mention: '👋', digest: '☀️', exec: '🏛️', milestone: '🚩', task: '✅', request: '📨', treport: '📋', comment: '💬', payment: '💰', submittal: '📐', challenge: '⚠️', stage: '🚩', stale: '⏳', leave: '🏖️', msg: '📣', comment: '💬', info: 'ℹ️' };
 let cache = [], unread = 0, timer = null, open = false;
 const ago = d => { const m = Math.floor((Date.now() - new Date(d)) / 60000); return m < 1 ? 'الآن' : m < 60 ? `منذ ${m} د` : m < 1440 ? `منذ ${Math.floor(m / 60)} س` : dateAr(d); };
 
@@ -88,7 +88,7 @@ export async function mountSettings(root) {
   $('#calReset').onclick = async () => { if (!await confirm('إعادة إنشاء الرابط تُبطل الرابط القديم في كل الأجهزة التي أضفته فيها. متابعة؟', 'إعادة الإنشاء', true)) return; const { data: tok } = await sb.rpc('my_cal_token', { p_reset: true }); setCal(tok); toast('أُنشئ رابط جديد'); };
   const on = $('#pOn'); if (on) on.onclick = async () => { on.disabled = true; try { await enablePush(); toast('تم تفعيل الإشعارات على هذا الجهاز'); mountSettings(root); } catch (e) { err(e); on.disabled = false; } };
   const off = $('#pOff'); if (off) off.onclick = async () => { try { await disablePush(); toast('أُوقفت الإشعارات على هذا الجهاز'); mountSettings(root); } catch (e) { err(e); } };
-  const t = $('#pTest'); if (t) t.onclick = async () => { try { const reg = await navigator.serviceWorker.ready; await reg.showNotification('منصة إدارة المشاريع', { body: 'هذا إشعار تجريبي — الإشعارات تعمل على هذا الجهاز ✅', icon: 'assets/logo.png', dir: 'rtl', lang: 'ar' }); } catch (e) { err(e); } };
+  const t = $('#pTest'); if (t) t.onclick = async () => { try { const reg = await navigator.serviceWorker.ready; await reg.showNotification('إدارة الخدمات الفنية', { body: 'هذا إشعار تجريبي — الإشعارات تعمل على هذا الجهاز ✅', icon: 'assets/logo.png', dir: 'rtl', lang: 'ar' }); } catch (e) { err(e); } };
   $('#savePrefs').onclick = async () => { const k = {}; $$('[data-k]').forEach(i => k[i.getAttribute('data-k')] = i.checked); try { await q(sb.from('profiles').update({ notify_prefs: { push: $('#pushAll').checked, digest: $('#digest').checked, kinds: k } }).eq('id', session.user.id)); toast('تم حفظ التفضيلات'); } catch (e) { err(e); } };
 }
 const devName = ua => /iphone/i.test(ua) ? 'آيفون' : /ipad/i.test(ua) ? 'آيباد' : /android/i.test(ua) ? 'أندرويد' : /macintosh/i.test(ua) ? 'ماك' : /windows/i.test(ua) ? 'ويندوز' : 'جهاز';

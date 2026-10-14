@@ -3,7 +3,7 @@
 
 -- ---------- دور جديد: facility (موظفو المرافق والصيانة والأمن والسلامة؛ يرون متابعة الأنظمة والحوكمة فقط)
 alter table public.profiles drop constraint if exists profiles_role_check;
-alter table public.profiles add constraint profiles_role_check check (role in ('admin','engineer','viewer','finance','clerk','facility','pending','disabled'));
+alter table public.profiles add constraint profiles_role_check check (role in ('admin','engineer','viewer','finance','clerk','facility','tech','requester','pending','disabled'));
 create or replace function public.can_fm() returns boolean language sql stable set search_path = public as $$ select public.can_read() or public.my_role() = 'facility' $$;
 create or replace function public.fm_write() returns boolean language sql stable set search_path = public as $$ select public.my_role() in ('admin','facility') $$;
 

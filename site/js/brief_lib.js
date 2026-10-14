@@ -87,7 +87,7 @@ export async function buildBriefPptx(B, items, { org = 'تجمع الأحساء 
     const bw = (W - 2 * M - 3 * 0.2) / 4;
     stats.forEach(([n, l, c], i) => { const x = W - M - (i + 1) * bw - i * 0.2; RR(s, { x, y: 4.3, w: bw, h: 0.95, fill: { color: 'FFFFFF', transparency: 92 }, line: { color: 'FFFFFF', transparency: 80, width: 0.5 }, rectRadius: 0.1 }); T(s, n, { x: x + 0.15, y: 4.33, w: 1.1, h: 0.9, fontSize: 30, bold: true, color: c, align: 'center', valign: 'middle' }); T(s, l, { x: x + 1.3, y: 4.35, w: bw - 1.45, h: 0.85, fontSize: 12, color: 'DDE7EF', valign: 'middle' }); });
     if (B.intro) { RR(s, { x: M, y: 5.5, w: W - 2 * M, h: 1.25, fill: { color: NAVY2 }, line: { color: '2A5C85', width: 0.5 }, rectRadius: 0.1 }); T(s, cut(B.intro, 420), { x: M + 0.25, y: 5.58, w: W - 2 * M - 0.5, h: 1.1, fontSize: 12, color: 'E6EEF5', valign: 'middle', lineSpacingMultiple: 1.2 }); }
-    const meta = [`تاريخ الإصدار: ${issued}`]; if (B.by) meta.push(`إعداد: ${B.by}`); meta.push('الأرقام حيّة من منصة إدارة المشاريع');
+    const meta = [`تاريخ الإصدار: ${issued}`]; if (B.by) meta.push(`إعداد: ${B.by}`); meta.push('الأرقام حيّة من منصة إدارة الخدمات الفنية');
     T(s, meta.join('   ·   '), { x: W - M - 6.4, y: H - 0.38, w: 6.4, h: 0.3, fontSize: 9.5, color: '8FA7BC', align: 'right' });
     s.addNotes(`${kindAr}: ${B.title}`);
   }
@@ -96,7 +96,7 @@ export async function buildBriefPptx(B, items, { org = 'تجمع الأحساء 
   for (let pg = 0; pg < pages; pg++) {
     const s = pres.addSlide(); s.background = { color: BG }; chrome(s, false); pageNo(s, ++pn);
     T(s, pages > 1 ? `البنود ووضعها الراهن (${pg + 1} من ${pages})` : 'البنود ووضعها الراهن', { x: M, y: 0.4, w: 9, h: 0.5, fontSize: 22, bold: true, color: navy });
-    T(s, `الوضع الراهن من منصة إدارة المشاريع بتاريخ ${issued}`, { x: M, y: 0.9, w: 9, h: 0.28, fontSize: 11, color: grey });
+    T(s, `الوضع الراهن من منصة إدارة الخدمات الفنية بتاريخ ${issued}`, { x: M, y: 0.9, w: 9, h: 0.28, fontSize: 11, color: grey });
     const gap = 0.3, colW = (W - 2 * M - gap) / 2, rows = 6, y0 = 1.35, pitch = (H - 0.55 - y0) / rows, cardH = pitch - 0.1;
     items.slice(pg * PER, pg * PER + PER).forEach((it, k) => {
       const i = pg * PER + k, col = k < rows ? 0 : 1, row = k % rows, x = col === 0 ? W - M - colW : M, y = y0 + row * pitch, S = itemState(it);

@@ -19,13 +19,13 @@ export const STAGES = [
   { key: 'cancelled', ar: 'ملغى',               color: '#7A2E22' },
 ];
 export const stageOf = k => STAGES.find(s => s.key === k) || { key: k, ar: k, color: '#999' };
-export const ROLES = { admin: 'مدير النظام', engineer: 'مهندس مشاريع', viewer: 'مطّلع (قراءة فقط)', finance: 'مالية (تسجيل الصرف فقط)', clerk: 'إداري (اطلاع ورفع مستندات)', facility: 'مرافق وصيانة (متابعة الأنظمة والحوكمة فقط)', pending: 'بانتظار الاعتماد', disabled: 'موقوف' };
+export const ROLES = { admin: 'مدير النظام', engineer: 'مهندس مشاريع', viewer: 'مطّلع (قراءة فقط)', finance: 'مالية (تسجيل الصرف فقط)', clerk: 'إداري (اطلاع ورفع مستندات)', facility: 'مرافق وصيانة (الأنظمة والأقسام الفنية)', tech: 'موظف قسم فني', requester: 'مُبلّغ من المنشأة (رفع البلاغات ومتابعتها)', pending: 'بانتظار الاعتماد', disabled: 'موقوف' };
 export const PROJECT_TYPES = ['إنشاء جديد', 'تجديد وتأهيل', 'توسعة', 'صيانة وإصلاح', 'توريد وتركيب', 'أعمال خارجية', 'دراسة'];
 export const UPDATE_KINDS = { note: 'ملاحظة', visit: 'زيارة ميدانية', issue: 'معوّق / مشكلة', letter: 'خطاب', payment: 'مستخلص / دفعة', milestone: 'إنجاز' };
 
 // ---------- الجلسة
 export const session = { user: null, profile: null };
-export const SETTINGS = { org: { name: 'تجمع الأحساء الصحي', dept: 'إدارة الخدمات الفنية / قسم المشاريع' }, stale_days: 14, submittal_sla_days: 7, warranty_alert_days: 60, doc_expiry_alert_days: 30, perf_leaderboard: false };
+export const SETTINGS = { org: { name: 'تجمع الأحساء الصحي', dept: 'إدارة الخدمات الفنية' }, stale_days: 14, submittal_sla_days: 7, warranty_alert_days: 60, doc_expiry_alert_days: 30, perf_leaderboard: false };
 export async function loadSession() {
   const { data } = await sb.auth.getSession();
   session.user = data.session?.user || null;

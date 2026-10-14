@@ -4,7 +4,7 @@ self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
 self.addEventListener('push', e => {
   let d = {}; try { d = e.data ? e.data.json() : {}; } catch (er) { d = { title: 'منصة المشاريع', body: e.data ? e.data.text() : '' }; }
   const base = self.registration.scope;
-  const p = self.registration.showNotification(d.title || 'منصة إدارة المشاريع', { body: d.body || '', icon: base + 'assets/logo.png', badge: base + 'assets/badge.png', dir: 'rtl', lang: 'ar', tag: 'ahc-' + (d.id || Date.now()), renotify: false, data: { link: d.link || '' } });
+  const p = self.registration.showNotification(d.title || 'إدارة الخدمات الفنية', { body: d.body || '', icon: base + 'assets/logo.png', badge: base + 'assets/badge.png', dir: 'rtl', lang: 'ar', tag: 'ahc-' + (d.id || Date.now()), renotify: false, data: { link: d.link || '' } });
   e.waitUntil(Promise.all([p, (self.navigator.setAppBadge && d.badge != null) ? self.navigator.setAppBadge(d.badge).catch(() => { }) : Promise.resolve()]));
 });
 self.addEventListener('notificationclick', e => {
