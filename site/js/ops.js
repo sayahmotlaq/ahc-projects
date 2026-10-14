@@ -183,7 +183,7 @@ export async function openItem(id, re) {
   const mineReq = i.requester_id === session.user.id || i.created_by === session.user.id;
   const open = isOpen(i);
   const flow = { new: [['accepted', 'استلام', 'primary']], accepted: [['in_progress', 'بدء التنفيذ', 'primary'], ['on_hold', 'تعليق']], in_progress: [['verify', 'أُنجز — بانتظار تأكيد صاحب الطلب', 'primary'], ['done', 'إغلاق مباشر'], ['on_hold', 'تعليق']], on_hold: [['in_progress', 'استئناف', 'primary']], verify: [['done', 'إغلاق', 'primary'], ['in_progress', 'إعادة للتنفيذ']], done: [['in_progress', 'إعادة فتح']], cancelled: [['new', 'إعادة فتح']] }[i.status] || [];
-  const dataKv = (Array.isArray(k.fields) ? k.fields : []).filter(x => i.data?.[x.k] != null && i.data[x.k] !== '').map(x => [x.l, esc(x.t === 'datetime-local' ? fmtDT(i.data[x.k]) : String(i.data[x.k]))]);
+  const dataKv = [...(Array.isArray(k.fields) ? k.fields : []), ...(Array.isArray(k.close_fields) ? k.close_fields : [])].filter(x => i.data?.[x.k] != null && i.data[x.k] !== '').map(x => [x.l, esc(x.t === 'datetime-local' ? fmtDT(i.data[x.k]) : String(i.data[x.k]))]);
   const loc = i.location_id ? O.Loc[i.location_id] : null;
   const gates = Array.isArray(k.gates) ? k.gates : [], checks = [...(Array.isArray(k.checklist) ? k.checklist : []), ...(Array.isArray(i.data?.plan_check) ? i.data.plan_check : [])];
   const ast = i.asset_id ? await q(sb.from('assets').select('id,code,name,unit,status').eq('id', i.asset_id).maybeSingle()).catch(() => null) : null;
@@ -232,8 +232,11 @@ export async function openItem(id, re) {
       $$('[data-chk]', w).forEach(c => c.onchange = async () => { try { const cur = (await q(sb.from('ops_items').select('data').eq('id', i.id).single()))?.data || i.data || {}; const ck = { ...(cur.check || {}), [c.dataset.chk]: c.checked }; await q(sb.from('ops_items').update({ data: { ...cur, check: ck } }).eq('id', i.id)); i.data = { ...cur, check: ck }; c.closest('label').classList.toggle('on', c.checked); changed.v = true; } catch (e) { err(e); c.checked = !c.checked; } });
       $$('[data-to]', w).forEach(b => b.onclick = async () => {
         const to = b.dataset.to, lab = { accepted: 'ملاحظة الاستلام (مثل: موعد الزيارة أو المكلّف) *', in_progress: i.status === 'done' || i.status === 'cancelled' ? 'سبب إعادة الفتح *' : 'ما الذي بدأ؟ *', on_hold: 'سبب التعليق (قطعة غيار، مقاول، اعتماد…) *', verify: 'ما الذي أُنجز؟ (يصل لصاحب الطلب ليؤكده) *', done: 'المعالجة النهائية *', cancelled: 'سبب الإلغاء *' }[to];
-        const a = await askAction(ST[to].ar, lab); if (!a) return;
-        upd({ status: to, last_action: a.a, ...(to === 'done' && n ? { step: n } : {}), ...(to === 'accepted' && !i.assignee_id && !i.assignee_name && isStaff() ? { assignee_id: session.user.id } : {}) });
+        const cf = ['verify', 'done'].includes(to) && Array.isArray(k.close_fields) ? k.close_fields : [];
+        const a = await askAction(ST[to].ar, lab, undefined, cf.length ? `<div class="pgrid mt8">${cf.map(f => fieldHtml(f, i.data?.[f.k])).join('')}</div>` : ''); if (!a) return;
+        const cd = {}; cf.forEach(f => { const val = a['d_' + f.k]; if (val !== '' && val != null) cd[f.k] = f.t === 'number' ? +val : val; });
+        const miss = cf.filter(f => f.req && (cd[f.k] == null || cd[f.k] === '')); if (miss.length) return toast('أكمل: ' + miss.map(f => f.l).join('، '), 'bad');
+        upd({ status: to, last_action: a.a, ...(cf.length ? { data: { ...((await q(sb.from('ops_items').select('data').eq('id', i.id).single()))?.data || i.data || {}), ...cd } } : {}), ...(to === 'done' && n ? { step: n } : {}), ...(to === 'accepted' && !i.assignee_id && !i.assignee_name && isStaff() ? { assignee_id: session.user.id } : {}) });
       });
       $('#oStep', w) && ($('#oStep', w).onchange = async e => { const to = +e.target.value; const a = await askAction(`الانتقال إلى الخطوة ${to}`); if (!a) { e.target.value = i.step || 1; return; } upd({ step: to, last_action: a.a, ...(i.status === 'new' || i.status === 'accepted' ? { status: 'in_progress' } : {}) }); });
       $('#oAdv', w) && ($('#oAdv', w).onclick = async () => { const a = await askAction(`إنجاز الخطوة ${i.step || 1}`, 'ما الذي أُنجز في هذه الخطوة؟ *'); if (!a) return; upd({ step: (i.step || 1) + 1, last_action: a.a, ...(i.status === 'new' || i.status === 'accepted' ? { status: 'in_progress' } : {}) }); });

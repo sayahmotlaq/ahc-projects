@@ -3,10 +3,10 @@ import { sb, ROLES, q, session, invalidateRef } from './api.js';
 import { $, $$, esc, money, dateAr, toast, err, confirm, modal, field, inp, sel, formData } from './ui.js';
 
 export async function mountAdmin(root, tab = 'users') {
-  const tabs = [['users', 'المستخدمون'], ['quality', 'جودة البيانات'], ['prices', 'سجل الأسعار'], ['audit', 'سجل التدقيق'], ['lumpsum', 'بنود المقطوعية'], ['facilities', 'المرافق والخريطة'], ['settings', 'الإعدادات']];
+  const tabs = [['users', 'المستخدمون'], ['quality', 'جودة البيانات'], ['prices', 'سجل الأسعار'], ['audit', 'سجل التدقيق'], ['lumpsum', 'بنود المقطوعية'], ['facilities', 'المرافق والخريطة'], ['kinds', 'نماذج الأقسام'], ['settings', 'الإعدادات']];
   root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">الإدارة</h1></div><div class="tabs">${tabs.map(([k, t]) => `<a href="#/admin/${k}" class="${tab === k ? 'on' : ''}">${t}</a>`).join('')}</div><div id="atab"><p class="muted">…</p></div>`;
   const t = $('#atab');
-  if (tab === 'users') users(t); else if (tab === 'quality') quality(t); else if (tab === 'prices') prices(t); else if (tab === 'audit') audit(t); else if (tab === 'lumpsum') (await import('./lumpsum.js')).mountLsAdmin(t).catch(err); else if (tab === 'facilities') (await import('./map.js')).mountFacilities(t).catch(err); else settings(t);
+  if (tab === 'users') users(t); else if (tab === 'quality') quality(t); else if (tab === 'prices') prices(t); else if (tab === 'audit') audit(t); else if (tab === 'lumpsum') (await import('./lumpsum.js')).mountLsAdmin(t).catch(err); else if (tab === 'facilities') (await import('./map.js')).mountFacilities(t).catch(err); else if (tab === 'kinds') kinds(t).catch(err); else settings(t);
 }
 async function users(t) {
   const rows = await q(sb.from('profiles').select('*').order('created_at'));
@@ -106,4 +106,31 @@ async function quality(t) {
     <p class="muted small" style="margin:-6px 0 12px">الفحص يُحسب لحظياً من البيانات الحالية. النواقص المؤثرة (بالأحمر) تشوّه لوحة المؤشرات والتقارير مباشرة؛ الملاحظات تحسّن الدقة والمتابعة.</p>
     ${checks.filter(c => c[3].length).map(c => `<div class="pcard"><h2><span class="badge ${c[0]}">${c[3].length}</span> ${c[1]}${c[2] ? ` <small class="muted" style="font-weight:500">— ${c[2]}</small>` : ''}</h2><div class="chips">${c[3].slice(0, 40).map(i => `<a class="chip" href="${i.l}">${esc(i.t)}</a>`).join('')}${c[3].length > 40 ? `<span class="muted small">و${c[3].length - 40} أخرى…</span>` : ''}</div></div>`).join('') || '<div class="empty-boq">✅ لا توجد نواقص — البيانات مكتملة.</div>'}
     ${checks.filter(c => !c[3].length).length ? `<div class="pcard"><h2>فحوصات سليمة <span class="badge full">${checks.filter(c => !c[3].length).length}</span></h2><div class="chips">${checks.filter(c => !c[3].length).map(c => `<span class="chip">✓ ${c[1]}</span>`).join('')}</div></div>` : ''}`;
+}
+
+// ---------- نماذج الأقسام (أنواع الأعمال في المحرّك التشغيلي): الحقول، بيانات الإنجاز، الاعتمادات، قائمة التحقق
+async function kinds(t) {
+  const [ks, units, procs] = await Promise.all([q(sb.from('ops_kinds').select('*').order('sort')), q(sb.from('gov_units').select('code,short,color,kind').order('sort')), q(sb.from('gov_processes').select('code,title').order('code'))]);
+  const U = Object.fromEntries(units.map(u => [u.code, u]));
+  t.innerHTML = `<div class="pcard"><div class="toolbar m0"><h2 class="m0">نماذج الأقسام <span class="muted">(${ks.length})</span></h2><span class="sp"></span><button class="btn primary" id="kNew">＋ نموذج</button></div>
+    <p class="muted small">كل نموذج نوع عمل لقسمه: يظهر للجميع في مركز البلاغات إن كان «استقبال»، أو لفرق الأقسام فقط. الحقول وبيانات الإنجاز والاعتمادات وقائمة التحقق تُكتب بصيغة JSON — التعديل يسري فوراً على الطلبات الجديدة.</p>
+    <table class="lst"><thead><tr><th></th><th>النموذج</th><th>القسم</th><th>الإجراء</th><th>الأولوية</th><th>الظهور</th><th>حقول</th><th>اعتمادات</th><th>تحقق</th><th></th></tr></thead><tbody>${ks.map(k => `<tr class="${k.active === false ? 'muted' : ''}"><td style="font-size:18px">${esc(k.icon)}</td><td><b>${esc(k.name)}</b><div class="muted small ltr">${esc(k.code)}</div></td><td><span class="uchip" style="--c:#${U[k.unit]?.color || '6B7A88'}">${esc(U[k.unit]?.short || k.unit)}</span></td><td>${esc(k.proc || '—')}</td><td>${esc(k.prio)}</td><td>${k.intake ? 'استقبال للجميع' : 'فرق الأقسام'}${k.active === false ? ' · موقوف' : ''}</td><td class="c">${(k.fields || []).length}</td><td class="c">${(k.gates || []).length}</td><td class="c">${(k.checklist || []).length}</td><td><button class="btn sm" data-k="${k.code}">تعديل</button></td></tr>`).join('')}</tbody></table></div>`;
+  const form = async k0 => {
+    const k = k0 || { code: '', unit: 'MNT', name: '', short: '', icon: '•', descr: '', proc: '', intake: true, prio: 'p3', fields: [], close_fields: [], gates: [], checklist: [], sort: 200, active: true };
+    const J = v => esc(JSON.stringify(v || [], null, 1));
+    await modal(`<form id="kf" class="pgrid">${field('الرمز *', inp('code', k.code, `required dir="ltr" ${k0 ? 'readonly' : ''} pattern="[a-z_]+"`))}${field('القسم', sel('unit', units.filter(u => u.kind === 'unit').map(u => [u.code, u.short]), k.unit))}
+      ${field('الاسم *', inp('name', k.name, 'required'))}${field('اسم مختصر', inp('short', k.short))}${field('أيقونة', inp('icon', k.icon))}${field('الإجراء الحاكم', sel('proc', [['', '—'], ...procs.map(p => [p.code, p.code + ' — ' + p.title])], k.proc))}
+      ${field('الوصف', inp('descr', k.descr), 'wide')}${field('الأولوية المقترحة', sel('prio', [['p1', 'طارئ'], ['p2', 'عاجل'], ['p3', 'عادي'], ['p4', 'مخطط']], k.prio))}${field('الترتيب', inp('sort', k.sort, 'type="number"'))}
+      <label class="chk"><input type="checkbox" name="intake" ${k.intake ? 'checked' : ''}> يظهر للجميع في مركز البلاغات</label><label class="chk"><input type="checkbox" name="active" ${k.active !== false ? 'checked' : ''}> فعّال</label>
+      ${field('حقول النموذج — [{"k":"المفتاح","l":"العنوان","t":"text|textarea|select|number|date|datetime-local","o":["خيار"],"req":true}]', `<textarea name="fields" rows="5" dir="ltr">${J(k.fields)}</textarea>`, 'wide')}
+      ${field('بيانات الإنجاز (تُطلب عند «أُنجز» أو «إغلاق») — بالصيغة نفسها', `<textarea name="close_fields" rows="4" dir="ltr">${J(k.close_fields)}</textarea>`, 'wide')}
+      ${field('اعتمادات الأقسام — [{"k":"saf","unit":"SAF","l":"العنوان","before":"in_progress|verify|done"}]', `<textarea name="gates" rows="3" dir="ltr">${J(k.gates)}</textarea>`, 'wide')}
+      ${field('قائمة التحقق قبل الإغلاق — [{"k":"clean","l":"التنظيف"}]', `<textarea name="checklist" rows="3" dir="ltr">${J(k.checklist)}</textarea>`, 'wide')}
+      <div class="btnrow end wide"><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">حفظ</button></div></form>`,
+      { title: k0 ? 'تعديل نموذج' : 'نموذج جديد', wide: true, onOpen: (w, c) => { $('#kf', w).onsubmit = async e => { e.preventDefault(); const x = formData(e.target); const row = { unit: x.unit, name: x.name.trim(), short: x.short.trim(), icon: x.icon.trim() || '•', descr: x.descr.trim(), proc: x.proc, prio: x.prio, sort: +x.sort || 0, intake: !!x.intake, active: !!x.active };
+        for (const f of ['fields', 'close_fields', 'gates', 'checklist']) { try { const v = JSON.parse(x[f] || '[]'); if (!Array.isArray(v)) throw 0; row[f] = v; } catch (er) { return toast('صيغة JSON غير صحيحة في: ' + f, 'bad'); } }
+        try { if (k0) await q(sb.from('ops_kinds').update(row).eq('code', k0.code)); else await q(sb.from('ops_kinds').insert({ code: x.code.trim(), ...row })); toast('حُفظ'); c(); kinds(t); } catch (er) { err(er); } }; } });
+  };
+  $('#kNew', t).onclick = () => form(null);
+  $$('[data-k]', t).forEach(b => b.onclick = () => form(ks.find(k => k.code === b.dataset.k)));
 }
