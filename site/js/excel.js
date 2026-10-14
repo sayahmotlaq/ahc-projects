@@ -64,7 +64,7 @@ async function boqSheet(wb, prj, c, priced){
       ws.getCell(r,8).value = {formula:`F${r}*G${r}`};
       if(!priced){ ws.getCell(r,7).fill = {type:'pattern', pattern:'solid', fgColor:{argb:GOLDBG}}; ws.getCell(r,7).protection = {locked:false}; }
       else ws.getCell(r,6).protection = {locked:false};
-      const lines = L.free ? 1 + Math.ceil((L.ln.descr||'').length/(lump?75:50)) + (L.ln.loc?1:0) : 2 + (L.ln.loc?1:0); ws.getRow(r).height = Math.min(300, Math.max(30, 15*lines, 15*Math.ceil((L.r.v.spec||'').length/40)));
+      const lines = L.free ? 1 + (L.ln.descr||'').split('\n').reduce((n, p) => n + Math.max(1, Math.ceil(p.length/(lump?88:52))), 0) + (L.ln.loc?1:0) : 2 + (L.ln.loc?1:0); ws.getRow(r).height = Math.min(409, Math.max(30, 14*lines, L.free ? 0 : 15*Math.ceil((L.r.v.spec||'').length/40)));
       if(L.free) ws.getCell(r,3).font = {name:FONT, size:10};
     });
     r++; ws.mergeCells(r,1,r,7); const sc = ws.getCell(r,1); sc.value = g.div.code==='00' ? `مجموع ${g.div.ar}` : `مجموع الشعبة ${g.div.code} — ${g.div.ar}`; cellStyle(sc, {font:{bold:true, color:{argb:NAVY}}, fill:CARD});

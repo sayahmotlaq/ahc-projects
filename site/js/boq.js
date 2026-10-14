@@ -28,6 +28,8 @@ export function calc(boq, lines) {
   });
   const ordered = Object.values(groups).sort((a, b) => a.div.code.localeCompare(b.div.code));
   ordered.forEach(g => g.lines.sort((a, b) => a.free && b.free ? (a.ln.sort - b.ln.sort) || (a.ln.id - b.ln.id) : a.free ? -1 : b.free ? 1 : a.ln.variant_code.localeCompare(b.ln.variant_code)));
+  // ترقيم البنود الحرة L-01… بترتيب ظهورها الفعلي في الجدول بعد التجميع والترتيب
+  let fk = 0; ordered.forEach(g => g.lines.forEach(L => { if (!L.free) return; const c = 'L-' + String(++fk).padStart(2, '0'); L.r.v.code = c; L.r.it.code = c; }));
   const cont = subtotal * Number(boq.contingency || 0) / 100, base = subtotal + cont, vat = base * Number(boq.vat || 0) / 100;
   return { groups: ordered, subtotal, cont, base, vat, grand: base + vat };
 }
@@ -105,7 +107,7 @@ export async function mountBoq(root, boqId, project, onBack) {
       $$('[data-all]', w).forEach(a => a.onclick = () => { const bs = $$('input[name=c]', a.closest('.lsg')).filter(b => b.closest('.lsi').style.display !== 'none'); const all = bs.every(b => b.checked); bs.forEach(b => b.checked = !all); count(); });
       $('#lsq', w).oninput = () => { const t = norm($('#lsq', w).value); $$('.lsi', w).forEach(el => { const i = LS_BY_CODE[el.getAttribute('data-code')]; el.style.display = !t || norm(i.title + ' ' + i.descr + ' ' + i.code).includes(t) ? '' : 'none'; }); $$('.lsg', w).forEach(g => g.style.display = $$('.lsi', g).some(e => e.style.display !== 'none') ? '' : 'none'); };
       $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target); const codes = boxes.filter(b => b.checked).map(b => b.value); if (!codes.length) return;
-        const rows = codes.map((c, i) => { const it = LS_BY_CODE[c]; return { boq_id: boq.id, kind: 'free', title: it.title, descr: it.descr, unit: it.unit || 'مقطوعية', qty: 1, unit_price: null, sort: lines.length + i }; });
+        const rows = codes.map((c, i) => { const it = LS_BY_CODE[c]; return { boq_id: boq.id, kind: 'free', title: it.title, descr: it.descr, unit: it.unit || 'مقطوعية', qty: 1, unit_price: null, div_code: it.div_code || null, sort: lines.length + i }; });
         try { const ins = await q(sb.from('boq_lines').insert(rows).select()); lines.push(...ins); const up = {}; if (f.lump) Object.assign(up, { pricing: 'lumpsum', hide_prices: true }); if (f.notes && !boq.notes) up.notes = LS_DEFAULT_NOTES; if (Object.keys(up).length) { await q(sb.from('boqs').update(up).eq('id', boq.id)); Object.assign(boq, up); } close(); toast(`أُضيف ${ins.length} بنداً`); mountBoq(root, boqId, project, onBack); } catch (er) { err(er); } };
     } });
   }
