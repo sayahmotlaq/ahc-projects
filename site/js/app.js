@@ -9,6 +9,8 @@ const NAV = [
   ['today', 'يومي', 'sun'], ['dashboard', 'لوحة المؤشرات', 'dash'], ['projects', 'المشاريع', 'folder'], ['map', 'الخريطة', 'map'],
   ['sec', 'المتابعة'],
   ['tasks', 'المهام', 'check'], ['requests', 'الطلبات', 'inbox'], ['challenges', 'التحديات والمخاطر', 'alert'], ['treports', 'التقارير الفنية والمحاضر', 'file'], ['leaves', 'الإجازات والتغطية', 'clock'],
+  ['sec', 'المرافق'],
+  ['fm', 'متابعة أنظمة المنشآت', 'pulse'],
   ['sec', 'المستندات والمالية'],
   ['submittals', 'الاعتمادات', 'stamp'], ['documents', 'المستندات الرسمية', 'doc'], ['drawings', 'المخططات', 'draw'], ['payments', 'المستخلصات', 'coins'],
   ['sec', 'النظام'],
@@ -20,11 +22,12 @@ let projIndex = null;
 function shell(inner) {
   const p = session.profile;
   const okRole = r => !r || (Array.isArray(r) ? r.includes(role()) : role() === r);
-  const navItems = NAV.filter(n => n[0] !== 'sec' ? okRole(n[3]) : true);
+  const fac = role() === 'facility', FAC_NAV = ['fm', 'gov'];
+  const navItems = NAV.filter(n => n[0] !== 'sec' ? (fac ? FAC_NAV.includes(n[0]) : okRole(n[3])) : !fac || n[1] === 'المرافق');
   const links = (cls) => navItems.map(n => n[0] === 'sec' ? `<div class="sec">${n[1]}</div>` : `<a href="#/${n[0]}" data-nav="${n[0]}" class="${cls}">${ico(n[2])}<span>${n[1]}</span><span class="cnt" data-cnt="${n[0]}"></span></a>`).join('');
   const mini = (() => { try { return localStorage.getItem('ahc_mini') === '1'; } catch (e) { return false; } })();
   app.innerHTML = `<div class="app2 ${mini ? 'mini' : ''}" id="app2">
-    <aside class="side"><a class="brand" href="#/today"><img src="assets/logo.png" alt=""><div><b>منصة إدارة المشاريع</b><small>تجمع الأحساء الصحي</small></div></a>
+    <aside class="side"><a class="brand" href="#/${role() === 'facility' ? 'fm' : 'today'}"><img src="assets/logo.png" alt=""><div><b>منصة إدارة المشاريع</b><small>تجمع الأحساء الصحي</small></div></a>
       <nav class="snav">${links('')}</nav>
       <button class="fold" id="fold" title="طيّ القائمة">${ico('fold')}</button></aside>
     <div class="mainwrap">
@@ -32,7 +35,7 @@ function shell(inner) {
         <div class="user"><div><b>${esc(p?.full_name || '')}</b><small>${esc(ROLES[role()] || '')}</small></div><div class="av">${esc((p?.full_name || '?').trim().charAt(0))}</div></div>
         <button class="ib" id="logout" title="خروج">${ico('logout')}</button></div>
       <main id="main">${inner || ''}</main></div></div>
-    <nav class="bottom">${BOTTOM.map(b => `<a href="${b[0] === 'more' ? '#' : '#/' + b[0]}" data-nav="${b[0]}" ${b[0] === 'more' ? 'id="moreBtn"' : ''}>${ico(b[2])}${b[1]}<span class="cnt" data-cnt="${b[0]}"></span></a>`).join('')}</nav>
+    <nav class="bottom">${(role() === 'facility' ? [['fm', 'الأنظمة', 'pulse'], ['gov', 'الحوكمة', 'book'], ['settings', 'الإعدادات', 'cog'], ['more', 'المزيد', 'menu']] : BOTTOM).map(b => `<a href="${b[0] === 'more' ? '#' : '#/' + b[0]}" data-nav="${b[0]}" ${b[0] === 'more' ? 'id="moreBtn"' : ''}>${ico(b[2])}${b[1]}<span class="cnt" data-cnt="${b[0]}"></span></a>`).join('')}</nav>
     <div class="sheet" id="sheet"><div class="sh">${links('')}<a href="#" id="logout2">${ico('logout')}<span>خروج</span></a></div></div>`;
   const out = async () => { await sb.auth.signOut(); location.hash = ''; boot(); };
   $('#logout').onclick = out; $('#logout2').onclick = e => { e.preventDefault(); out(); };
@@ -41,7 +44,7 @@ function shell(inner) {
   $('#sheet').addEventListener('click', e => { if (e.target === $('#sheet') || e.target.closest('a')) $('#sheet').classList.remove('show'); });
   $('#gsearch').onclick = openPalette;
   document.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openPalette(); } });
-  if (canRead()) import('./notif.js').then(n => { n.mountBell($('#bellhost')); n.registerSW(); });
+  if (canRead() || role() === 'facility') import('./notif.js').then(n => { n.mountBell($('#bellhost')); n.registerSW(); });
 }
 function setNav(k) { const key = ALIAS[k] || k; $$('[data-nav]').forEach(a => a.classList.toggle('on', a.getAttribute('data-nav') === key)); $('#sheet')?.classList.remove('show'); }
 export function setCounts(map) { Object.entries(map).forEach(([k, v]) => $$(`[data-cnt="${k}"]`).forEach(el => { el.textContent = v || ''; el.classList.toggle('show', !!v); })); }
@@ -97,8 +100,10 @@ let refLoading = null;
 async function ensureRef() { if (REF.loaded) return; if (!refLoading) refLoading = loadRef(false, msg => { const m = $('#main'); if (m) m.innerHTML = `<div class="loading"><div class="spin"></div>${esc(msg)}</div>`; }); await refLoading; }
 async function route() {
   if (!session.user) return authScreen('login');
-  if (!canRead()) return pendingScreen();
-  const h = location.hash.replace(/^#\/?/, '') || 'today';
+  const fac = role() === 'facility';
+  if (!canRead() && !fac) return pendingScreen();
+  const h = location.hash.replace(/^#\/?/, '') || (fac ? 'fm' : 'today');
+  if (fac && !['fm', 'gov', 'settings'].includes(h.split(/[/?]/)[0])) { location.hash = '#/fm'; return; }
   const [path, query] = h.split('?'); const params = new URLSearchParams(query || '');
   const parts = path.split('/'); const main = $('#main'); if (!main) shell('');
   const m = $('#main'); setNav(parts[0]); watch(m);
@@ -119,6 +124,7 @@ async function route() {
     else if (parts[0] === 'performance') { const pf = await import('./perf.js'); if (parts[1]) await pf.mountPerson(m, parts[1], params); else await pf.mountPerformance(m, params); }
     else if (parts[0] === 'me') { const { mountMyWork } = await import('./perf.js'); await mountMyWork(m, params); }
     else if (parts[0] === 'open') { const k = parts[1], id = parts[2]; history.replaceState(null, '', location.pathname + location.search + '#/today'); setNav('today'); const { mountToday } = await import('./today.js'); await mountToday(m, new URLSearchParams()); const { openQuick } = await import('./quick.js'); openQuick({ q: { k, id: /^\d+$/.test(id) ? +id : id }, link: '#/today' }, () => route()); }
+    else if (parts[0] === 'fm') { const { mountFM } = await import('./fm.js'); await mountFM(m, parts[1] || 'dash', params); }
     else if (parts[0] === 'gov') { const { mountGov } = await import('./gov.js'); await mountGov(m, parts[1] || 'start', parts[2] || null, params); }
     else if (parts[0] === 'map') { const { mountMap } = await import('./map.js'); await mountMap(m, params); }
     else if (parts[0] === 'briefs') { const br = await import('./briefs.js'); if (parts[1]) await br.mountBrief(m, +parts[1], params); else await br.mountBriefs(m, params); }
