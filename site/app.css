@@ -1208,3 +1208,7 @@ button.fmc:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(18,36,47,
 .dplans>button:hover{box-shadow:var(--shadow)} .dplans b{font-size:13px} .dplans span{font-size:12px;color:var(--muted)} .dplans .late{border-inline-start-color:#C0392B} .dplans .off{opacity:.55}
 .dup{display:flex;flex-direction:column} .dup>div{display:grid;grid-template-columns:110px 1fr;gap:8px;padding:6px 2px;border-bottom:1px dashed var(--line2);font-size:12.5px} .dup b{color:var(--navy)} .dup .late b{color:#C0392B}
 .row2{display:flex;gap:6px;align-items:center} .row2 select{flex:1}
+/* التقرير الشهري للإدارة (حزمة 76) */
+.tsdrep{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px 22px} .tsdrep h2{font-size:15px;color:#123B5C;margin:18px 0 8px}
+.rbars{display:flex;flex-direction:column;gap:3px;min-width:120px} .rbars i{display:block;height:7px;border-radius:4px}
+@media print{.tsdrep{border:0;padding:0} .noprint{display:none!important}}

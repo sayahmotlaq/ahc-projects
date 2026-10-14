@@ -54,18 +54,27 @@ function shell(inner) {
   $('#sheet').addEventListener('click', e => { if (e.target === $('#sheet') || e.target.closest('a')) $('#sheet').classList.remove('show'); });
   $('#gsearch').onclick = openPalette;
   document.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openPalette(); } });
+  opsCounts();
   if (canRead() || ['facility', 'tech', 'requester'].includes(role())) import('./notif.js').then(n => { n.mountBell($('#bellhost')); n.registerSW(); });
+}
+// عدّادات القائمة: الجديد غير المستلم في كل قسم (يظهر بجانب القسم)، وطلباتي المنتظرة لتأكيدي
+async function opsCounts() {
+  try { if (!(canRead() || OPS_ROLES.includes(role()) || role() === 'requester')) return;
+    const { data } = await sb.from('ops_items').select('unit,status,requester_id,created_by').in('status', ['new', 'verify']).limit(2000);
+    const c = {}; (data || []).forEach(i => { if (i.status === 'new') c['dept/' + i.unit] = (c['dept/' + i.unit] || 0) + 1; if (i.status === 'verify' && (i.requester_id === session.user.id || i.created_by === session.user.id)) { c.ops = (c.ops || 0) + 1; c['ops/mine'] = (c['ops/mine'] || 0) + 1; } });
+    setCounts(c); } catch (e) { }
 }
 function setNav(k) { const key = ALIAS[k] || k; if (!$$(`[data-nav="${key}"]`).length && key.startsWith('dept/')) return setNav('tsd'); $$('[data-nav]').forEach(a => a.classList.toggle('on', a.getAttribute('data-nav') === key)); $('#sheet')?.classList.remove('show'); }
 export function setCounts(map) { Object.entries(map).forEach(([k, v]) => $$(`[data-cnt="${k}"]`).forEach(el => { el.textContent = v || ''; el.classList.toggle('show', !!v); })); }
 async function openPalette() {
   if ($('.pal')) return;
   if (!projIndex) { try { projIndex = canRead() ? await q(sb.from('projects').select('id,name,ref,stage,category').eq('archived', false).order('name')) : []; } catch (e) { projIndex = []; } }
+  let opsIdx = []; try { if (canRead() || OPS_ROLES.includes(role())) { const { data } = await sb.from('ops_items').select('id,ref,title,unit,status').order('id', { ascending: false }).limit(400); opsIdx = data || []; } } catch (e) { }
   const pages = NAV.filter(n => n[0] !== 'sec' && allow(n[3])).map(n => ({ id: null, name: (n[0].startsWith('dept/') ? 'قسم ' : '') + n[1], link: '#/' + n[0], kind: n[0].startsWith('dept/') ? 'قسم' : 'صفحة' }));
-  const w = document.createElement('div'); w.className = 'pal'; w.innerHTML = `<div class="box"><input id="palq" placeholder="اكتب اسم المشروع أو الصفحة…" autocomplete="off"><div class="list" id="pall"></div></div>`;
+  const w = document.createElement('div'); w.className = 'pal'; w.innerHTML = `<div class="box"><input id="palq" placeholder="اكتب اسم مشروع أو صفحة أو قسم، أو رقم عمل مثل MNT-26-…" autocomplete="off"><div class="list" id="pall"></div></div>`;
   document.body.appendChild(w); const inp = $('#palq', w), list = $('#pall', w); let sel = 0, items = [];
   const norm = s => (s || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي');
-  const render = () => { const qs = norm(inp.value.trim()); items = qs ? [...projIndex.filter(p => norm(p.name + ' ' + (p.ref || '')).includes(qs)).slice(0, 8).map(p => ({ name: p.name, link: '#/project/' + p.id, kind: p.category || 'مشروع' })), ...pages.filter(p => norm(p.name).includes(qs)).slice(0, 4)] : pages.slice(0, 8);
+  const render = () => { const qs = norm(inp.value.trim()); items = qs ? [...projIndex.filter(p => norm(p.name + ' ' + (p.ref || '')).includes(qs)).slice(0, 8).map(p => ({ name: p.name, link: '#/project/' + p.id, kind: p.category || 'مشروع' })), ...opsIdx.filter(o => norm(o.ref + ' ' + o.title).includes(qs)).slice(0, 6).map(o => ({ name: o.title, link: '#/ops/list?id=' + o.id, kind: o.ref })), ...pages.filter(p => norm(p.name).includes(qs)).slice(0, 4)] : pages.slice(0, 8);
     sel = 0; list.innerHTML = items.map((it, i) => `<a class="res ${i === sel ? 'sel' : ''}" href="${it.link}" data-i="${i}">${ico(it.id === null && it.kind === 'صفحة' ? 'dash' : 'folder')}<span>${esc(it.name)}</span><small>${esc(it.kind)}</small></a>`).join('') || '<p class="muted" style="padding:14px">لا نتائج</p>'; };
   const close = () => w.remove();
   inp.oninput = render; render(); inp.focus();
@@ -135,7 +144,7 @@ async function route() {
     else if (parts[0] === 'performance') { const pf = await import('./perf.js'); if (parts[1]) await pf.mountPerson(m, parts[1], params); else await pf.mountPerformance(m, params); }
     else if (parts[0] === 'me') { const { mountMyWork } = await import('./perf.js'); await mountMyWork(m, params); }
     else if (parts[0] === 'open') { const k = parts[1], id = parts[2]; history.replaceState(null, '', location.pathname + location.search + '#/today'); setNav('today'); const { mountToday } = await import('./today.js'); await mountToday(m, new URLSearchParams()); const { openQuick } = await import('./quick.js'); openQuick({ q: { k, id: /^\d+$/.test(id) ? +id : id }, link: '#/today' }, () => route()); }
-    else if (parts[0] === 'tsd') { const { mountTSD } = await import('./depts.js'); await mountTSD(m); }
+    else if (parts[0] === 'tsd') { const d = await import('./depts.js'); if (parts[1] === 'report') await d.mountTSDReport(m, params); else await d.mountTSD(m); }
     else if (parts[0] === 'dept') { const { mountDept } = await import('./depts.js'); await mountDept(m, parts[1], parts[2] || 'overview', params); }
     else if (parts[0] === 'ops') { const { mountOps } = await import('./ops.js'); await mountOps(m, parts[1] || '', params); }
     else if (parts[0] === 'fm') { const { mountFM } = await import('./fm.js'); await mountFM(m, parts[1] || 'dash', params); }

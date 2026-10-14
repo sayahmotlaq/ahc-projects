@@ -399,7 +399,7 @@ function viewReport(t, params) {
 // ---------- ملف Excel منسّق: الملخص، المصفوفة الملونة، الملاحظات
 async function exportXlsx(R) {
   try { const { loadExcelJS } = await import('./excel.js'); await loadExcelJS(); } catch (e) { return err('تعذّر تحميل مكتبة Excel'); }
-  const wb = new ExcelJS.Workbook(); wb.creator = 'منصة إدارة مشاريع تجمع الأحساء الصحي';
+  const wb = new ExcelJS.Workbook(); wb.creator = 'إدارة الخدمات الفنية — تجمع الأحساء الصحي';
   const NAVY = 'FF123B5C', SKY = 'FF27A8DF', F = { name: 'Tajawal', size: 11 };
   const COL = { good: 'FF2E8B57', attention: 'FFC99A1E', partial: 'FFD9772B', down: 'FFC0392B', na: 'FFDCE3EA' };
   const LBL = { good: 'يعمل جيداً', attention: 'يحتاج متابعة', partial: 'معطل جزئياً', down: 'معطل', na: 'لا ينطبق' };

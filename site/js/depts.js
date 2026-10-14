@@ -1,6 +1,6 @@
 // ===== إدارة الخدمات الفنية: لوحة الإدارة (كل الأقسام في شاشة) وصفحة كل قسم (لوحته، أعماله، دليله، فريقه) =====
 import { sb, q, session, isAdmin, role, canRead } from './api.js';
-import { $, $$, esc, toast, err, modal, field, sel, formData, dateAr } from './ui.js';
+import { $, $$, esc, toast, err, modal, field, sel, formData, dateAr, download } from './ui.js';
 import { O, loadOps, ST, PR, OPEN, isOpen, isLate, itemRow, bindRows, listView, newItem, openItem, uchip, uname, ucolor, pname, staffOf, dur, canFile, activeCritical, criticalHtml, LST, locPill, locLabel, isStaff } from './ops.js';
 
 const ASSET_UNITS = ['MNT', 'BME', 'IT', 'MED', 'SAF', 'GEN'], PLAN_UNITS = ['MNT', 'BME', 'SAF', 'IT', 'GEN', 'FAC'];
@@ -44,7 +44,7 @@ export async function mountTSD(root) {
   const urgent = O.items.filter(i => isOpen(i) && (i.priority === 'p1' || isLate(i))).sort((a, b) => a.priority.localeCompare(b.priority)).slice(0, 6);
   const bad = fm.latest.filter(l => ['down', 'partial'].includes(l.status));
   root.innerHTML = `<div class="tsdhero"><div><small>تجمع الأحساء الصحي</small><h1>إدارة الخدمات الفنية</h1><p>ثمانية أقسام تعمل كمنظومة واحدة: كل طلب يصل للقسم المختص، وكل إحالة بين الأقسام مرئية، وكل عمل يسير وفق دليل إجراءاته.</p>
-      <div class="btnrow">${canFile() ? '<button class="btn primary" id="tNew">＋ بلاغ أو طلب</button>' : ''}<a class="btn" href="#/ops/list">كل الأعمال</a><a class="btn" href="#/gov">الحوكمة والأدلة</a></div></div>
+      <div class="btnrow">${canFile() ? '<button class="btn primary" id="tNew">＋ بلاغ أو طلب</button>' : ''}<a class="btn" href="#/ops/list">كل الأعمال</a><a class="btn" href="#/tsd/report">التقرير الشهري</a><a class="btn" href="#/map?l=ops">على الخريطة</a></div></div>
       <div class="tsdk">${[[all.open, 'عمل مفتوح'], [all.late, 'متأخر عن مهلته', all.late ? 'r' : ''], [all.urgent, 'طارئ أو عاجل', all.urgent ? 'a' : ''], [all.doneM, 'أُنجز هذا الشهر', 'g'], [all.sla == null ? '—' : all.sla + '٪', 'ضمن المهلة'], [all.rating || '—', 'رضا أصحاب الطلبات']].map(([b, l, c]) => `<div class="${c || ''}"><b>${b}</b><span>${l}</span></div>`).join('')}</div></div>
     <div class="tsdunits">${us.map(u => { const s = stats(O.items.filter(i => i.unit === u.code)); const sysBad = bad.filter(l => fm.sys.find(x => x.code === l.system_code)?.owner === u.code).length;
       return `<a class="tsdu" href="#/dept/${u.code}" style="--c:#${u.color}"><div class="tsdu-h"><b>${esc(u.short)}</b>${u.head ? `<small>${esc(u.head)}</small>` : ''}</div>
@@ -295,4 +295,59 @@ async function planForm(code, p0 = {}, done) {
           checklist: x.checklist.split('\n').map(l => l.trim()).filter(Boolean).map((l, i) => ({ k: 'p' + (i + 1), l })) };
         try { if (v.id) await q(sb.from('ops_plans').update(row).eq('id', v.id)); else await q(sb.from('ops_plans').insert(row)); toast('حُفظت الخطة'); c(); done(); } catch (e2) { err(e2); } };
     } });
+}
+
+// ---------- التقرير الشهري للإدارة (#/tsd/report?m=YYYY-MM): أداء كل قسم ومؤشرات الإدارة، للطباعة وExcel
+const MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+const mAr = m => `${MONTHS[+m.slice(5, 7) - 1]} ${m.slice(0, 4)}`;
+export async function mountTSDReport(root, params) {
+  await loadOps();
+  const m = params.get('m') || month();
+  const end = new Date(+m.slice(0, 4), +m.slice(5, 7), 1).toISOString();
+  // كل أعمال الشهر (قد تكون أقدم من نافذة التحميل الافتراضية)
+  const start = m + '-01T00:00:00Z';
+  const all = await q(sb.from('ops_items').select('*').or(`created_at.gte.${start},closed_at.gte.${start},status.in.(new,accepted,in_progress,on_hold,verify)`).limit(5000)).catch(() => O.items);
+  const inM = d => d && d >= start && d < end;
+  const rows = units().map(u => { const L = all.filter(i => i.unit === u.code);
+    const rec = L.filter(i => inM(i.created_at)), done = L.filter(i => i.status === 'done' && inM(i.closed_at));
+    const openEnd = L.filter(i => i.created_at < end && !(i.closed_at && i.closed_at < end) && i.status !== 'cancelled');
+    const lateEnd = openEnd.filter(i => i.due_at && i.due_at < (end < new Date().toISOString() ? end : new Date().toISOString()));
+    const tt = done.map(i => new Date(i.resolved_at || i.closed_at) - new Date(i.created_at)).filter(x => x > 0);
+    const ok = done.filter(i => !i.due_at || new Date(i.resolved_at || i.closed_at) <= new Date(i.due_at)).length;
+    const rated = done.filter(i => i.rating);
+    const handIn = rec.filter(i => i.parent_id).length, ppm = rec.filter(i => i.source === 'ppm').length;
+    return { u, rec: rec.length, done: done.length, open: openEnd.length, late: lateEnd.length, avg: tt.length ? tt.reduce((a, b) => a + b, 0) / tt.length : null, sla: done.length ? Math.round(ok / done.length * 100) : null, rating: rated.length ? (rated.reduce((a, b) => a + b.rating, 0) / rated.length).toFixed(1) : null, handIn, ppm,
+      kinds: Object.entries(rec.reduce((o, i) => (o[i.kind] = (o[i.kind] || 0) + 1, o), {})).sort((a, b) => b[1] - a[1]).slice(0, 3) };
+  });
+  const T = rows.reduce((a, r) => ({ rec: a.rec + r.rec, done: a.done + r.done, open: a.open + r.open, late: a.late + r.late }), { rec: 0, done: 0, open: 0, late: 0 });
+  const doneAll = all.filter(i => i.status === 'done' && inM(i.closed_at)), okAll = doneAll.filter(i => !i.due_at || new Date(i.resolved_at || i.closed_at) <= new Date(i.due_at)).length;
+  const ratedAll = doneAll.filter(i => i.rating);
+  const byFac = Object.entries(all.filter(i => inM(i.created_at)).reduce((o, i) => (o[i.facility_id] = (o[i.facility_id] || 0) + 1, o), {})).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const crit = all.filter(i => ['closure', 'permit', 'impair', 'shutdown'].includes(O.K[i.kind]?.effect) && (inM(i.created_at) || inM(i.closed_at)));
+  const maxR = Math.max(1, ...rows.map(r => Math.max(r.rec, r.done)));
+  const months = []; for (let k = 0; k < 12; k++) { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - k); months.push(d.toISOString().slice(0, 7)); }
+  root.innerHTML = `<div class="toolbar noprint"><a class="btn sm" href="#/tsd">→ لوحة الإدارة</a><span class="sp"></span><select id="rm">${months.map(x => `<option value="${x}" ${x === m ? 'selected' : ''}>${mAr(x)}</option>`).join('')}</select><button class="btn" id="rx">تصدير Excel</button><button class="btn primary" onclick="print()">طباعة / PDF</button></div>
+    <div class="tsdrep"><header class="fmrep-h"><img src="assets/logo.png" alt=""><div><h1>التقرير الشهري لإدارة الخدمات الفنية</h1><p>تجمع الأحساء الصحي · ${mAr(m)}</p></div><div class="fmrep-d">تاريخ الإصدار<br><b>${dateAr(new Date())}</b></div></header>
+    <div class="fmrep-k"><div><b>${T.rec}</b><span>طلب وعمل جديد</span></div><div class="g"><b>${T.done}</b><span>أُنجز</span></div><div><b>${doneAll.length ? Math.round(okAll / doneAll.length * 100) + '٪' : '—'}</b><span>أُنجز ضمن المهلة</span></div><div class="${T.late ? 'r' : ''}"><b>${T.late}</b><span>متأخر نهاية الشهر</span></div><div><b>${T.open}</b><span>مفتوح نهاية الشهر</span></div><div><b>${ratedAll.length ? (ratedAll.reduce((a, b) => a + b.rating, 0) / ratedAll.length).toFixed(1) : '—'}</b><span>رضا أصحاب الطلبات</span></div></div>
+    <h2>أداء الأقسام</h2><div class="tblwrap"><table class="rt2"><thead><tr><th>القسم</th><th class="c">وارد</th><th class="c">مُنجز</th><th>الوارد والمنجز</th><th class="c">ضمن المهلة</th><th class="c">متوسط الإنجاز</th><th class="c">متأخر</th><th class="c">مفتوح</th><th class="c">الرضا</th><th>الأكثر طلباً</th></tr></thead><tbody>${rows.map(r => `<tr><td><b style="color:#${r.u.color}">${esc(r.u.short)}</b>${r.handIn || r.ppm ? `<div class="muted small">${r.handIn ? r.handIn + ' محال من أقسام' : ''}${r.handIn && r.ppm ? ' · ' : ''}${r.ppm ? r.ppm + ' مخطط' : ''}</div>` : ''}</td><td class="c">${r.rec}</td><td class="c">${r.done}</td><td><div class="rbars"><i style="width:${r.rec / maxR * 100}%;background:#${r.u.color}55"></i><i style="width:${r.done / maxR * 100}%;background:#${r.u.color}"></i></div></td><td class="c ${r.sla != null && r.sla < 80 ? 'bad' : ''}">${r.sla == null ? '—' : r.sla + '٪'}</td><td class="c">${r.avg ? dur(r.avg) : '—'}</td><td class="c ${r.late ? 'bad' : ''}">${r.late}</td><td class="c">${r.open}</td><td class="c">${r.rating || '—'}</td><td class="small">${r.kinds.map(([k, n]) => `${esc(O.K[k]?.short || k)} ${n}`).join('، ') || '—'}</td></tr>`).join('')}</tbody></table></div>
+    <div class="fm2col"><div><h2>أكثر المنشآت طلباً</h2>${byFac.length ? `<div class="fmbars">${byFac.map(([f, n]) => `<div class="fmbar"><span>${esc(O.F[f]?.name || '—')}</span><i><em style="width:${Math.round(n / byFac[0][1] * 100)}%"></em></i><b>${n}</b></div>`).join('')}</div>` : '<p class="muted">لا طلبات هذا الشهر.</p>'}</div>
+      <div><h2>الأعمال الحرجة خلال الشهر</h2>${crit.length ? `<ul class="rlist">${crit.slice(0, 12).map(i => `<li>${esc(O.K[i.kind]?.icon || '')} <b>${esc(O.K[i.kind]?.short || '')}</b>: ${esc(i.title)} — ${esc(O.F[i.facility_id]?.name || '')} <span class="muted">(${ST[i.status]?.ar})</span></li>`).join('')}</ul>` : '<p class="muted">لا إغلاقات أو تصاريح أو تعطيلات هذا الشهر.</p>'}</div></div></div>`;
+  $('#rm', root).onchange = e => location.hash = '#/tsd/report?m=' + e.target.value;
+  $('#rx', root).onclick = async () => {
+    try { const { loadExcelJS } = await import('./excel.js'); await loadExcelJS(); } catch (e) { return err('تعذّر تحميل مكتبة Excel'); }
+    const wb = new ExcelJS.Workbook(); wb.creator = 'إدارة الخدمات الفنية — تجمع الأحساء الصحي';
+    const ws = wb.addWorksheet('أداء الأقسام', { views: [{ rightToLeft: true }] });
+    ws.addRow([`التقرير الشهري لإدارة الخدمات الفنية — ${mAr(m)}`]).font = { bold: true, size: 14, name: 'Tajawal', color: { argb: 'FF123B5C' } }; ws.addRow([]);
+    const h = ws.addRow(['القسم', 'وارد', 'مُنجز', 'ضمن المهلة ٪', 'متوسط الإنجاز (ساعة)', 'متأخر', 'مفتوح', 'الرضا', 'محال من أقسام', 'مخطط']);
+    h.eachCell(c => { c.font = { bold: true, color: { argb: 'FFFFFFFF' }, name: 'Tajawal' }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF123B5C' } }; c.alignment = { horizontal: 'center' }; });
+    rows.forEach(r => ws.addRow([r.u.short, r.rec, r.done, r.sla, r.avg ? Math.round(r.avg / 36e5) : null, r.late, r.open, r.rating ? +r.rating : null, r.handIn, r.ppm]).eachCell(c => c.font = { name: 'Tajawal' }));
+    ws.addRow(['الإجمالي', T.rec, T.done, doneAll.length ? Math.round(okAll / doneAll.length * 100) : null, null, T.late, T.open]).eachCell(c => c.font = { bold: true, name: 'Tajawal' });
+    ws.columns.forEach((c, i) => c.width = i === 0 ? 22 : 14);
+    const ws2 = wb.addWorksheet('الأعمال', { views: [{ rightToLeft: true }] });
+    const h2 = ws2.addRow(['الرقم', 'القسم', 'النوع', 'العنوان', 'المنشأة', 'الموقع', 'الأولوية', 'الحالة', 'أُنشئ', 'أُغلق', 'آخر إجراء متخذ', 'التقييم']);
+    h2.eachCell(c => { c.font = { bold: true, color: { argb: 'FFFFFFFF' }, name: 'Tajawal' }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF123B5C' } }; });
+    all.filter(i => inM(i.created_at) || inM(i.closed_at)).sort((a, b) => a.unit.localeCompare(b.unit) || a.id - b.id).forEach(i => ws2.addRow([i.ref, uname(i.unit), O.K[i.kind]?.name || i.kind, i.title, O.F[i.facility_id]?.name || '', i.location || '', PR[i.priority]?.ar, ST[i.status]?.ar, (i.created_at || '').slice(0, 10), (i.closed_at || '').slice(0, 10), i.last_action || '', i.rating || '']).eachCell(c => c.font = { name: 'Tajawal' }));
+    ws2.columns.forEach((c, i) => c.width = [14, 14, 18, 40, 24, 20, 10, 14, 12, 12, 50, 8][i]);
+    download(new Blob([await wb.xlsx.writeBuffer()], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `تقرير-الخدمات-الفنية-${m}.xlsx`);
+  };
 }

@@ -27,6 +27,16 @@ export async function mountToday(root, params) {
   else lastSeen = sessionStorage.getItem('ahc_prev_seen') || lastSeen;
   const sinceIso = lastSeen || new Date(Date.now() - 864e5).toISOString();
   const leavesCard = await import('./leaves.js').then(m => m.todayLeavesCard()).catch(() => '');
+  // أعمال الأقسام المسندة إليّ، وطلباتي المفتوحة (المحرّك التشغيلي)
+  const opsCard = await import('./ops.js').then(async o => { const O = await o.loadOps(); const me = session.user.id;
+    const mine = O.items.filter(i => o.isOpen(i) && i.assignee_id === me).sort((a, b) => o.isLate(b) - o.isLate(a) || a.priority.localeCompare(b.priority));
+    const unitNew = session.profile?.unit ? O.items.filter(i => i.unit === session.profile.unit && i.status === 'new') : [];
+    const asked = O.items.filter(i => o.isOpen(i) && (i.requester_id === me || i.created_by === me) && i.assignee_id !== me);
+    if (!mine.length && !unitNew.length && !asked.length) return '';
+    return `<div class="pcard"><h2>أعمال الأقسام <span class="badge ${mine.some(o.isLate) ? 'bad' : 'ovr'}">${mine.length + unitNew.length}</span><a class="small" href="#/ops/list?who=me">كل أعمالي ‹</a></h2>
+      ${unitNew.length ? `<p class="small m0"><b>${unitNew.length}</b> طلب جديد في قسمك لم يُستلم — <a href="#/dept/${session.profile.unit}/work?s=new">استلمها</a></p>` : ''}
+      ${mine.length ? `<div class="olist mt8">${mine.slice(0, 5).map(i => o.itemRow(i)).join('')}</div>` : ''}
+      ${asked.length ? `<h3 class="sub-h">طلبات رفعتها (${asked.length})</h3><div class="olist">${asked.slice(0, 3).map(i => o.itemRow(i)).join('')}</div>` : ''}</div>`; }).catch(() => '');
   // ذُكرت في متابعات (@منشن) — غير المقروءة أولاً ثم آخر 5 مقروءة
   const mentions = await q(sb.from('mentions').select('*').eq('user_id', me).order('id', { ascending: false }).limit(30)).catch(() => []);
   const unseenM = mentions.filter(m => !m.seen_at), seenM = mentions.filter(m => m.seen_at).slice(0, 5);
@@ -87,6 +97,7 @@ export async function mountToday(root, params) {
         <div class="pcard"><h2>هذا الأسبوع <span class="badge skel">${week.length}</span></h2>${week.length ? `<div class="tl">${week.slice(0, 10).map(w => `<div class="e"><i>${ico(w[1])}</i><div><b><a href="${w[3]}" style="color:inherit">${esc(w[2])}</a></b><small>${w[0] === today() ? 'اليوم' : w[0] === plus(1) ? 'غداً' : dateAr(w[0])}</small></div></div>`).join('')}</div>` : '<p class="muted">لا مواعيد خلال الأيام السبعة القادمة.</p>'}</div>
       </div>
       <div class="stack">
+        ${opsCard}
         ${mentionsCard}
         ${myMentionsCard}
         ${leavesCard}
@@ -96,6 +107,7 @@ export async function mountToday(root, params) {
     </div></div>`;
   import('./messages.js').then(m => m.bindMessagesCard(root)).catch(() => { });
   bindFeed(root, D, () => mountToday(root, params));
+  if (opsCard) import('./ops.js').then(o => o.bindRows(root, () => mountToday(root, params)));
   $$('[data-mnclose]', root).forEach(b => b.onclick = async e => { e.stopPropagation(); const id = +b.dataset.mnclose; await sb.from('mentions').update({ closed_at: new Date().toISOString() }).eq('id', id); const row = b.closest('.mnr'); row.remove(); const card = row && $('.mentions', root); });
   $$('.mnr', root).forEach(el => el.onclick = async () => { if (el.classList.contains('sent')) { const { openQuick } = await import('./quick.js'); const ref = el.dataset.ref; return openQuick({ q: { k: el.dataset.k, id: /^\d+$/.test(ref) ? +ref : ref }, link: '#/today' }, () => mountToday(root, params)); } const id = +el.dataset.mn; if (!el.classList.contains('seen')) { el.classList.add('seen'); sb.from('mentions').update({ seen_at: new Date().toISOString() }).eq('id', id).then(() => { }); } const { openQuick } = await import('./quick.js'); const ref = el.dataset.ref; openQuick({ q: { k: el.dataset.k, id: /^\d+$/.test(ref) ? +ref : ref }, link: '#/today' }, () => mountToday(root, params)); });
   bindInbox(root, todayItems, () => { const h = $('.inbox h2 .badge', root); const n = root.querySelectorAll('.qi').length; if (h) h.textContent = n; if (!n) { const box = $('.inbox', root); if (box && !box.querySelector('p.muted')) box.insertAdjacentHTML('beforeend', '<p class="muted">أنجزت كل ما ينتظرك 👌</p>'); } });

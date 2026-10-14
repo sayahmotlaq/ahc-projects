@@ -64,7 +64,7 @@ export async function mountMap(root, params) {
   active.forEach(p => { const f = p.facility_id ? fById[p.facility_id] : null; const lat = p.lat ?? f?.lat, lng = p.lng ?? f?.lng; const st = projectStatus(p, D); if (lat != null && lng != null) located.push({ p, lat: +lat, lng: +lng, st, fac: f, own: p.lat != null }); else unlocated.push({ p, st }); });
   const counts = { urgent: 0, me: 0, exec: 0, pre: 0, done: 0 }; located.forEach(x => counts[x.st.k]++);
   const RANK = { urgent: 0, me: 1, exec: 2, pre: 3, done: 4 };
-  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">الخريطة</h1><span class="muted small">${located.length} مشروعاً على الخريطة${unlocated.length ? ` · ${unlocated.length} بلا موقع` : ''}</span><span class="sp"></span>${isAdmin() ? '<a class="btn sm" href="#/admin/facilities">المرافق ومواقعها</a>' : ''}</div>
+  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">الخريطة</h1><span class="muted small" id="mapsum">${located.length} مشروعاً على الخريطة${unlocated.length ? ` · ${unlocated.length} بلا موقع` : ''}</span><span class="sp"></span><div class="oview"><button data-l="p" class="on">المشاريع</button><button data-l="o">أعمال الأقسام</button></div><button class="btn sm" id="hofuf" title="العودة لمستوى مدينة الهفوف">🎯 الهفوف</button>${isAdmin() ? '<a class="btn sm" href="#/admin/facilities">المرافق ومواقعها</a>' : ''}</div>
     <div class="mapfilters"><button class="mf on" data-f="all">الكل <b>${located.length}</b></button><button class="mf" data-f="urgent"><i style="background:#C0392B"></i>عاجل / متعثر <b>${counts.urgent}</b></button><button class="mf" data-f="me"><i style="background:#B8860B"></i>ينتظر قرارك <b>${counts.me}</b></button><button class="mf" data-f="exec"><i style="background:#27A8DF"></i>تحت التنفيذ <b>${counts.exec}</b></button><button class="mf" data-f="pre"><i style="background:#8A94A0"></i>دراسة / طرح <b>${counts.pre}</b></button><button class="mf" data-f="done"><i style="background:#2E8B57"></i>مستلم <b>${counts.done}</b></button></div>
     <div id="pmap" class="lmap big"></div>
     ${unlocated.length ? `<details class="pcard mt12"><summary><b>مشاريع بلا موقع (${unlocated.length})</b> <span class="muted small">— اربط المشروع بمنشأة من نموذج المشروع أو ضع رابط موقعه</span></summary><div class="chips mt8">${unlocated.map(x => `<a class="chip" href="#/project/${x.p.id}" style="border-color:${x.st.color}">${esc(x.p.name)}</a>`).join('')}</div></details>` : ''}`;
@@ -88,6 +88,29 @@ export async function mountMap(root, params) {
   draw(); setTimeout(() => map.invalidateSize(), 80);
   map.on('popupopen', e => { $$('[data-pid]', e.popup.getElement()).forEach(a => a.onclick = ev => { ev.preventDefault(); map.closePopup(); openProjectDrawer(a.dataset.pid, located.map(x => x.p)); }); });
   $$('.mf', root).forEach(b => b.onclick = () => { filter = b.dataset.f; $$('.mf', root).forEach(x => x.classList.toggle('on', x === b)); draw(); });
+  $('#hofuf', root).onclick = () => map.setView(AHSA, 12);
+  // طبقة أعمال الأقسام: لكل منشأة عدد الأعمال المفتوحة وأخطرها (إغلاق نافذ، تعطيل حريق، متأخر، طارئ)
+  let opsLayer = null;
+  const drawOps = async () => {
+    const ops = await import('./ops.js'); const O = await ops.loadOps();
+    opsLayer = L.layerGroup().addTo(map); const bounds = []; let tot = 0;
+    facs.filter(f => f.lat != null && f.lng != null).forEach(f => {
+      const items = O.items.filter(i => i.facility_id === f.id && ops.isOpen(i)); if (!items.length) return; tot += items.length;
+      const crit = items.filter(i => ['closure', 'impair'].includes(O.K[i.kind]?.effect) && i.status !== 'new'), late = items.filter(ops.isLate), urg = items.filter(i => ['p1', 'p2'].includes(i.priority));
+      const color = crit.length || late.length ? '#C0392B' : urg.length ? '#D9772B' : '#1B6CA8';
+      const units = {}; items.forEach(i => units[i.unit] = (units[i.unit] || 0) + 1);
+      const mk = L.marker([+f.lat, +f.lng], { icon: L.divIcon({ className: 'pmw', html: `<div class="pm ${crit.length || late.length ? 'urgent' : ''}" style="--c:${color}"><span>${items.length}</span></div>`, iconSize: [36, 36], iconAnchor: [18, 18] }), title: f.name }).addTo(opsLayer);
+      mk.bindTooltip(`<b>${esc(f.name)}</b><br>${items.length} عمل مفتوح${late.length ? ` · ${late.length} متأخر` : ''}${crit.length ? ` · ${crit.length} إغلاق/تعطيل نافذ` : ''}<br>${Object.entries(units).map(([u, n]) => `${esc(ops.uname(u))} ${n}`).join(' · ')}`, { direction: 'top', offset: [0, -14] });
+      mk.bindPopup(`<div class="pmlist"><b>${esc(f.name)}</b>${items.sort((a, b) => ops.isLate(b) - ops.isLate(a) || a.priority.localeCompare(b.priority)).slice(0, 10).map(i => `<a href="#/ops/list?id=${i.id}"><i style="background:${ops.ucolor(i.unit)}"></i><span>${esc(O.K[i.kind]?.icon || '')} ${esc(i.title)}</span><small>${esc(ops.uname(i.unit))}${ops.isLate(i) ? ' · متأخر' : ''}</small></a>`).join('')}${items.length > 10 ? `<a href="#/ops/list?f=${f.id}"><span>كل الأعمال (${items.length}) ‹</span></a>` : ''}</div>`, { maxWidth: 360 });
+      bounds.push([+f.lat, +f.lng]);
+    });
+    $('#mapsum', root).textContent = `${tot} عملاً مفتوحاً في المنشآت`;
+    if (bounds.length) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13 });
+  };
+  $$('[data-l]', root).forEach(b => b.onclick = async () => { $$('[data-l]', root).forEach(x => x.classList.toggle('on', x === b)); const o = b.dataset.l === 'o';
+    $('.mapfilters', root).style.display = o ? 'none' : '';
+    if (o) { map.removeLayer(layer); try { await drawOps(); } catch (e) { err(e); } } else { if (opsLayer) map.removeLayer(opsLayer); layer.addTo(map); draw(); $('#mapsum', root).textContent = `${located.length} مشروعاً على الخريطة`; } });
+  if (params?.get?.('l') === 'ops') $('[data-l=o]', root).click();
 }
 
 // ---------- إدارة المرافق (تبويب في الإدارة)
