@@ -79,6 +79,7 @@ jobs:
           K=$([ "$(date -u +%H)" -lt 9 ] && echo morning || echo evening)
           printf "select public.daily_digest('%s') as digest_sent;\n" "$K" | psql "${{ steps.db.outputs.url }}" -v ON_ERROR_STOP=1 2>&1 | tee -a "$RUNNER_TEMP/seed.txt"; test ${PIPESTATUS[1]} -eq 0
           if [ "$K" = morning ]; then printf "select public.fm_daily(7) as fm_digest_sent;\nselect public.ops_daily() as ops_digest_sent;\n" | psql "${{ steps.db.outputs.url }}" -v ON_ERROR_STOP=1 2>&1 | tee -a "$RUNNER_TEMP/seed.txt"; fi
+          printf "select public.fleet_daily('%s') as fleet_sent;\n" "$K" | psql "${{ steps.db.outputs.url }}" -v ON_ERROR_STOP=1 2>&1 | tee -a "$RUNNER_TEMP/seed.txt" || true
       - name: Publish seed log
         if: always()
         continue-on-error: true

@@ -3,12 +3,12 @@ import { sb, q, session, isAdmin, role, canRead } from './api.js';
 import { $, $$, esc, toast, err, modal, field, sel, formData, dateAr, download, ico, kic } from './ui.js';
 import { O, loadOps, ST, PR, OPEN, isOpen, isLate, itemRow, bindRows, listView, newItem, openItem, uchip, uname, ucolor, pname, staffOf, dur, canFile, activeCritical, criticalHtml, LST, locPill, locLabel, isStaff } from './ops.js';
 
-const ASSET_UNITS = ['MNT', 'BME', 'IT', 'MED', 'SAF', 'GEN'], PLAN_UNITS = ['MNT', 'BME', 'SAF', 'IT', 'GEN', 'FAC'];
+const ASSET_UNITS = ['MNT', 'BME', 'IT', 'MED', 'SAF', 'GEN'], PLAN_UNITS = ['MNT', 'BME', 'SAF', 'IT', 'GEN', 'FAC', 'TRN'];
 const AST = { in_service: { ar: 'في الخدمة', c: '#2E8B57' }, down: { ar: 'متعطل', c: '#C0392B' }, out: { ar: 'خارج الخدمة', c: '#7A8794' }, disposed: { ar: 'مُكهَّن', c: '#B5C0CB' } };
 const CRIT = { high: 'عالية', medium: 'متوسطة', low: 'منخفضة' };
 const PER = { day: 'يوم', week: 'أسبوع', month: 'شهر', year: 'سنة' };
 const perLabel = p => p.every === 1 ? { day: 'يومياً', week: 'أسبوعياً', month: 'شهرياً', year: 'سنوياً' }[p.per] : `كل ${p.every} ${{ day: 'أيام', week: 'أسابيع', month: 'أشهر', year: 'سنوات' }[p.per]}`;
-const MAN_PREFIX = { PRJ: 'P', FAC: 'F', MNT: 'M', SAF: 'H', BME: 'B', MED: 'E', GEN: 'S', IT: 'T' };
+const MAN_PREFIX = { PRJ: 'P', FAC: 'F', MNT: 'M', SAF: 'H', BME: 'B', MED: 'E', GEN: 'S', IT: 'T', TRN: 'V' };
 const month = () => new Date().toISOString().slice(0, 7);
 const units = () => O.G.units.filter(u => u.kind === 'unit' && u.active !== false);
 function stats(list) {
@@ -73,14 +73,15 @@ export async function mountDept(root, code, tab = 'overview', params = new URLSe
   const mine = O.items.filter(i => i.unit === code), s = stats(mine), kinds = O.kinds.filter(k => k.unit === code && k.active !== false);
   const team = O.people.filter(p => p.unit === code || (p.role === 'facility' && !p.unit && ['FAC', 'MNT', 'SAF'].includes(code)));
   const procs = O.G.procs.filter(p => p.code.startsWith((MAN_PREFIX[code] || '#') + '-')).sort((a, b) => a.code.localeCompare(b.code));
-  const tabs = [['overview', 'نظرة عامة'], ['work', `الأعمال <b class="fmcnt ${s.late ? 'bad' : ''}">${s.open}</b>`], ...(code === 'FAC' ? [['locations', `المواقع والغرف <b class="fmcnt ${O.locs.some(l => l.status !== 'operational') ? 'bad' : ''}">${O.locs.length}</b>`]] : []),
+  const tabs = [['overview', 'نظرة عامة'], ...(code === 'TRN' ? [['fleet', 'لوحة الحركة'], ['trips', 'سجل الحركة'], ['vehicles', 'الأسطول']] : []), ['work', `الأعمال <b class="fmcnt ${s.late ? 'bad' : ''}">${s.open}</b>`], ...(code === 'FAC' ? [['locations', `المواقع والغرف <b class="fmcnt ${O.locs.some(l => l.status !== 'operational') ? 'bad' : ''}">${O.locs.length}</b>`]] : []),
     ...(ASSET_UNITS.includes(code) ? [['assets', 'الأصول']] : []), ...(PLAN_UNITS.includes(code) ? [['plans', 'الأعمال المخططة']] : []), ['manual', `دليل القسم <b class="fmcnt">${procs.length}</b>`], ['team', `الفريق <b class="fmcnt">${team.length}</b>`]];
   root.innerHTML = `<div class="dhero" style="--c:#${u.color}"><div class="dhero-t"><small>إدارة الخدمات الفنية ‹ الأقسام</small><h1>${esc(u.name)}</h1><p>${esc(u.mission || '')}</p>${u.head ? `<span class="dhead">رئيس القسم: <b>${esc(u.head)}</b></span>` : ''}</div>
-      <div class="dhero-a">${kinds.filter(k => k.intake || isStaff()).map(k => `<button class="btn ${k.intake && !staffOf(code) ? 'primary' : ''}" data-nk="${k.code}" title="${esc(k.descr)}">${kic(k)} ${esc(k.name)}</button>`).join('')}${code === 'PRJ' && canRead() ? '<a class="btn" href="#/dashboard">لوحة المشاريع</a><a class="btn" href="#/projects">المشاريع</a>' : ''}</div></div>
+      <div class="dhero-a">${kinds.filter(k => k.intake || isStaff()).map(k => `<button class="btn ${k.intake && !staffOf(code) ? 'primary' : ''}" data-nk="${k.code}" title="${esc(k.descr)}">${kic(k)} ${esc(k.name)}</button>`).join('')}${code === 'PRJ' && canRead() ? '<a class="btn" href="#/dashboard">لوحة المشاريع</a><a class="btn" href="#/projects">المشاريع</a>' : ''}${code === 'TRN' ? `<a class="btn primary" href="#/dept/TRN/fleet">${ico('car')} لوحة الحركة</a><a class="btn" href="#/fleet">${ico('plus')} طلب سيارة</a>` : ''}</div></div>
     <nav class="fmtabs">${tabs.map(([k, v]) => `<a href="#/dept/${code}/${k}" class="${tab === k ? 'on' : ''}">${v}</a>`).join('')}</nav><div id="dBody"></div>`;
   const re = () => mountDept(root, code, tab, params);
   $$('[data-nk]', root).forEach(b => b.onclick = () => newItem({ kind: b.dataset.nk }, r => openItem(r.id, re)));
   const t = $('#dBody', root);
+  if (code === 'TRN' && ['fleet', 'trips', 'vehicles'].includes(tab)) { const { mountFleetTab } = await import('./fleet.js'); return mountFleetTab(t, tab, params, re); }
   if (tab === 'work') return listView(t, mine, { params, showUnit: false, units: false, re });
   if (tab === 'manual') return viewManual(t, code, procs);
   if (tab === 'locations' && code === 'FAC') return viewLocations(t, params, re);
@@ -104,7 +105,10 @@ export async function mountDept(root, code, tab = 'overview', params = new URLSe
       <li><b>يتعاون مع الأقسام</b><span>يحيل جزءاً من العمل لقسم آخر أو يعيد توجيهه، أو يحوّله إلى مشروع (R-01)؛ وتظهر السلسلة لكل الأطراف وفي لوحة الإدارة.</span></li>
       <li><b>يُقاس أداؤه</b><span>المفتوح والمتأخر وضمن المهلة ومتوسط الإنجاز ورضا أصحاب الطلبات وتكلفة الإصلاح — في هذه الصفحة وفي التقرير الشهري للإدارة.</span></li></ol>
     <div class="dready"><b>للتشغيل:</b> ${team.length ? `<span class="ok">✓ الفريق (${team.length})</span>` : `<a href="#/admin/users">＋ أضف موظفي القسم (الدور «موظف قسم فني» + القسم)</a>`}${ASSET_UNITS.includes(code) ? `<a href="#/dept/${code}/assets">＋ سجّل أصول القسم</a>` : ''}${PLAN_UNITS.includes(code) ? `<a href="#/dept/${code}/plans">＋ أضف الخطط الدورية</a>` : ''}${code === 'FAC' ? '<a href="#/dept/FAC/locations">＋ سجّل الغرف والمواقع</a>' : ''}${intakeK[0] ? `<a href="#" data-nk="${intakeK[0].code}">جرّب: ارفع ${esc(intakeK[0].name)}</a>` : ''}</div></div>`;
-  t.innerHTML = `${howto}<div class="fmkpis dk">
+  let trn = '';
+  if (code === 'TRN') { try { const { F, loadFleet } = await import('./fleet.js'); await loadFleet(); const act = F.V.filter(v => v.active), out = F.trips.filter(x => x.status === 'out'), late = out.filter(x => new Date(x.expected_back) < new Date()), rq = F.trips.filter(x => x.status === 'requested');
+    trn = `<div class="pcard"><h2>الحركة الآن <a class="small" href="#/dept/TRN/fleet">لوحة الحركة ‹</a></h2><div class="dmini">${[['متاحة', act.filter(v => v.status === 'available').length], ['خارج المقر', out.length], ['متأخرة عن العودة', late.length], ['طلبات بانتظار التسليم', rq.length], ['في الصيانة', act.filter(v => v.status === 'maint').length]].map(([l, n]) => `<a href="#/dept/TRN/fleet"><b>${n}</b><span>${l}</span></a>`).join('')}</div></div>`; } catch (e) { } }
+  t.innerHTML = `${trn}${howto}<div class="fmkpis dk">
       ${kpi('blue', s.open, 'عمل مفتوح', `${s.fresh} جديد · ${s.verify} بانتظار التأكيد`, `#/dept/${code}/work`)}
       ${kpi(s.late ? 'red' : 'green', s.late, 'متأخر عن مهلته', s.late ? 'يحتاج تدخلاً' : 'كل الأعمال في مهلتها', `#/dept/${code}/work?late=1`)}
       ${kpi(s.urgent ? 'amber' : '', s.urgent, 'طارئ أو عاجل')}

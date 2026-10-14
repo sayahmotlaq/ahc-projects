@@ -156,7 +156,7 @@ function viewMatrix(t, params) {
 
 // ---------- الإجراءات
 // الإجراءات: مشتركة بين الأقسام (G-) + دليل إجراءات لكل قسم (المشاريع P-، المرافق F-، الصيانة M-، …)
-const MAN_PREFIX = { PRJ: 'P', FAC: 'F', MNT: 'M', SAF: 'H', BME: 'B', MED: 'E', GEN: 'S', IT: 'T' };
+const MAN_PREFIX = { PRJ: 'P', FAC: 'F', MNT: 'M', SAF: 'H', BME: 'B', MED: 'E', GEN: 'S', IT: 'T', TRN: 'V' };
 const isShared = p => /^G-/.test(p.code);
 async function markImpl(t) {
   try { if (!KINDS) KINDS = await q(sb.from('ops_kinds').select('code,name,icon,unit,proc,intake,active').eq('active', true)).catch(() => []);
@@ -199,6 +199,7 @@ const IMPL = {
   'P-10': [['#/tasks', 'المهام'], ['#/requests', 'طلبات المشاريع']], 'P-11': [['#/documents', 'المستندات الرسمية']], 'P-12': [['#/treports', 'محاضر الاجتماعات']], 'P-13': [['#/projects', 'الإغلاق (في المشروع)']], 'P-14': [['#/projects', 'الضمان (في المشروع)']],
   'P-15': [['#/report', 'التقارير'], ['#/briefs', 'العروض التنفيذية']], 'P-16': [['#/admin/quality', 'فاحص جودة البيانات']],
   // إجراءات تُنفَّذ بنماذج إجراءات أخرى
+  'V-01': [['#/fleet', 'سيارات المقر — طلب سيارة'], ['#/dept/TRN/fleet', 'لوحة الحركة — التسليم والاستلام']], 'V-02': [['#/dept/TRN/vehicles', 'سجل الأسطول ووثائقه']], 'V-03': [['k:vfix'], ['#/dept/TRN/plans', 'الأعمال المخططة — صيانة السيارات']], 'V-04': [['#/dept/TRN/trips', 'سجل الحركة — التعبئة والكيلومترات']], 'V-05': [['k:vacc'], ['#/dept/TRN/trips', 'سجل الحركة — من استخدم السيارة']], 'V-06': [['#/fleet', 'طلب سيارة بمبيت'], ['#/dept/TRN/fleet', 'لوحة الحركة']],
   'G-09': [['k:it'], ['#/projects', 'المشاريع']], 'H-07': [['k:permit'], ['k:saf']], 'E-03': [['k:mspec']], 'S-04': [['k:gen']], 'T-03': [['k:it'], ['#/dept/BME/assets', 'سجل الأجهزة الطبية']],
 };
 let KINDS = null;

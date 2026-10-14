@@ -89,6 +89,7 @@ export const ICONS = {
   permit: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 14l2 2 4-4"/>',
   power: '<path d="M12 3v8"/><path d="M6.5 7a8 8 0 1 0 11 0"/>',
   calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 14h2M12 14h2"/>',
+  car: '<path d="M5 17H3v-5l2-5h14l2 5v5h-2"/><path d="M3 12h18M7 7l-1 5M17 7l1 5"/><circle cx="7.5" cy="17" r="2"/><circle cx="16.5" cy="17" r="2"/><path d="M9.5 17h5"/>',
   key: '<circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 8.2-8.2M17 6l2 2M14.5 8.5l2 2"/>',
   star: '<path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.6l1-5.8L3.5 9.7l5.9-.9z"/>',
   tag: '<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="7.5" r="1.4"/>',
@@ -110,7 +111,7 @@ export const ICONS = {
   print: '<path d="M6 9V3h12v6M6 18H4V9h16v9h-2M6 14h12v7H6z"/>', edit: '<path d="M4 20h4l11-11-4-4L4 16z"/>', alert: '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/>', clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
 };
 // أيقونة نوع العمل: الاسم من ops_kinds.icon إن كان من المجموعة، وإلا حسب الرمز
-const KICON = { mnt: 'wrench', bme: 'steth', it: 'monitor', gen: 'sparkle', saf: 'shield', fac: 'building', med: 'box', prj: 'ruler', emerg: 'siren', handover: 'clipok', drill: 'flame', dispose: 'recycle', spare: 'cog', mspec: 'clip2', siteprep: 'crane', worksite: 'cone', closure: 'barrier', permit: 'permit', impair: 'flameoff', shutdown: 'power', ppm: 'calendar', accept: 'box', recall: 'alert', access: 'key', ceval: 'star' };
+const KICON = { mnt: 'wrench', bme: 'steth', it: 'monitor', gen: 'sparkle', saf: 'shield', fac: 'building', med: 'box', prj: 'ruler', emerg: 'siren', handover: 'clipok', drill: 'flame', dispose: 'recycle', spare: 'cog', mspec: 'clip2', siteprep: 'crane', worksite: 'cone', closure: 'barrier', permit: 'permit', impair: 'flameoff', shutdown: 'power', ppm: 'calendar', accept: 'box', recall: 'alert', access: 'key', ceval: 'star', vfix: 'car', vacc: 'alert' };
 export const kic = (k, cls = '') => ico(ICONS[k?.icon] ? k.icon : (KICON[k?.code] || 'doc'), cls);
 export const ico = (n, cls = '') => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n] || ''}</svg>`;
 
