@@ -1,6 +1,6 @@
 // ===== المستخلصات المالية =====
 import { sb, canEdit, isAdmin, role, q, session, today } from './api.js';
-import { $, $$, esc, money, fmt, dateAr, toast, err, modal, confirm, field, inp, sel, formData, money_inp } from './ui.js';
+import { $, $$, esc, money, fmt, dateAr, toast, err, modal, confirm, field, inp, sel, formData, money_inp, ico } from './ui.js';
 import { exportTable, xbtn } from './xlsx.js';
 import { threadBox, mountThread } from './thread.js';
 import { govBar, govChip, GOV } from './govlink.js';
@@ -136,7 +136,7 @@ export function paySummary(p, rows) {
   const finPct = cv ? Math.round(certified / cv * 100) : null; const paidPct = cv ? Math.round(totalPaid / cv * 100) : null;
   const prog = Number(p.progress_actual || 0);
   const warn = finPct !== null && p.stage === 'execution' && finPct > prog + 10;
-  return { certified, paidNet, pending, retention, cv, totalPaid, finPct, paidPct, warn, prog, html: `<div class="kpis fin"><div class="kpi"><b>${money(cv)}</b><span>قيمة العقد (ر.س)</span></div><div class="kpi"><b>${money(Math.round(certified))}</b><span>أعمال مُستخلصة تراكمياً${finPct !== null ? ` · ${finPct}%` : ''}</span></div><div class="kpi ${pending ? 'bad' : ''}"><b>${money(Math.round(pending))}</b><span>قيد الاعتماد / لدى المالية</span></div><div class="kpi"><b>${money(Math.round(totalPaid))}</b><span>المصروف${paidPct !== null ? ` · ${paidPct}%` : ''}${p.paid_opening ? ` <small>(منها ${money(p.paid_opening)} رصيد سابق)</small>` : ''}</span></div><div class="kpi"><b>${cv ? money(Math.round(cv - totalPaid)) : '—'}</b><span>المتبقي من العقد</span></div><div class="kpi"><b>${money(Math.round(retention))}</b><span>ضمان محتجز</span></div></div>${warn ? `<div class="alert bad">⚠ الإنجاز المالي (${finPct}%) يفوق الإنجاز الفعلي (${prog}%) بأكثر من 10% — يُنصح بمراجعة نسب الأعمال قبل الاعتماد.</div>` : ''}` };
+  return { certified, paidNet, pending, retention, cv, totalPaid, finPct, paidPct, warn, prog, html: `<div class="kpis fin"><div class="kpi"><b>${money(cv)}</b><span>قيمة العقد (ر.س)</span></div><div class="kpi"><b>${money(Math.round(certified))}</b><span>أعمال مُستخلصة تراكمياً${finPct !== null ? ` · ${finPct}%` : ''}</span></div><div class="kpi ${pending ? 'bad' : ''}"><b>${money(Math.round(pending))}</b><span>قيد الاعتماد / لدى المالية</span></div><div class="kpi"><b>${money(Math.round(totalPaid))}</b><span>المصروف${paidPct !== null ? ` · ${paidPct}%` : ''}${p.paid_opening ? ` <small>(منها ${money(p.paid_opening)} رصيد سابق)</small>` : ''}</span></div><div class="kpi"><b>${cv ? money(Math.round(cv - totalPaid)) : '—'}</b><span>المتبقي من العقد</span></div><div class="kpi"><b>${money(Math.round(retention))}</b><span>ضمان محتجز</span></div></div>${warn ? `<div class="alert bad">${ico('alert')} الإنجاز المالي (${finPct}%) يفوق الإنجاز الفعلي (${prog}%) بأكثر من 10% — يُنصح بمراجعة نسب الأعمال قبل الاعتماد.</div>` : ''}` };
 }
 
 function payRows(rows, opts = {}) {

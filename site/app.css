@@ -1267,3 +1267,14 @@ a:hover>.garr.fwd{transform:translateX(-3px)} a:hover>.garr.back,.btn:hover>.gar
 .gimpl{display:flex;flex-direction:column;gap:8px;background:#F3FAFE;border:1px solid #BFE3F5;border-inline-start:4px solid #27A8DF;border-radius:12px;padding:10px 12px;margin:12px 0}
 .gimpl.none{background:var(--surface2);border-color:var(--line);border-inline-start-color:var(--faint)} .gimpl-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap} .gimpl-h b{color:#0E7AB0} .gimpl-l{display:flex;flex-wrap:wrap;gap:6px}
 .gimpl-b{font-size:10.5px;font-weight:800;color:#0E7AB0;background:#E6F4FB;border-radius:6px;padding:1px 7px;margin-inline-start:6px} .gimpl-b.off{color:var(--muted);background:var(--surface2)}
+/* ===== أيقونات خطية موحّدة (حزمة 83): لون القسم بدل الرموز التعبيرية ===== */
+.oi-k{color:var(--k,var(--navy));background:color-mix(in srgb,var(--k,var(--navy)) 11%,transparent)} .oi-k svg.i{width:16px;height:16px} .oi-k.big svg.i{width:24px;height:24px;stroke-width:1.7}
+.ocard-i{color:var(--c)} .ocard-i svg.i{width:24px;height:24px;stroke-width:1.7}
+.okhead .ocard-i svg.i{width:24px;height:24px}
+td.kic{color:var(--k)} td.kic svg.i{width:20px;height:20px}
+.nitem .nic{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:color-mix(in srgb,var(--navy) 8%,transparent);color:var(--navy);flex:none} .nitem .nic svg.i{width:17px;height:17px}
+.gbi{color:var(--navy);display:grid;place-items:center} .gbi svg.i{width:20px;height:20px}
+.ogate-i svg.i{width:15px;height:15px} .ogate.ok .ogate-i{color:#2E8B57}
+.dhero-a .btn svg.i,.gimpl-l .btn svg.i{width:16px;height:16px}
+.olink svg.i,.fmproc svg.i,.osla svg.i,.ochain-r svg.i,.gsm svg.i,.achip svg.i,.alert svg.i{width:15px;height:15px;vertical-align:-3px}
+.tl .e>i svg.i{width:15px;height:15px}

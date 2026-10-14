@@ -93,7 +93,7 @@ export async function mountToday(root, params) {
     ${pulseHtml}
     <div class="two">
       <div class="stack">
-        <div class="pcard inbox"><h2>مطلوب منك اليوم ${nTodo ? `<span class="badge ${todayItems.some(i => i.bad) ? 'bad' : 'ovr'}">${nTodo}</span>` : ''}</h2>${todayItems.length ? todayItems.map((i, idx) => inboxItem(i, idx, D.ago)).join('') : '<p class="muted">لا يوجد ما ينتظرك الآن 👌</p>'}</div>
+        <div class="pcard inbox"><h2>مطلوب منك اليوم ${nTodo ? `<span class="badge ${todayItems.some(i => i.bad) ? 'bad' : 'ovr'}">${nTodo}</span>` : ''}</h2>${todayItems.length ? todayItems.map((i, idx) => inboxItem(i, idx, D.ago)).join('') : '<p class="muted">لا يوجد ما ينتظرك الآن</p>'}</div>
         <div class="pcard"><h2>هذا الأسبوع <span class="badge skel">${week.length}</span></h2>${week.length ? `<div class="tl">${week.slice(0, 10).map(w => `<div class="e"><i>${ico(w[1])}</i><div><b><a href="${w[3]}" style="color:inherit">${esc(w[2])}</a></b><small>${w[0] === today() ? 'اليوم' : w[0] === plus(1) ? 'غداً' : dateAr(w[0])}</small></div></div>`).join('')}</div>` : '<p class="muted">لا مواعيد خلال الأيام السبعة القادمة.</p>'}</div>
       </div>
       <div class="stack">
@@ -110,7 +110,7 @@ export async function mountToday(root, params) {
   if (opsCard) import('./ops.js').then(o => o.bindRows(root, () => mountToday(root, params)));
   $$('[data-mnclose]', root).forEach(b => b.onclick = async e => { e.stopPropagation(); const id = +b.dataset.mnclose; await sb.from('mentions').update({ closed_at: new Date().toISOString() }).eq('id', id); const row = b.closest('.mnr'); row.remove(); const card = row && $('.mentions', root); });
   $$('.mnr', root).forEach(el => el.onclick = async () => { if (el.classList.contains('sent')) { const { openQuick } = await import('./quick.js'); const ref = el.dataset.ref; return openQuick({ q: { k: el.dataset.k, id: /^\d+$/.test(ref) ? +ref : ref }, link: '#/today' }, () => mountToday(root, params)); } const id = +el.dataset.mn; if (!el.classList.contains('seen')) { el.classList.add('seen'); sb.from('mentions').update({ seen_at: new Date().toISOString() }).eq('id', id).then(() => { }); } const { openQuick } = await import('./quick.js'); const ref = el.dataset.ref; openQuick({ q: { k: el.dataset.k, id: /^\d+$/.test(ref) ? +ref : ref }, link: '#/today' }, () => mountToday(root, params)); });
-  bindInbox(root, todayItems, () => { const h = $('.inbox h2 .badge', root); const n = root.querySelectorAll('.qi').length; if (h) h.textContent = n; if (!n) { const box = $('.inbox', root); if (box && !box.querySelector('p.muted')) box.insertAdjacentHTML('beforeend', '<p class="muted">أنجزت كل ما ينتظرك 👌</p>'); } });
+  bindInbox(root, todayItems, () => { const h = $('.inbox h2 .badge', root); const n = root.querySelectorAll('.qi').length; if (h) h.textContent = n; if (!n) { const box = $('.inbox', root); if (box && !box.querySelector('p.muted')) box.insertAdjacentHTML('beforeend', '<p class="muted">أنجزت كل ما ينتظرك</p>'); } });
 }
 
 // ---------- حركة الفريق (سلسلة التعليقات والمتابعات لكل الفريق)

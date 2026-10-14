@@ -1,6 +1,6 @@
 // ===== الحوكمة: إدارة الخدمات الفنية بأقسامها — الهيكل والعلاقات، موجّه الطلبات، مصفوفة الصلاحيات، الإجراءات، القواعد، أسئلة «كيف» =====
 import { sb, q, session, isAdmin } from './api.js';
-import { $, $$, esc as esc0, toast, err, modal, confirm, field, inp, sel, formData, ico, dateAr } from './ui.js';
+import { $, $$, esc as esc0, toast, err, modal, confirm, field, inp, sel, formData, ico, kic, dateAr } from './ui.js';
 
 // في السياق العربي (RTL) السهم الدال على «ثم/يؤدي إلى» هو ← ؛ أي → يُدخل يدوياً يُعرض ←
 const esc = s => esc0(String(s ?? '').replace(/→/g, '←'));
@@ -22,7 +22,7 @@ const refLink = code => /^[A-QS-Z]-\d/.test(code) ? `<a class="gref" data-peek="
 // نص مع تحويل أكواد الإجراءات والقواعد (G-05، P-03، R-01) إلى إحالات قابلة للنقر
 const linkify = s => esc(s).replace(/\b([A-Z]-\d{2})\b/g, m => (G?.P?.[m] || G?.R?.[m]) ? refLink(m).replace('class="gref"', 'class="gref in"') : m);
 
-const stepHtml = (s, i, cur) => `<div class="gstep ${s.kind === 'decision' ? 'dec' : ''} ${cur === i + 1 ? 'cur' : ''} ${typeof cur === 'number' && i + 1 < cur ? 'past' : ''}" style="--c:#${uc(s.unit)}"><span class="gno"><i>${i + 1}</i></span><div class="gsb"><div class="gsh">${chip(s.unit)}${s.role ? `<small class="muted">${esc(s.role)}</small>` : ''}${s.kind === 'decision' ? '<span class="badge ovr">قرار</span>' : ''}${cur === i + 1 ? '<span class="badge info">أنت هنا</span>' : ''}</div><p>${linkify(s.action)}</p><div class="gsm">${s.sla ? `<span>⏱ ${esc(s.sla)}</span>` : ''}${s.where && s.where !== '—' ? `<span>📍 ${esc(s.where)}</span>` : ''}</div></div></div>`;
+const stepHtml = (s, i, cur) => `<div class="gstep ${s.kind === 'decision' ? 'dec' : ''} ${cur === i + 1 ? 'cur' : ''} ${typeof cur === 'number' && i + 1 < cur ? 'past' : ''}" style="--c:#${uc(s.unit)}"><span class="gno"><i>${i + 1}</i></span><div class="gsb"><div class="gsh">${chip(s.unit)}${s.role ? `<small class="muted">${esc(s.role)}</small>` : ''}${s.kind === 'decision' ? '<span class="badge ovr">قرار</span>' : ''}${cur === i + 1 ? '<span class="badge info">أنت هنا</span>' : ''}</div><p>${linkify(s.action)}</p><div class="gsm">${s.sla ? `<span>${ico('clock')} ${esc(s.sla)}</span>` : ''}${s.where && s.where !== '—' ? `<span>${ico('pin')} ${esc(s.where)}</span>` : ''}</div></div></div>`;
 const flowHtml = (p, cur) => `<div class="gflow">${(p.steps || []).map((s, i) => `<span class="gfi">${i ? '<i class="gfa">←</i>' : ''}<span class="gfs ${s.kind === 'decision' ? 'dec' : ''} ${cur === i + 1 ? 'cur' : ''}" style="--c:#${uc(s.unit)}"><b><i>${i + 1}</i></b>${esc(un(s.unit))}</span></span>`).join('')}</div>`;
 const who = s => esc(un(s.unit)) + (s.role && s.role !== un(s.unit) ? ' / ' + esc(s.role) : '');
 
@@ -68,7 +68,7 @@ export function govBarHtml(code, step, note) {
   const p = G?.P?.[code]; if (!p) return '';
   const n = (p.steps || []).length, k = step === 'done' ? n : Number(step) || 0, c = k ? p.steps[k - 1] : null, nx = step === 'done' ? null : (k ? p.steps[k] : p.steps[0]);
   const where = step === 'done' ? '<span class="gbs ok">✓ اكتمل الإجراء</span>' : c ? `<span class="gbs"><b>الخطوة ${k}/${n}</b> ${who(c)}: ${esc(c.action)}</span>` : `<span class="gbs">${n} خطوات</span>`;
-  return `<button type="button" class="gb" data-peek="${esc(code)}" data-step="${esc(step || '')}" style="--c:#${uc(p.owner)}" title="اضغط لعرض الإجراء كاملاً${c ? ' والخطوة الحالية' : ''}"><span class="gbi">📘</span><span class="gbt"><span class="gbh"><b class="gbc">${esc(code)}</b> ${esc(p.title)}${note ? ` <small>· ${esc(note)}</small>` : ''}</span>${where}${nx && step !== 'done' ? `<span class="gbn">التالي: ${who(nx)}</span>` : ''}</span><span class="gbo">عرض ‹</span></button>`;
+  return `<button type="button" class="gb" data-peek="${esc(code)}" data-step="${esc(step || '')}" style="--c:#${uc(p.owner)}" title="اضغط لعرض الإجراء كاملاً${c ? ' والخطوة الحالية' : ''}"><span class="gbi">${ico('book')}</span><span class="gbt"><span class="gbh"><b class="gbc">${esc(code)}</b> ${esc(p.title)}${note ? ` <small>· ${esc(note)}</small>` : ''}</span>${where}${nx && step !== 'done' ? `<span class="gbn">التالي: ${who(nx)}</span>` : ''}</span><span class="gbo">عرض ‹</span></button>`;
 }
 
 export async function mountGov(root, tab = 'start', id = null, params) {
@@ -215,7 +215,7 @@ async function implBox(t, p) {
     if (!ks.length && !mods.length) { box.innerHTML = '<div class="gimpl none"><b>لم يُربط بعد بشاشة أو نموذج في المنصة</b><span class="muted small">يُنفَّذ حالياً ورقياً أو خارج المنصة.</span></div>'; return; }
     const total = Object.values(steps).reduce((a, b) => a + b, 0);
     box.innerHTML = `<div class="gimpl"><div class="gimpl-h"><b>يُنفَّذ في المنصة</b>${total ? `<span class="badge info">${total} جارٍ الآن</span>` : '<span class="muted small">لا أعمال جارية عليه الآن</span>'}</div>
-      <div class="gimpl-l">${ks.map(k => `<button class="btn sm ${k.intake ? '' : 'ghost'}" data-nk="${k.code}">${esc(k.icon)} ${esc(k.name)}</button>`).join('')}${mods.map(([h, l]) => `<a class="btn sm ghost" href="${h}">${esc(l)}</a>`).join('')}${ks.length || total ? `<a class="btn sm ghost" href="#/ops/list?proc=${p.code}">الأعمال على هذا الإجراء</a>` : ''}</div></div>`;
+      <div class="gimpl-l">${ks.map(k => `<button class="btn sm ${k.intake ? '' : 'ghost'}" data-nk="${k.code}">${kic(k)} ${esc(k.name)}</button>`).join('')}${mods.map(([h, l]) => `<a class="btn sm ghost" href="${h}">${esc(l)}</a>`).join('')}${ks.length || total ? `<a class="btn sm ghost" href="#/ops/list?proc=${p.code}">الأعمال على هذا الإجراء</a>` : ''}</div></div>`;
     $$('[data-nk]', box).forEach(b => b.onclick = async () => { const o = await import('./ops.js'); o.newItem({ kind: b.dataset.nk }, r => o.openItem(r.id)); });
     $$('.gsteps .gstep', t).forEach((el, i) => { const n = steps[i + 1]; if (n) el.querySelector('.gsh')?.insertAdjacentHTML('beforeend', `<span class="badge info" title="أعمال متوقفة عند هذه الخطوة الآن">${n} هنا الآن</span>`); });
   } catch (e) { box.innerHTML = ''; }

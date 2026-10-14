@@ -1,6 +1,6 @@
 // ===== سلسلة المتابعة الموحدة: تعليقات/متابعات لأي عنصر (مهمة، طلب، تحدٍ، اعتماد، مستخلص، أمر تغيير، تقرير، إجازة) =====
 import { sb, q, session, isAdmin } from './api.js';
-import { $, $$, esc, dateAr, toast, err } from './ui.js';
+import { $, $$, esc, dateAr, toast, err, ico } from './ui.js';
 import { uploadAttachment, loadAttachments, attachChip, bindChips, ACCEPT } from './attach.js';
 
 export const THREAD_KINDS = { task: 'المهمة', request: 'الطلب', challenge: 'التحدي', submittal: 'الاعتماد', payment: 'المستخلص', change: 'أمر التغيير', treport: 'التقرير', leave: 'الإجازة', boq: 'جدول الكميات' };
@@ -16,14 +16,14 @@ const initials = n => (n || '؟').trim().split(' ').filter(Boolean).slice(0, 2).
 const when = d => { const m = Math.floor((Date.now() - new Date(d)) / 6e4); const t = new Date(d).toLocaleTimeString('ar-SA-u-nu-latn', { hour: '2-digit', minute: '2-digit' }); return m < 1 ? 'الآن' : m < 60 ? `منذ ${m} د` : m < 1440 ? `اليوم ${t}` : m < 2880 ? `أمس ${t}` : `${dateAr(d)} ${t}`; };
 const R_ST = { new: 'جديد', in_review: 'قيد المراجعة', approved: 'معتمد', rejected: 'مرفوض', done: 'منفّذ', closed: 'مغلق' };
 
-export const threadBox = (kind, refId, title = 'المتابعة والتعليقات') => `<div class="thread" data-th="${kind}:${refId}"><h3 class="sub-h thh">${esc(title)} <span class="muted thn"></span></h3><div class="thl"><p class="muted small">جارٍ التحميل…</p></div><form class="thf"><label class="btn sm ghost thatt" title="إرفاق ملف (PDF، صورة، Word…)">📎<input type="file" multiple accept="${ACCEPT}" hidden></label><textarea name="body" rows="1" placeholder="اكتب متابعة… (Enter للإرسال، Shift+Enter لسطر جديد)" maxlength="2000"></textarea><button class="btn primary sm">إضافة</button></form><div class="mnbox" hidden></div><div class="thpend"></div><small class="muted thhint">اكتب @ لذكر زميل فيصله إشعار</small></div>`;
+export const threadBox = (kind, refId, title = 'المتابعة والتعليقات') => `<div class="thread" data-th="${kind}:${refId}"><h3 class="sub-h thh">${esc(title)} <span class="muted thn"></span></h3><div class="thl"><p class="muted small">جارٍ التحميل…</p></div><form class="thf"><label class="btn sm ghost thatt" title="إرفاق ملف (PDF، صورة، Word…)">${ico('clip')}<input type="file" multiple accept="${ACCEPT}" hidden></label><textarea name="body" rows="1" placeholder="اكتب متابعة… (Enter للإرسال، Shift+Enter لسطر جديد)" maxlength="2000"></textarea><button class="btn primary sm">إضافة</button></form><div class="mnbox" hidden></div><div class="thpend"></div><small class="muted thhint">اكتب @ لذكر زميل فيصله إشعار</small></div>`;
 
 export async function mountThread(container, kind, refId, { projectId = null, onPosted = null } = {}) {
   const box = container.matches?.('.thread') ? container : $(`.thread[data-th="${kind}:${refId}"]`, container); if (!box) return;
   await loadProfiles(); const me = session.user.id, admin = isAdmin();
   const list = $('.thl', box), form = $('.thf', box), ta = $('textarea', form), n = $('.thn', box), fin = $('input[type=file]', form), pendBox = $('.thpend', box);
   let pending = [];
-  const renderPend = () => { pendBox.innerHTML = pending.length ? pending.map((f, i) => `<span class="achip pend">📎 ${esc(f.name)} <button type="button" data-rm="${i}">✕</button></span>`).join('') : ''; $$('[data-rm]', pendBox).forEach(b => b.onclick = () => { pending.splice(+b.dataset.rm, 1); renderPend(); }); };
+  const renderPend = () => { pendBox.innerHTML = pending.length ? pending.map((f, i) => `<span class="achip pend">${ico('clip')} ${esc(f.name)} <button type="button" data-rm="${i}">✕</button></span>`).join('') : ''; $$('[data-rm]', pendBox).forEach(b => b.onclick = () => { pending.splice(+b.dataset.rm, 1); renderPend(); }); };
   fin.onchange = () => { pending.push(...fin.files); fin.value = ''; renderPend(); if (!ta.value.trim()) ta.placeholder = 'اكتب تعليقاً مع المرفق ثم Enter'; };
   // ---- الإشارة @
   const mnbox = $('.mnbox', box); const chosen = new Map(); let mnItems = [], mnIdx = 0, mnStart = -1;

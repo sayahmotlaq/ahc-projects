@@ -1,7 +1,7 @@
 // ===== ربط شاشات المنصة بدليل الإجراءات والحوكمة =====
 // govBar(code, step) يضع شريطاً يُملأ تلقائياً: الإجراء الحاكم، الخطوة الحالية ومن يملكها، والتالي؛ والنقر عليه (أو على أي [data-peek])
 // يفتح الإجراء في نافذة جانبية فوق الشاشة الحالية على الخطوة نفسها. govChip(code) شارة مختصرة لرؤوس القوائم.
-import { esc } from './ui.js';
+import { esc, ico } from './ui.js';
 
 let mod = null;
 const gov = () => (mod ||= import('./gov.js'));
@@ -11,7 +11,7 @@ export const govBar = (map, note = '') => {
   const [code, step] = map;
   return `<div class="govbar" data-gov="${esc(code)}" data-step="${esc(step ?? '')}" data-note="${esc(note)}"></div>`;
 };
-export const govChip = (code, label = '') => `<a class="gref gchip" href="#/gov/sop/${esc(code)}" data-peek="${esc(code)}" title="الإجراء الحاكم في دليل الإجراءات">📘 ${esc(code)}${label ? ' · ' + esc(label) : ''}</a>`;
+export const govChip = (code, label = '') => `<a class="gref gchip" href="#/gov/sop/${esc(code)}" data-peek="${esc(code)}" title="الإجراء الحاكم في دليل الإجراءات">${ico('book')} ${esc(code)}${label ? ' · ' + esc(label) : ''}</a>`;
 
 // ---------- أين يقف كل عنصر في دليل إجراءات المشاريع (P-) — [الإجراء, الخطوة | 'done']
 export const GOV = {

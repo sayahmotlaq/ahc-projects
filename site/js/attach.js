@@ -1,11 +1,11 @@
 // ===== المرفقات العامة: ملفات (PDF، صور، Word، Excel، DWG…) مرتبطة بأي عنصر عبر مفتاح ref مثل treport:12 أو thread:c-55 =====
 import { sb, q, session, isAdmin, canRead } from './api.js';
-import { $, $$, esc, toast, err, confirm } from './ui.js';
+import { $, $$, esc, toast, err, confirm, ico } from './ui.js';
 
 const BUCKET = 'project-files', MAX = 25 * 1024 * 1024;
 export const ACCEPT = '.pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.dwg,.dxf,.zip,.txt,.csv';
 const EXT = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
-const icon = n => { const e = (n.match(/\.([a-z0-9]+)$/i) || [, ''])[1].toLowerCase(); return e === 'pdf' ? '📄' : /^(jpe?g|png|webp|gif)$/.test(e) ? '🖼️' : /^(docx?|txt)$/.test(e) ? '📝' : /^(xlsx?|csv)$/.test(e) ? '📊' : /^(dwg|dxf)$/.test(e) ? '📐' : '📎'; };
+const icon = n => { const e = (n.match(/\.([a-z0-9]+)$/i) || [, ''])[1].toLowerCase(); return ico(e === 'pdf' ? 'file' : /^(jpe?g|png|webp|gif)$/.test(e) ? 'image' : /^(docx?|txt)$/.test(e) ? 'doc' : /^(xlsx?|csv)$/.test(e) ? 'chart' : /^(dwg|dxf)$/.test(e) ? 'draw' : 'clip'); };
 const kb = n => n > 1048576 ? (n / 1048576).toFixed(1) + ' م.ب' : Math.max(1, Math.round(n / 1024)) + ' ك.ب';
 const safeKey = s => String(s).replace(/[^A-Za-z0-9_-]/g, '_');
 
@@ -32,7 +32,7 @@ export function bindChips(root, list, onDeleted) {
 }
 
 // صندوق مرفقات كامل لعنصر: قائمة + رفع + حذف. ref مثل 'treport:12'
-export const attachBox = (title = 'المرفقات') => `<div class="attbox"><h3 class="sub-h">${esc(title)} <span class="muted attn"></span></h3><div class="attl"><p class="muted small">…</p></div><label class="btn sm attadd">📎 إرفاق ملف <input type="file" multiple accept="${ACCEPT}" hidden></label><small class="muted"> PDF أو صور أو Word/Excel أو DWG — حتى 25 م.ب للملف</small></div>`;
+export const attachBox = (title = 'المرفقات') => `<div class="attbox"><h3 class="sub-h">${esc(title)} <span class="muted attn"></span></h3><div class="attl"><p class="muted small">…</p></div><label class="btn sm attadd">${ico('clip')} إرفاق ملف <input type="file" multiple accept="${ACCEPT}" hidden></label><small class="muted"> PDF أو صور أو Word/Excel أو DWG — حتى 25 م.ب للملف</small></div>`;
 export async function mountAttachBox(container, ref, { projectId = null, canAdd = canRead() } = {}) {
   const box = container.matches?.('.attbox') ? container : $('.attbox', container); if (!box) return;
   const list = $('.attl', box), n = $('.attn', box), add = $('.attadd', box), inp = $('input[type=file]', box);

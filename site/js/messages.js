@@ -36,7 +36,7 @@ export async function todayMessagesCard(root, focusId) {
     const tg = targets(m); const rd = reads.filter(x => x.message_id === m.id && tg.includes(x.user_id)); const unread = tg.filter(u => !rd.some(x => x.user_id === u));
     const replies = reads.filter(x => x.message_id === m.id && x.reply);
     return `<div class="msg ${K[1]} ${m.pinned ? 'pinned' : ''} ${toMe && !r && !mine(m) ? 'new' : ''}" data-m="${m.id}" id="msg${m.id}">
-      <div class="mh"><span class="av">${esc(initials(pname(m.author_id)))}</span><div class="mi"><b>${esc(pname(m.author_id))}</b><small>${ago(m.show_from)} · <span class="kchip">${K[0]}</span>${m.pinned ? ' · 📌 مثبتة' : ''}${m.audience === 'users' ? ` · إلى: ${esc(m.recipients.map(u => first(pname(u))).join('، '))}` : ''}${priv ? ' · <span class="lock">🔒 خاصة</span>' : ''}</small></div></div>
+      <div class="mh"><span class="av">${esc(initials(pname(m.author_id)))}</span><div class="mi"><b>${esc(pname(m.author_id))}</b><small>${ago(m.show_from)} · <span class="kchip">${K[0]}</span>${m.pinned ? ' · ' + ico('pin') + ' مثبتة' : ''}${m.audience === 'users' ? ` · إلى: ${esc(m.recipients.map(u => first(pname(u))).join('، '))}` : ''}${priv ? ' · <span class="lock">' + ico('lock') + ' خاصة</span>' : ''}</small></div></div>
       <div class="mb">${esc(m.body)}</div>
       ${m.link ? `<a class="mlink" href="${esc(m.link)}">${ico('folder')} ${esc(m.link_label || m.link)}</a>` : ''}
       ${replies.length && (admin || mine(m)) ? `<div class="mreplies">${replies.map(x => `<div class="mr"><b>${esc(first(pname(x.user_id)))}:</b> ${esc(x.reply)}</div>`).join('')}</div>` : ''}
