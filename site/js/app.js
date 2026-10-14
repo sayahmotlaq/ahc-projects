@@ -6,18 +6,14 @@ import './govlink.js';
 
 const app = $('#app');
 const DEPTS = [['PRJ', 'المشاريع', '27A8DF'], ['FAC', 'المرافق', '2E8B57'], ['MNT', 'الصيانة', 'B8860B'], ['SAF', 'الأمن والسلامة', 'B03A48'], ['BME', 'الصيانة الطبية', 'A0522D'], ['MED', 'التجهيزات الطبية', '6B4C9A'], ['GEN', 'الخدمات العامة', '5F7A5B'], ['IT', 'تقنية المعلومات', '1B6CA8']];
-const NAV = [
-  ['tsd', 'لوحة الإدارة', 'dash', 'ops'], ['today', 'يومي', 'sun', 'read'], ['ops', 'البلاغات والطلبات', 'inbox', 'any'], ['map', 'الخريطة', 'map', 'read'],
-  ['sec', 'الأقسام', 'ops'],
-  ...DEPTS.map(([c, n, col]) => ['dept/' + c, n, 'dot:' + col, 'ops']),
-  ['sec', 'المشاريع', 'read'],
-  ['dashboard', 'لوحة المشاريع', 'chart', 'read'], ['projects', 'المشاريع', 'folder', 'read'], ['tasks', 'المهام', 'check', 'read'], ['requests', 'طلبات المشاريع', 'inbox', 'read'], ['challenges', 'التحديات والمخاطر', 'alert', 'read'], ['treports', 'التقارير الفنية والمحاضر', 'file', 'read'],
-  ['sec', 'المرافق والتشغيل', 'ops'],
-  ['fm', 'متابعة أنظمة المنشآت', 'pulse', 'ops'],
-  ['sec', 'المستندات والمالية', 'read'],
-  ['submittals', 'الاعتمادات', 'stamp', 'read'], ['documents', 'المستندات الرسمية', 'doc', 'read'], ['drawings', 'المخططات', 'draw', 'read'], ['payments', 'المستخلصات', 'coins', 'read'],
-  ['sec', 'النظام', 'any'],
-  ['gov', 'الحوكمة والأدلة', 'book', 'ops'], ['leaves', 'الإجازات والتغطية', 'clock', 'read'], ['report', 'التقارير', 'chart', 'read'], ['briefs', 'العروض التنفيذية', 'print', 'read'], ['performance', 'الأداء والإنجازات', 'users', 'admin'], ['me', 'إنجازاتي', 'users', ['engineer', 'clerk']], ['ref', 'المرجع الفني', 'book', 'read'], ['settings', 'الإعدادات والإشعارات', 'bell', 'any'], ['admin', 'الإدارة', 'cog', 'admin']];
+// القائمة: الإدارة ← الأقسام (كل قسم يتفتح على صفحاته مثل المشاريع) ← النظام
+const TOP = [['tsd', 'لوحة الإدارة', 'dash', 'ops'], ['today', 'يومي', 'sun', 'read'], ['ops', 'البلاغات والطلبات', 'inbox', 'any'], ['map', 'الخريطة', 'map', 'read'], ['fm', 'متابعة أنظمة المنشآت', 'pulse', 'ops'], ['gov', 'الحوكمة والأدلة', 'book', 'ops']];
+const SYS = [['leaves', 'الإجازات والتغطية', 'clock', 'read'], ['report', 'التقارير', 'chart', 'read'], ['briefs', 'العروض التنفيذية', 'print', 'read'], ['performance', 'الأداء والإنجازات', 'users', 'admin'], ['me', 'إنجازاتي', 'users', ['engineer', 'clerk']], ['ref', 'المرجع الفني', 'book', 'read'], ['settings', 'الإعدادات والإشعارات', 'bell', 'any'], ['admin', 'الإدارة', 'cog', 'admin']];
+const ASSET_U = ['MNT', 'BME', 'IT', 'MED', 'SAF', 'GEN'], PLAN_U = ['MNT', 'BME', 'SAF', 'IT', 'GEN', 'FAC'];
+const SUBS = c => c === 'PRJ' ? [['dept/PRJ/work', 'طلبات وأعمال القسم', 'inbox', 'ops'], ['dashboard', 'لوحة المشاريع', 'chart', 'read'], ['projects', 'المشاريع', 'folder', 'read'], ['tasks', 'المهام', 'check', 'read'], ['requests', 'طلبات المشاريع', 'inbox', 'read'], ['challenges', 'التحديات والمخاطر', 'alert', 'read'], ['treports', 'التقارير الفنية والمحاضر', 'file', 'read'], ['submittals', 'الاعتمادات', 'stamp', 'read'], ['documents', 'المستندات الرسمية', 'doc', 'read'], ['drawings', 'المخططات', 'draw', 'read'], ['payments', 'المستخلصات', 'coins', 'read'], ['dept/PRJ/manual', 'دليل القسم', 'book', 'ops'], ['dept/PRJ/team', 'الفريق', 'users', 'ops']]
+  : [['dept/' + c + '/work', 'الأعمال والبلاغات', 'inbox', 'ops'], ...(c === 'FAC' ? [['dept/FAC/locations', 'المواقع والغرف', 'map', 'ops']] : []), ...(['FAC', 'MNT'].includes(c) ? [['fm', 'متابعة أنظمة المنشآت', 'pulse', 'ops']] : []), ...(ASSET_U.includes(c) ? [['dept/' + c + '/assets', 'الأصول', 'stamp', 'ops']] : []), ...(PLAN_U.includes(c) ? [['dept/' + c + '/plans', 'الأعمال المخططة', 'clock', 'ops']] : []), ['dept/' + c + '/manual', 'دليل القسم', 'book', 'ops'], ['dept/' + c + '/team', 'الفريق', 'users', 'ops']];
+// قائمة مسطحة للبحث ⌘K
+const NAV = [...TOP, ...DEPTS.flatMap(([c, n]) => [['dept/' + c, 'قسم ' + n, 'dash', 'ops'], ...SUBS(c).filter(x => x[0].startsWith('dept/') || c === 'PRJ').map(x => [x[0], x[0].startsWith('dept/') ? `${x[1]} — ${n}` : x[1], x[2], x[3]])]), ...SYS];
 const ALIAS = { treport: 'treports', project: 'projects' };
 // الوصول: read = من يقرأ المنصة كاملة، ops = هم + موظفو الأقسام الفنية، any = الجميع (ومنهم المبلّغ)، أو دور/أدوار محددة
 const OPS_ROLES = ['facility', 'tech'];
@@ -32,13 +28,17 @@ const bottomFor = () => { const r = role(), u = session.profile?.unit;
 let projIndex = null;
 function shell(inner) {
   const p = session.profile;
-  const navItems = NAV.filter(n => n[0] === 'sec' ? allow(n[2]) : allow(n[3])).filter((n, i, a) => n[0] !== 'sec' || (a[i + 1] && a[i + 1][0] !== 'sec'));
   const icon = n => n.startsWith('dot:') ? `<i class="ndot" style="--c:#${n.slice(4)}"></i>` : ico(n);
-  const links = (cls) => navItems.map(n => n[0] === 'sec' ? `<div class="sec">${n[1]}</div>` : `<a href="#/${n[0]}" data-nav="${n[0]}" class="${cls}">${icon(n[2])}<span>${n[1]}</span><span class="cnt" data-cnt="${n[0]}"></span></a>`).join('');
+  const link = n => `<a href="#/${n[0]}" data-nav="${n[0]}">${icon(n[2])}<span>${n[1]}</span><span class="cnt" data-cnt="${n[0]}"></span></a>`;
+  let opened = []; try { opened = JSON.parse(localStorage.getItem('ahc_open') || '[]'); } catch (e) { }
+  const links = () => { const top = TOP.filter(n => allow(n[3])), sys = SYS.filter(n => allow(n[3])), deps = allow('ops') ? DEPTS : [];
+    return top.map(link).join('') + (deps.length ? '<div class="sec">الأقسام</div>' + deps.map(([c, nm, col]) => { const sub = SUBS(c).filter(x => allow(x[3]));
+      return `<div class="ngrp ${opened.includes(c) ? 'open' : ''}" data-grp="${c}" style="--c:#${col}"><a href="#/dept/${c}" data-nav="dept/${c}">${icon('dot:' + col)}<span>${nm}</span><span class="cnt" data-cnt="dept/${c}"></span><i class="nchev" data-tg="${c}" title="عرض صفحات القسم">‹</i></a><div class="nsub">${sub.map(link).join('')}</div></div>`; }).join('') : '')
+      + '<div class="sec">النظام</div>' + sys.map(link).join(''); };
   const mini = (() => { try { return localStorage.getItem('ahc_mini') === '1'; } catch (e) { return false; } })();
   app.innerHTML = `<div class="app2 ${mini ? 'mini' : ''}" id="app2">
     <aside class="side"><a class="brand" href="#/${home()}"><img src="assets/logo.png" alt=""><div><b>إدارة الخدمات الفنية</b><small>تجمع الأحساء الصحي</small></div></a>
-      <nav class="snav">${links('')}</nav>
+      <nav class="snav">${links()}</nav>
       <button class="fold" id="fold" title="طيّ القائمة">${ico('fold')}</button></aside>
     <div class="mainwrap">
       <div class="topbar"><div class="gsearch" id="gsearch">${ico('search')}<span>ابحث عن صفحة أو مشروع أو قسم…</span><kbd>⌘K</kbd></div><span class="sp"></span><span id="bellhost"></span>
@@ -46,12 +46,16 @@ function shell(inner) {
         <button class="ib" id="logout" title="خروج">${ico('logout')}</button></div>
       <main id="main">${inner || ''}</main></div></div>
     <nav class="bottom">${bottomFor().map(b => `<a href="${b[0] === 'more' ? '#' : '#/' + b[0]}" data-nav="${b[0]}" ${b[0] === 'more' ? 'id="moreBtn"' : ''}>${ico(b[2])}${b[1]}<span class="cnt" data-cnt="${b[0]}"></span></a>`).join('')}</nav>
-    <div class="sheet" id="sheet"><div class="sh">${links('')}<a href="#" id="logout2">${ico('logout')}<span>خروج</span></a></div></div>`;
+    <div class="sheet" id="sheet"><div class="sh">${links()}<a href="#" id="logout2">${ico('logout')}<span>خروج</span></a></div></div>`;
   const out = async () => { await sb.auth.signOut(); location.hash = ''; boot(); };
   $('#logout').onclick = out; $('#logout2').onclick = e => { e.preventDefault(); out(); };
   $('#fold').onclick = () => { const a = $('#app2'); a.classList.toggle('mini'); try { localStorage.setItem('ahc_mini', a.classList.contains('mini') ? '1' : '0'); } catch (e) { } };
   $('#moreBtn').onclick = e => { e.preventDefault(); $('#sheet').classList.toggle('show'); };
-  $('#sheet').addEventListener('click', e => { if (e.target === $('#sheet') || e.target.closest('a')) $('#sheet').classList.remove('show'); });
+  $('#sheet').addEventListener('click', e => { if (e.target.closest('[data-tg]')) return; if (e.target === $('#sheet') || e.target.closest('a')) $('#sheet').classList.remove('show'); });
+  // فتح وإغلاق صفحات القسم في القائمة دون الانتقال
+  document.querySelectorAll('[data-tg]').forEach(t => t.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); const c = t.dataset.tg;
+    $$(`.ngrp[data-grp="${c}"]`).forEach(g => g.classList.toggle('open')); const isOpen = $(`.snav .ngrp[data-grp="${c}"]`)?.classList.contains('open');
+    try { let o = JSON.parse(localStorage.getItem('ahc_open') || '[]'); o = isOpen ? [...new Set([...o, c])] : o.filter(x => x !== c); localStorage.setItem('ahc_open', JSON.stringify(o)); } catch (er) { } }));
   $('#gsearch').onclick = openPalette;
   document.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openPalette(); } });
   opsCounts();
@@ -64,7 +68,15 @@ async function opsCounts() {
     const c = {}; (data || []).forEach(i => { if (i.status === 'new') c['dept/' + i.unit] = (c['dept/' + i.unit] || 0) + 1; if (i.status === 'verify' && (i.requester_id === session.user.id || i.created_by === session.user.id)) { c.ops = (c.ops || 0) + 1; c['ops/mine'] = (c['ops/mine'] || 0) + 1; } });
     setCounts(c); } catch (e) { }
 }
-function setNav(k) { const key = ALIAS[k] || k; if (!$$(`[data-nav="${key}"]`).length && key.startsWith('dept/')) return setNav('tsd'); $$('[data-nav]').forEach(a => a.classList.toggle('on', a.getAttribute('data-nav') === key)); $('#sheet')?.classList.remove('show'); }
+function setNav(k) {
+  let key = ALIAS[k] || k;
+  if (!$$(`[data-nav="${key}"]`).length && key.startsWith('dept/')) key = key.split('/').slice(0, 2).join('/');
+  if (!$$(`[data-nav="${key}"]`).length && key.startsWith('dept/')) key = 'tsd';
+  $$('[data-nav]').forEach(a => a.classList.toggle('on', a.getAttribute('data-nav') === key));
+  // القسم الذي فيه الصفحة الحالية يتفتح تلقائياً (المشروع داخل قسم المشاريع)
+  $$('.ngrp').forEach(g => { if (g.querySelector('a.on')) g.classList.add('open', 'cur'); else g.classList.remove('cur'); });
+  $('#sheet')?.classList.remove('show');
+}
 export function setCounts(map) { Object.entries(map).forEach(([k, v]) => $$(`[data-cnt="${k}"]`).forEach(el => { el.textContent = v || ''; el.classList.toggle('show', !!v); })); }
 async function openPalette() {
   if ($('.pal')) return;
@@ -126,7 +138,7 @@ async function route() {
   if (!canRead() && !allow(ROUTE_ACCESS[top] || 'read')) { location.hash = '#/' + home(); return; }
   const [path, query] = h.split('?'); const params = new URLSearchParams(query || '');
   const parts = path.split('/'); const main = $('#main'); if (!main) shell('');
-  const m = $('#main'); setNav(parts[0] === 'dept' || (parts[0] === 'ops' && ['mine', 'new'].includes(parts[1]) && role() === 'requester') ? parts[0] + '/' + parts[1] : parts[0]); watch(m);
+  const m = $('#main'); setNav(parts[0] === 'dept' ? parts.slice(0, parts[2] && parts[2] !== 'overview' ? 3 : 2).join('/') : (parts[0] === 'ops' && ['mine', 'new'].includes(parts[1]) && role() === 'requester') ? parts[0] + '/' + parts[1] : parts[0]); watch(m);
   const rkey = parts.slice(0, 2).join('/'); if (m._rkey !== rkey && parts[0] !== 'ref') { m._rkey = rkey; markRoute(); m.innerHTML = skeleton(parts[0] === 'project' ? 'page' : ['dashboard', 'today', 'performance', 'me', 'tsd', 'dept'].includes(parts[0]) ? 'page' : 'list'); m.classList.remove('pagein'); void m.offsetWidth; m.classList.add('pagein'); }
   try {
     if (parts[0] === 'today') { const { mountToday } = await import('./today.js'); await mountToday(m, params); }

@@ -1212,3 +1212,16 @@ button.fmc:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(18,36,47,
 .tsdrep{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px 22px} .tsdrep h2{font-size:15px;color:#123B5C;margin:18px 0 8px}
 .rbars{display:flex;flex-direction:column;gap:3px;min-width:120px} .rbars i{display:block;height:7px;border-radius:4px}
 @media print{.tsdrep{border:0;padding:0} .noprint{display:none!important}}
+/* القائمة: كل قسم يتفتح على صفحاته */
+.ngrp>a{position:relative} .nchev{margin-inline-start:auto;font-style:normal;width:22px;height:22px;display:grid;place-items:center;border-radius:6px;color:var(--faint);transition:transform .2s,background .15s;font-size:15px}
+.nchev:hover{background:var(--line2);color:var(--text)} .ngrp.open .nchev{transform:rotate(90deg)} .ngrp>a .cnt{margin-inline-start:6px}
+.ngrp .nsub{display:none;margin:2px 0 6px;margin-inline-start:16px;padding-inline-start:8px;border-inline-start:2px solid color-mix(in srgb,var(--c) 45%,transparent)}
+.ngrp.open .nsub{display:block} .ngrp .nsub a{padding:7px 10px;font-size:12.8px} .ngrp .nsub a .i{width:15px;height:15px}
+.ngrp.cur>a:not(.on){color:var(--text);font-weight:700}
+.app2.mini .ngrp .nsub,.app2.mini .nchev{display:none}
+.sheet .sh .ngrp .nsub a{padding:9px 10px}
+.dhow{border-top:4px solid var(--c)} .dsteps{margin:0;padding:0;list-style:none;counter-reset:s;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.dsteps li{counter-increment:s;background:var(--surface2);border-radius:12px;padding:12px 12px 12px 12px;display:flex;flex-direction:column;gap:4px;position:relative}
+.dsteps li::before{content:counter(s);position:absolute;inset-inline-end:10px;top:8px;width:24px;height:24px;border-radius:50%;background:var(--c);color:#fff;display:grid;place-items:center;font-weight:800;font-size:12px}
+.dsteps b{font-size:13.5px;color:var(--text);padding-inline-end:30px} .dsteps span{font-size:12.5px;color:var(--muted);line-height:1.8}
+.dready{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;font-size:12.5px} .dready a,.dready .ok{border:1px dashed var(--line);border-radius:999px;padding:5px 12px;text-decoration:none;font-weight:700} .dready .ok{border-style:solid;color:#2E8B57;background:#E7F5EC}

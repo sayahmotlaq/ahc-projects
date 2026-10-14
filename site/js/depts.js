@@ -94,7 +94,15 @@ export async function mountDept(root, code, tab = 'overview', params = new URLSe
   const hand = (O.G.handoffs || []).filter(h => h.from_unit === code || h.to_unit === code);
   let prj = '';
   if (code === 'PRJ' && canRead()) { try { const ps = await q(sb.from('projects').select('id,stage').eq('archived', false)); const by = k => ps.filter(p => p.stage === k).length; prj = `<div class="pcard"><h2>المشاريع <a class="small" href="#/dashboard">لوحة المشاريع ‹</a></h2><div class="dmini">${[['دراسة', by('study') + by('request') + by('approval')], ['تصميم وطرح', by('design') + by('tender') + by('award')], ['تنفيذ', by('execution')], ['استلام وضمان', by('handover') + by('warranty')]].map(([a, b]) => `<a href="#/projects"><b>${b}</b><span>${a}</span></a>`).join('')}</div></div>`; } catch (e) { } }
-  t.innerHTML = `<div class="fmkpis dk">
+  const intakeK = kinds.filter(k => k.intake), staffK = kinds.filter(k => !k.intake);
+  const howto = mine.length ? '' : `<div class="pcard dhow" style="--c:#${u.color}"><h2>كيف يعمل ${esc(u.short)} في المنصة</h2><ol class="dsteps">
+      <li><b>تصل إليه الطلبات</b><span>أي موظف في المنشآت أو الأقسام يرفع من «البلاغات والطلبات»: ${intakeK.map(k => `${k.icon} ${esc(k.name)}`).join('، ') || '—'}. ويصله أيضاً ما تحيله الأقسام الأخرى إليه، وما تولّده خططه الدورية.</span></li>
+      <li><b>يستلمها الفريق ويعمل وفق الدليل</b><span>كل طلب له أولوية ومهلة (R-17) وإجراء من دليل القسم (${procs.length} إجراءات) بخطواته؛ لا تتغير حالته إلا بكتابة الإجراء المتخذ، ويرى صاحب الطلب كل خطوة.</span></li>
+      ${staffK.length ? `<li><b>نماذج الفريق</b><span>${staffK.map(k => `${k.icon} ${esc(k.name)}`).join('، ')} — بعضها يحتاج اعتماد قسم آخر قبل التنفيذ، وقائمة تحقق قبل الإغلاق.</span></li>` : ''}
+      <li><b>يتعاون مع الأقسام</b><span>يحيل جزءاً من العمل لقسم آخر أو يعيد توجيهه، أو يحوّله إلى مشروع (R-01)؛ وتظهر السلسلة لكل الأطراف وفي لوحة الإدارة.</span></li>
+      <li><b>يُقاس أداؤه</b><span>المفتوح والمتأخر وضمن المهلة ومتوسط الإنجاز ورضا أصحاب الطلبات وتكلفة الإصلاح — في هذه الصفحة وفي التقرير الشهري للإدارة.</span></li></ol>
+    <div class="dready"><b>للتشغيل:</b> ${team.length ? `<span class="ok">✓ الفريق (${team.length})</span>` : `<a href="#/admin/users">＋ أضف موظفي القسم (الدور «موظف قسم فني» + القسم)</a>`}${ASSET_UNITS.includes(code) ? `<a href="#/dept/${code}/assets">＋ سجّل أصول القسم</a>` : ''}${PLAN_UNITS.includes(code) ? `<a href="#/dept/${code}/plans">＋ أضف الخطط الدورية</a>` : ''}${code === 'FAC' ? '<a href="#/dept/FAC/locations">＋ سجّل الغرف والمواقع</a>' : ''}${intakeK[0] ? `<a href="#" data-nk="${intakeK[0].code}">جرّب: ارفع ${esc(intakeK[0].name)}</a>` : ''}</div></div>`;
+  t.innerHTML = `${howto}<div class="fmkpis dk">
       ${kpi('blue', s.open, 'عمل مفتوح', `${s.fresh} جديد · ${s.verify} بانتظار التأكيد`, `#/dept/${code}/work`)}
       ${kpi(s.late ? 'red' : 'green', s.late, 'متأخر عن مهلته', s.late ? 'يحتاج تدخلاً' : 'كل الأعمال في مهلتها', `#/dept/${code}/work?late=1`)}
       ${kpi(s.urgent ? 'amber' : '', s.urgent, 'طارئ أو عاجل')}
@@ -113,6 +121,7 @@ export async function mountDept(root, code, tab = 'overview', params = new URLSe
         return `<a href="#/fm/dash" class="${b ? 'r' : a ? 'a' : 'g'}"><b>${esc(x.name)}${x.critical ? ' <i title="نظام حرج">●</i>' : ''}</b><span>${g} سليم${a ? ` · ${a} متابعة` : ''}${b ? ` · <em>${b} معطل</em>` : ''}</span></a>`; }).join('')}</div></div>` : ''}
     ${hand.length ? `<div class="pcard"><h2>نقاط التسليم في الدليل</h2><div class="dhand">${hand.map(h => `<div>${uchip(h.from_unit)}<span class="arr">←</span>${uchip(h.to_unit)}<span><b>${esc(h.trigger)}</b><small>${esc(h.deliverable || '')}${h.sla ? ' · ' + esc(h.sla) : ''}</small></span>${h.process_code ? `<a class="gref" data-peek="${esc(h.process_code)}" href="#/gov/sop/${esc(h.process_code)}">${esc(h.process_code)}</a>` : ''}</div>`).join('')}</div></div>` : ''}`;
   bindRows(t, re);
+  $$('[data-nk]', t).forEach(b => b.onclick = e => { e.preventDefault(); newItem({ kind: b.dataset.nk }, r => openItem(r.id, re)); });
 }
 
 function viewManual(t, code, procs) {
