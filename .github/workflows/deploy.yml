@@ -128,4 +128,4 @@ jobs:
         run: |
           npx --yes supabase@latest functions deploy push --project-ref ejyebwykojqwsjkyriom --no-verify-jwt
           npx --yes supabase@latest functions deploy ical --project-ref ejyebwykojqwsjkyriom --no-verify-jwt
-          npx --yes supabase@latest secrets set --project-ref ejyebwykojqwsjkyriom PUSH_SECRET="${{ secrets.PUSH_SECRET }}" VAPID_PUBLIC="${{ secrets.VAPID_PUBLIC }}" VAPID_PRIVATE="${{ secrets.VAPID_PRIVATE }}" SITE_URL="https://ahc-td.com/"
+          npx --yes supabase@latest secrets set --project-ref ejyebwykojqwsjkyriom PUSH_SECRET="${{ secrets.PUSH_SECRET }}" VAPID_PUBLIC="${{ secrets.VAPID_PUBLIC }}" VAPID_PRIVATE="${{ secrets.VAPID_PRIVATE }}" SITE_URL="https://ahc-tsd.com/"

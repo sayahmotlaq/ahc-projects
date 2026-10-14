@@ -3,7 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 const SB_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SB_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const SITE = Deno.env.get("SITE_URL") ?? "https://ahc-td.com/";
+const SITE = Deno.env.get("SITE_URL") ?? "https://ahc-tsd.com/";
 
 const esc = (s: string) => String(s ?? "").replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
 // طيّ الأسطر عند 74 بايت دون قطع حرف UTF-8
