@@ -2,6 +2,7 @@
 import { sb, session, loadSession, loadRef, REF, role, isAdmin, canRead, ROLES, q } from './api.js';
 import { $, $$, esc, toast, err, modal, field, inp, formData, ico } from './ui.js';
 import { skeleton, markRoute, watch } from './fx.js';
+import './govlink.js';
 
 const app = $('#app');
 const NAV = [

@@ -2,6 +2,7 @@
 import { sb, canEdit, isAdmin, q, session, today } from './api.js';
 import { $, $$, esc, dateAr, toast, err, modal, confirm, field, inp, sel, formData, ico } from './ui.js';
 import { attachBox, mountAttachBox } from './attach.js';
+import { govBar, govChip, GOV } from './govlink.js';
 
 export const TR_KIND = { visit: 'زيارة ميدانية', status: 'تقرير حالة', weekly: 'تقرير أسبوعي', monthly: 'تقرير شهري', incident: 'بلاغ / ملاحظة عاجلة', meeting: 'محضر اجتماع' };
 export const TR_STATUS = { draft: 'مسودة', published: 'بانتظار المراجعة', reviewed: 'تمت المراجعة', returned: 'مُعاد للمهندس' };
@@ -31,7 +32,7 @@ export async function signed(paths) {
 export async function mountTReports(root, params) {
   await loadProfiles();
   const projects = await q(sb.from('projects').select('id,name').eq('archived', false).order('name'));
-  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">التقارير الفنية والمحاضر</h1><span class="sp"></span>${canEdit() ? '<a class="btn primary" href="#/treport/new">＋ تقرير جديد</a>' : ''}</div>
+  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">التقارير الفنية والمحاضر</h1><span class="sp"></span>${govChip('P-05')}${govChip('P-12', 'المحاضر')}${canEdit() ? '<a class="btn primary" href="#/treport/new">＋ تقرير جديد</a>' : ''}</div>
     <div class="filters"><input id="fq" placeholder="بحث…"><select id="fSt"><option value="">${isAdmin() ? 'بانتظار المراجعة' : 'الكل'}</option>${isAdmin() ? '<option value="all">الكل</option>' : ''}${Object.entries(TR_STATUS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select><select id="fK"><option value="">كل الأنواع</option>${Object.entries(TR_KIND).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select><select id="fP"><option value="">كل المشاريع</option>${projects.map(p => `<option value="${p.id}" ${params.get('p') === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select>${canEdit() && !isAdmin() ? '<label class="chk"><input type="checkbox" id="fMe"> تقاريري فقط</label>' : ''}</div><div id="tl"><p class="muted">…</p></div>`;
   const all = await q(sb.from('tech_reports').select('id,project_id,kind,title,report_date,status,created_by,published_at,reviewed_at,progress_seen,projects(name)').order('report_date', { ascending: false }).order('id', { ascending: false }));
   if (params.get('st')) $('#fSt').value = params.get('st');
@@ -50,7 +51,7 @@ export async function projectTReports(t, p) {
   await loadProfiles();
   const rows = await q(sb.from('tech_reports').select('*').eq('project_id', p.id).order('report_date', { ascending: false }).order('id', { ascending: false }));
   const pend = rows.filter(r => r.status === 'published');
-  t.innerHTML = `<div class="pcard"><div class="toolbar"><h2><span class="ic"></span>التقارير الفنية والمحاضر <span class="muted">(${rows.length}${pend.length ? ' · ' + pend.length + ' بانتظار المراجعة' : ''})</span></h2><span class="sp"></span>${canEdit() ? `<a class="btn primary" href="#/treport/new?p=${p.id}">＋ تقرير جديد</a>` : ''}</div>${rows.length ? rowsHtml(rows, false) : '<p class="muted">لا توجد تقارير فنية على هذا المشروع بعد.</p>'}</div>`;
+  t.innerHTML = `<div class="pcard"><div class="toolbar"><h2><span class="ic"></span>التقارير الفنية والمحاضر <span class="muted">(${rows.length}${pend.length ? ' · ' + pend.length + ' بانتظار المراجعة' : ''})</span></h2><span class="sp"></span>${govChip('P-05')}${govChip('P-12', 'المحاضر')}${canEdit() ? `<a class="btn primary" href="#/treport/new?p=${p.id}">＋ تقرير جديد</a>` : ''}</div>${rows.length ? rowsHtml(rows, false) : '<p class="muted">لا توجد تقارير فنية على هذا المشروع بعد.</p>'}</div>`;
 }
 
 // ---------- المحرر (صفحة كاملة مناسبة للجوال)
@@ -66,7 +67,7 @@ export async function mountTReportEditor(root, id, params) {
   const items = Array.isArray(r.items) ? r.items.map(x => ({ ...x })) : [];
   const meeting = () => $('#kind').value === 'meeting';
 
-  root.innerHTML = `<div class="phead"><div class="crumb"><a href="#/treports">التقارير الفنية</a><span class="sep">‹</span><span>${id ? 'تعديل تقرير' : 'تقرير جديد'}</span></div></div>
+  root.innerHTML = `${govBar(GOV.treport(r))}<div class="phead"><div class="crumb"><a href="#/treports">التقارير الفنية</a><span class="sep">‹</span><span>${id ? 'تعديل تقرير' : 'تقرير جديد'}</span></div></div>
   <form id="trf" class="pcard trform">
     <div class="pgrid">
       ${field('المشروع *', sel('project_id', projects.map(p => [p.id, p.name]), r.project_id, 'required'))}
@@ -146,7 +147,7 @@ export async function mountTReport(root, id) {
   if (r.review_note) blocks.push(`<div class="rsec"><h3>ملاحظة المراجعة</h3><div class="pre ${r.status === 'returned' ? 'bad' : ''}">${esc(r.review_note)}</div></div>`);
   if (tasks.length) blocks.push(`<div class="rsec"><h3>المهام المرتبطة بالتقرير</h3><ul class="rlist">${tasks.map(t => `<li><a href="#/project/${r.project_id}/tasks">${esc(t.title)}</a> <span class="muted">— ${esc(pname(t.assignee_id) !== '—' ? pname(t.assignee_id) : t.assignee_name || '')} · ${TS[t.status]} · ${dateAr(t.due_date)}</span></li>`).join('')}</ul></div>`);
   blocks.push(`<footer class="rfoot"><div>صدر من منصة إدارة مشاريع تجمع الأحساء الصحي — ${esc(today())}</div><div class="sig"><div>المهندس: ${esc(pname(r.created_by))}<br><br>التوقيع: ..............</div><div>رئيس قسم المشاريع<br><br>التوقيع: ..............</div></div></footer>`);
-  root.innerHTML = `<div class="phead noprint"><div class="crumb"><a href="#/treports">التقارير الفنية</a><span class="sep">‹</span><a href="#/project/${r.project_id}/treports">${esc(r.projects?.name || '')}</a><span class="sep">‹</span><span>${esc(r.title)}</span></div>
+  root.innerHTML = `${govBar(GOV.treport(r), TR_STATUS[r.status])}<div class="phead noprint"><div class="crumb"><a href="#/treports">التقارير الفنية</a><span class="sep">‹</span><a href="#/project/${r.project_id}/treports">${esc(r.projects?.name || '')}</a><span class="sep">‹</span><span>${esc(r.title)}</span></div>
     <div class="btnrow wrap">${trBadge(r.status)}<span class="sp"></span>${editable ? `<a class="btn" href="#/treport/${id}/edit">تعديل</a>` : ''}${r.status === 'draft' && mine(r) ? '<button class="btn primary" id="pub">نشر التقرير</button>' : ''}${r.status === 'returned' && mine(r) ? '<button class="btn primary" id="pub">إعادة النشر بعد التعديل</button>' : ''}${admin && r.status === 'published' ? '<button class="btn primary" id="rev">✓ تمت المراجعة</button><button class="btn" id="ret">إعادة للمهندس</button>' : ''}${admin ? '<button class="btn" id="mkTask">＋ مهمة من التقرير</button>' : ''}<button class="btn" id="pdf">${ico('download')} PDF</button><button class="btn" id="prn">${ico('print')} طباعة</button></div></div>
   <div class="rep" id="rep"></div>
   <div class="pcard noprint">${attachBox('المرفقات')}</div>

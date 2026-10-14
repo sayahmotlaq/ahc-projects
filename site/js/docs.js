@@ -4,6 +4,7 @@ import { $, $$, esc, norm, money, dateAr, toast, err, modal, confirm, field, inp
 import { exportTable, xbtn } from './xlsx.js';
 import { compress } from './treports.js';
 import { threadBox, mountThread } from './thread.js';
+import { govBar, govChip, GOV } from './govlink.js';
 
 export const BUCKET = 'project-files';
 export const TENDER_CAT = { tender_terms: 'كراسة الشروط والمواصفات', tender_specs: 'المواصفات الفنية (الطرح)', tender_addendum: 'ملحق / تعميم طرح', site_visit: 'محضر زيارة الموقع', bid_opening: 'محضر فتح المظاريف', award_letter: 'خطاب الترسية' };
@@ -50,7 +51,7 @@ export async function projectDocs(t, p) {
   const missing = ['execution', 'handover', 'warranty'].includes(p.stage) ? REQUIRED_EXEC.filter(c => !rows.some(r => r.category === c)) : [];
   const soon = rows.filter(r => r.expiry_date && r.expiry_date <= addDays(30));
   const groups = Object.keys(DOC_CAT).map(c => [c, rows.filter(r => r.category === c)]).filter(([, a]) => a.length);
-  t.innerHTML = `<div class="pcard"><div class="toolbar"><h2><span class="ic"></span>المستندات الرسمية <span class="muted">(${rows.length})</span></h2><span class="sp"></span>${canDocs() ? '<button class="btn primary" id="dNew">＋ مستند</button>' : ''}</div>
+  t.innerHTML = `<div class="pcard"><div class="toolbar"><h2><span class="ic"></span>المستندات الرسمية <span class="muted">(${rows.length})</span></h2><span class="sp"></span>${govChip('P-11')}${canDocs() ? '<button class="btn primary" id="dNew">＋ مستند</button>' : ''}</div>
     ${missing.length ? `<div class="alert bad">⚠ مستندات أساسية ناقصة لمشروع تحت التنفيذ: ${missing.map(c => DOC_CAT[c]).join('، ')}</div>` : ''}
     ${soon.length ? `<div class="alert warn">⏰ تنتهي خلال 30 يوماً أو منتهية: ${soon.map(r => `<b>${esc(DOC_CAT[r.category])}</b> (${dateAr(r.expiry_date)})`).join('، ')}</div>` : ''}
     ${rows.length ? groups.map(([c, a]) => `<h3 class="sub-h">${DOC_CAT[c]} <small class="muted">(${a.length})</small></h3><table class="lst"><thead><tr><th>العنوان</th><th>الرقم</th><th>التاريخ</th><th>الجهة</th><th>${c === 'bank_guarantee' || c === 'insurance' ? 'الانتهاء' : c === 'change_order' || c === 'contract' ? 'المبلغ' : c === 'extension' ? 'الأيام' : c.startsWith('letter') ? 'الرد' : 'ملاحظة'}</th><th>الملف</th><th></th></tr></thead><tbody>${a.map(r => `<tr><td><b>${esc(r.title)}</b></td><td class="ltr">${esc(r.doc_no || '')}</td><td>${dateAr(r.doc_date)}</td><td>${esc(r.party || '')}</td><td class="${r.expiry_date && r.expiry_date < today() ? 'bad' : ''}">${c === 'bank_guarantee' || c === 'insurance' ? dateAr(r.expiry_date) : c === 'change_order' || c === 'contract' ? money(r.amount) : c === 'extension' ? (r.days || 0) + ' يوم' : c.startsWith('letter') ? (r.replied_on ? 'رُدّ ' + dateAr(r.replied_on) : r.reply_due ? `<span class="${r.reply_due < today() ? 'bad' : ''}">مطلوب قبل ${dateAr(r.reply_due)}</span>` : '—') : esc((r.notes || '').slice(0, 40))}</td><td>${fileCell(r)}</td><td>${isAdmin() || (canDocs() && r.created_by === session.user.id) ? `<button class="btn sm" data-d="${r.id}">تعديل</button>` : ''}</td></tr>`).join('')}</tbody></table>`).join('') : '<p class="muted">لا توجد مستندات مسجلة بعد.</p>'}</div>`;
@@ -136,14 +137,14 @@ export async function projectSubmittals(t, p) {
   await loadProfiles(); await loadSla();
   const rows = await q(sb.from('submittals').select('*').eq('project_id', p.id).order('no', { ascending: false }).order('rev', { ascending: false }));
   const open = rows.filter(r => r.status !== 'decided'), late = open.filter(isOverdue);
-  t.innerHTML = `<div class="pcard"><div class="toolbar"><h2><span class="ic"></span>الاعتمادات <span class="muted">(${open.length} قيد الإجراء${late.length ? ` · <b class="bad">${late.length} متأخرة</b>` : ''} من ${rows.length})</span></h2><span class="sp"></span>${canEdit() ? '<button class="btn primary" id="sNew">＋ طلب اعتماد</button>' : ''}</div>${rows.length ? subRows(rows) : '<p class="muted">لا توجد طلبات اعتماد بعد.</p>'}</div>`;
+  t.innerHTML = `<div class="pcard"><div class="toolbar"><h2><span class="ic"></span>الاعتمادات <span class="muted">(${open.length} قيد الإجراء${late.length ? ` · <b class="bad">${late.length} متأخرة</b>` : ''} من ${rows.length})</span></h2><span class="sp"></span>${govChip('P-06')}${canEdit() ? '<button class="btn primary" id="sNew">＋ طلب اعتماد</button>' : ''}</div>${rows.length ? subRows(rows) : '<p class="muted">لا توجد طلبات اعتماد بعد.</p>'}</div>`;
   if (canEdit()) $('#sNew').onclick = () => subForm(null, p, rows, () => projectSubmittals(t, p));
   $$('[data-s]', t).forEach(b => b.onclick = () => subDetail(rows.find(x => x.id === +b.getAttribute('data-s')), p, rows, () => projectSubmittals(t, p)));
 }
 async function subForm(s, p, existing, done, resubmitOf = null) {
   const v = s || resubmitOf || { kind: 'material', submitted_on: today() };
   const nextNo = resubmitOf ? resubmitOf.no : (existing.length ? Math.max(...existing.map(x => x.no)) + 1 : 1);
-  await modal(`<form id="f" class="pgrid">
+  await modal(`${govBar(['P-06', s ? 1 : 1])}<form id="f" class="pgrid">
     <p class="wide muted">رقم الطلب: <b class="ltr">SUB-${String(nextNo).padStart(3, '0')}${resubmitOf ? '-R' + (resubmitOf.rev + 1) : s?.rev ? '-R' + s.rev : ''}</b> · موعد الرد التلقائي: ${SLA} أيام من التقديم</p>
     ${field('النوع *', sel('kind', Object.entries(SUB_KIND), v.kind))}
     ${field('تاريخ التقديم', inp('submitted_on', resubmitOf ? today() : (v.submitted_on || today()), 'type="date"'))}
@@ -192,7 +193,7 @@ export async function subDetail(s, p, existing, done) {
   const admin = isAdmin(), edit = canEdit(); const V = (k, v) => `<div class="kv"><span>${k}</span><b>${v}</b></div>`;
   const spec = s.spec_ref && REF.loaded ? REF.byItem[s.spec_ref] : null;
   const filesHtml = side => { const a = files.filter(f => f.side === side); return a.length ? a.map(f => fileCell(f)).join(' ') : '<span class="muted">—</span>'; };
-  await modal(`<div class="kvs">${V('المشروع', esc(p.name))}${V('النوع', SUB_KIND[s.kind])}${V('مقدّمه', esc(s.submitted_by || '—'))}${V('تاريخ التقديم', dateAr(s.submitted_on))}${V('موعد الرد', `<span class="${isOverdue(s) ? 'bad' : ''}">${dateAr(s.due_on)}${isOverdue(s) ? ' — متأخر' : ''}</span>`)}${V('الحالة', s.status === 'decided' ? decBadge(s.decision) : SUB_ST[s.status])}</div>
+  await modal(`${govBar(GOV.submittal(s), SUB_ST[s.status])}<div class="kvs">${V('المشروع', esc(p.name))}${V('النوع', SUB_KIND[s.kind])}${V('مقدّمه', esc(s.submitted_by || '—'))}${V('تاريخ التقديم', dateAr(s.submitted_on))}${V('موعد الرد', `<span class="${isOverdue(s) ? 'bad' : ''}">${dateAr(s.due_on)}${isOverdue(s) ? ' — متأخر' : ''}</span>`)}${V('الحالة', s.status === 'decided' ? decBadge(s.decision) : SUB_ST[s.status])}</div>
     ${s.description ? `<p class="pre">${esc(s.description)}</p>` : ''}
     ${!s.spec_ref && s.spec_title ? `<div class="specbox"><b>البند:</b> ${esc(s.spec_title)}</div>` : ''}
     ${s.spec_ref ? `<div class="specbox"><b>${s.boq_line_id ? 'بند جدول الكميات' : 'البند المرجعي'}:</b> <span class="cd">${esc(s.spec_ref)}</span> ${esc(s.spec_title || '')} <a href="#/ref/${s.spec_ref.replace(/\s+/g, '-')}" target="_blank" class="small">فتح في المرجع الفني ‹</a>${spec ? `<div class="muted small" style="margin-top:4px">${esc((spec.scope || '').slice(0, 220))}</div>${(safeArr(spec.specs)).slice(0, 5).length ? `<ul class="small" style="margin:4px 16px 0">${safeArr(spec.specs).slice(0, 5).map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}` : ''}</div>` : ''}
@@ -231,7 +232,7 @@ async function decideForm(s, p, done) {
 // الصفحة العامة للاعتمادات
 export async function mountSubmittals(root, params) {
   await loadProfiles(); await loadSla();
-  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">الاعتمادات</h1><span class="sp"></span>${xbtn('xl')}</div><div class="filters"><input id="fq" placeholder="بحث…"><select id="fSt"><option value="">قيد الإجراء</option><option value="all">الكل</option><option value="submitted">بانتظار المهندس</option><option value="reviewed">بانتظار القرار</option><option value="late">متأخرة</option><option value="decided">صدر القرار</option></select><select id="fK"><option value="">كل الأنواع</option>${Object.entries(SUB_KIND).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div><div id="kp"></div><div id="sl"><p class="muted">…</p></div>`;
+  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">الاعتمادات</h1><span class="sp"></span>${govChip('P-06')}${xbtn('xl')}</div><div class="filters"><input id="fq" placeholder="بحث…"><select id="fSt"><option value="">قيد الإجراء</option><option value="all">الكل</option><option value="submitted">بانتظار المهندس</option><option value="reviewed">بانتظار القرار</option><option value="late">متأخرة</option><option value="decided">صدر القرار</option></select><select id="fK"><option value="">كل الأنواع</option>${Object.entries(SUB_KIND).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div><div id="kp"></div><div id="sl"><p class="muted">…</p></div>`;
   const all = await q(sb.from('submittals').select('*, projects(name,contractor)').order('id', { ascending: false }));
   const open = all.filter(s => s.status !== 'decided'), late = open.filter(isOverdue);
   const avg = (() => { const d = all.filter(s => s.decided_at); return d.length ? Math.round(d.reduce((a, s) => a + (new Date(s.decided_at) - new Date(s.submitted_on)) / 864e5, 0) / d.length) : null; })();
@@ -253,7 +254,7 @@ export async function mountDocsAll(root, params) {
   const missing = projects.filter(p => ['execution', 'handover', 'warranty'].includes(p.stage)).map(p => ({ p, m: REQUIRED_EXEC.filter(c => !rows.some(r => r.project_id === p.id && r.category === c)) })).filter(x => x.m.length);
   const expiring = rows.filter(r => r.expiry_date && r.expiry_date <= soonD);
   const openLetters = rows.filter(r => r.category.startsWith('letter') && r.reply_due && !r.replied_on);
-  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">سجل المستندات الرسمية</h1><span class="sp"></span>${xbtn('xl')}</div>
+  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">سجل المستندات الرسمية</h1><span class="sp"></span>${govChip('P-11')}${xbtn('xl')}</div>
     <div class="kpis"><a class="kpi ${expiring.length ? 'bad' : ''}" href="#/documents?f=expiring"><b>${expiring.length}</b><span>ضمانات / تأمينات تنتهي خلال 30 يوماً</span></a><a class="kpi ${missing.length ? 'bad' : ''}" href="#/documents?f=missing"><b>${missing.length}</b><span>مشاريع تحت التنفيذ ناقصة مستندات أساسية</span></a><a class="kpi ${openLetters.filter(r => r.reply_due < today()).length ? 'bad' : ''}" href="#/documents?f=letters"><b>${openLetters.length}</b><span>خطابات بانتظار رد${openLetters.filter(r => r.reply_due < today()).length ? ' · ' + openLetters.filter(r => r.reply_due < today()).length + ' متأخرة' : ''}</span></a><div class="kpi"><b>${rows.length}</b><span>إجمالي المستندات</span></div></div>
     <div class="filters"><input id="fq" placeholder="بحث…"><select id="fF"><option value="">كل المستندات</option><option value="expiring">تنتهي خلال 30 يوماً</option><option value="missing">نواقص المشاريع</option><option value="letters">خطابات بانتظار رد</option></select><select id="fC"><option value="">كل الأنواع</option>${Object.entries(DOC_CAT).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select><select id="fP"><option value="">كل المشاريع</option>${projects.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></div><div id="dl"></div>`;
   if (params.get('f')) $('#fF').value = params.get('f');

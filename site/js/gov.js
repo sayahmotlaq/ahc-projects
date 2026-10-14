@@ -22,43 +22,53 @@ const refLink = code => /^[A-QS-Z]-\d/.test(code) ? `<a class="gref" data-peek="
 // نص مع تحويل أكواد الإجراءات والقواعد (G-05، P-03، R-01) إلى إحالات قابلة للنقر
 const linkify = s => esc(s).replace(/\b([A-Z]-\d{2})\b/g, m => (G?.P?.[m] || G?.R?.[m]) ? refLink(m).replace('class="gref"', 'class="gref in"') : m);
 
-const stepHtml = (s, i) => `<div class="gstep ${s.kind === 'decision' ? 'dec' : ''}" style="--c:#${uc(s.unit)}"><span class="gno"><i>${i + 1}</i></span><div class="gsb"><div class="gsh">${chip(s.unit)}${s.role ? `<small class="muted">${esc(s.role)}</small>` : ''}${s.kind === 'decision' ? '<span class="badge ovr">قرار</span>' : ''}</div><p>${linkify(s.action)}</p><div class="gsm">${s.sla ? `<span>⏱ ${esc(s.sla)}</span>` : ''}${s.where && s.where !== '—' ? `<span>📍 ${esc(s.where)}</span>` : ''}</div></div></div>`;
-const flowHtml = p => `<div class="gflow">${(p.steps || []).map((s, i) => `<span class="gfi">${i ? '<i class="gfa">←</i>' : ''}<span class="gfs ${s.kind === 'decision' ? 'dec' : ''}" style="--c:#${uc(s.unit)}"><b><i>${i + 1}</i></b>${esc(un(s.unit))}</span></span>`).join('')}</div>`;
+const stepHtml = (s, i, cur) => `<div class="gstep ${s.kind === 'decision' ? 'dec' : ''} ${cur === i + 1 ? 'cur' : ''} ${typeof cur === 'number' && i + 1 < cur ? 'past' : ''}" style="--c:#${uc(s.unit)}"><span class="gno"><i>${i + 1}</i></span><div class="gsb"><div class="gsh">${chip(s.unit)}${s.role ? `<small class="muted">${esc(s.role)}</small>` : ''}${s.kind === 'decision' ? '<span class="badge ovr">قرار</span>' : ''}${cur === i + 1 ? '<span class="badge info">أنت هنا</span>' : ''}</div><p>${linkify(s.action)}</p><div class="gsm">${s.sla ? `<span>⏱ ${esc(s.sla)}</span>` : ''}${s.where && s.where !== '—' ? `<span>📍 ${esc(s.where)}</span>` : ''}</div></div></div>`;
+const flowHtml = (p, cur) => `<div class="gflow">${(p.steps || []).map((s, i) => `<span class="gfi">${i ? '<i class="gfa">←</i>' : ''}<span class="gfs ${s.kind === 'decision' ? 'dec' : ''} ${cur === i + 1 ? 'cur' : ''}" style="--c:#${uc(s.unit)}"><b><i>${i + 1}</i></b>${esc(un(s.unit))}</span></span>`).join('')}</div>`;
+const who = s => esc(un(s.unit)) + (s.role && s.role !== un(s.unit) ? ' / ' + esc(s.role) : '');
 
-// ---------- نافذة جانبية للإحالات: تفتح الإجراء أو القاعدة فوق الصفحة الحالية دون مغادرتها
+// ---------- نافذة جانبية للإحالات: تفتح الإجراء أو القاعدة فوق أي صفحة أو نافذة دون مغادرتها، وعند الطلب على خطوة محددة
 const PEEK = { stack: [] };
-function peekBody(code) {
+function nowBox(p, step) {
+  const n = (p.steps || []).length;
+  if (step === 'done') return `<div class="gpk-now done"><b>اكتمل هذا الإجراء لهذا البند</b><span>آخر خطوة: ${linkify(p.steps[n - 1]?.action || '')}</span></div>`;
+  const k = Number(step); if (!k || !p.steps?.[k - 1]) return '';
+  const c = p.steps[k - 1], nx = p.steps[k];
+  return `<div class="gpk-now"><b>أنت في الخطوة ${k} من ${n} — ${who(c)}</b><span>${linkify(c.action)}${c.sla && c.sla !== '—' ? ` <small>· المهلة: ${esc(c.sla)}</small>` : ''}</span>${nx ? `<span class="nx"><b>التالي:</b> ${who(nx)} — ${linkify(nx.action)}</span>` : '<span class="nx">هذه آخر خطوة في الإجراء.</span>'}</div>`;
+}
+function peekBody(code, step) {
   const p = G.P[code], r = G.R[code];
+  const cur = step === 'done' ? (p?.steps || []).length + 1 : Number(step) || null;
   if (p) return `<div class="gpk-h" style="--c:#${uc(p.owner)}"><b>${esc(p.code)}</b>${chip(p.owner)}<span class="badge ${p.status === 'approved' ? 'full' : 'skel'}">${p.status === 'approved' ? 'معتمد' : 'مسودة'} v${esc(p.version || '1.0')}</span></div><h3>${esc(p.title)}</h3>
+    ${step ? nowBox(p, step) : ''}
     ${p.goal ? `<p class="gpk-goal">${linkify(p.goal)}</p>` : ''}${p.trigger ? `<p class="muted small"><b>متى يبدأ:</b> ${esc(p.trigger)}</p>` : ''}
-    ${flowHtml(p)}<div class="gsteps">${(p.steps || []).map(stepHtml).join('')}</div>
+    ${flowHtml(p, cur)}<div class="gsteps">${(p.steps || []).map((s, i) => stepHtml(s, i, cur)).join('')}</div>
     ${p.notes ? `<div class="notice mt12"><b>ملاحظات:</b> ${linkify(p.notes)}</div>` : ''}`;
   if (r) return `<div class="gpk-h" style="--c:#${uc(r.owner)}"><b>${esc(r.code)}</b>${chip(r.owner)}${r.theme ? `<span class="muted small">${esc(r.theme)}</span>` : ''}</div><h3>${esc(r.title)}</h3>
     <p class="gpk-goal">${linkify(r.statement)}</p>${(r.criteria || []).length ? `<ul class="gpk-ul">${r.criteria.map(c => `<li>${linkify(c)}</li>`).join('')}</ul>` : ''}${r.note ? `<p class="muted small">${linkify(r.note)}</p>` : ''}
     ${r.process_code && G.P[r.process_code] ? `<p class="mt12">الإجراء المرتبط: ${refLink(r.process_code)} — ${esc(G.P[r.process_code].title)}</p>` : ''}`;
-  return '<div class="empty-boq">غير موجود</div>';
+  return '<div class="empty-boq">غير موجود في الحوكمة</div>';
 }
 function renderPeek() {
   let el = document.getElementById('gpeek');
-  const code = PEEK.stack[PEEK.stack.length - 1];
-  if (!code) { if (el) { el.classList.remove('on'); setTimeout(() => !PEEK.stack.length && el.remove(), 220); } return; }
+  const top = PEEK.stack[PEEK.stack.length - 1];
+  if (!top) { if (el) { el.classList.remove('on'); setTimeout(() => !PEEK.stack.length && el.remove(), 220); } return; }
   if (!el) { el = document.createElement('div'); el.id = 'gpeek'; document.body.appendChild(el); requestAnimationFrame(() => el.classList.add('on')); }
-  const full = /^R-/.test(code) ? `#/gov/rules/${code}` : `#/gov/sop/${code}`;
-  el.innerHTML = `<div class="gpeek-bg" data-pk="x"></div><aside class="gpeek" role="dialog" aria-label="${esc(code)}"><div class="gpk-top">${PEEK.stack.length > 1 ? `<button class="btn sm ghost" data-pk="back" title="رجوع">→ ${esc(PEEK.stack[PEEK.stack.length - 2])}</button>` : ''}<span class="sp"></span><a class="btn sm" href="${full}" data-pk="full">فتح الصفحة كاملة</a><button class="btn sm ghost" data-pk="x" title="إغلاق (Esc)">✕</button></div><div class="gpk-body">${peekBody(code)}</div></aside>`;
+  const full = /^R-/.test(top.code) ? `#/gov/rules/${top.code}` : `#/gov/sop/${top.code}`, prev = PEEK.stack[PEEK.stack.length - 2];
+  el.innerHTML = `<div class="gpeek-bg" data-pk="x"></div><aside class="gpeek" role="dialog" aria-label="${esc(top.code)}"><div class="gpk-top">${prev ? `<button class="btn sm ghost" data-pk="back" title="رجوع">→ ${esc(prev.code)}</button>` : ''}<span class="sp"></span><a class="btn sm" href="${full}" data-pk="full">فتح الصفحة كاملة</a><button class="btn sm ghost" data-pk="x" title="إغلاق (Esc)">✕</button></div><div class="gpk-body">${peekBody(top.code, top.step)}</div></aside>`;
   el.classList.add('on');
+  const c = el.querySelector('.gstep.cur'); if (c) setTimeout(() => c.scrollIntoView({ block: 'center', behavior: 'smooth' }), 240);
 }
-export function openPeek(code) { if (!G) return; PEEK.stack.push(code); renderPeek(); }
-const closePeek = () => { PEEK.stack = []; renderPeek(); };
-if (!window.__govPeek) {
-  window.__govPeek = 1;
-  document.addEventListener('click', e => {
-    const a = e.target.closest('[data-peek]');
-    if (a && G && !e.metaKey && !e.ctrlKey && !e.shiftKey) { e.preventDefault(); if (PEEK.stack[PEEK.stack.length - 1] !== a.dataset.peek) openPeek(a.dataset.peek); return; }
-    const b = e.target.closest('[data-pk]'); if (!b) return;
-    if (b.dataset.pk === 'x') closePeek(); else if (b.dataset.pk === 'back') { PEEK.stack.pop(); renderPeek(); } else if (b.dataset.pk === 'full') { PEEK.stack = []; renderPeek(); }
-  });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && PEEK.stack.length && !document.querySelector('.mwrap')) closePeek(); });
-  window.addEventListener('hashchange', () => { if (PEEK.stack.length) closePeek(); });
+export async function govData(force) { return load(force); }
+export async function openPeek(code, step) { if (!G) await load(); const top = PEEK.stack[PEEK.stack.length - 1]; if (top && top.code === code && String(top.step || '') === String(step || '')) return; PEEK.stack.push({ code, step: step || null }); renderPeek(); }
+export function peekAction(a) { if (a === 'x' || a === 'full') PEEK.stack = []; else if (a === 'back') PEEK.stack.pop(); renderPeek(); }
+export const peekOpen = () => PEEK.stack.length > 0;
+
+// ---------- شريط «الإجراء الحاكم» داخل شاشات المنصة (يملؤه govlink.js)
+export function govBarHtml(code, step, note) {
+  const p = G?.P?.[code]; if (!p) return '';
+  const n = (p.steps || []).length, k = step === 'done' ? n : Number(step) || 0, c = k ? p.steps[k - 1] : null, nx = step === 'done' ? null : (k ? p.steps[k] : p.steps[0]);
+  const where = step === 'done' ? '<span class="gbs ok">✓ اكتمل الإجراء</span>' : c ? `<span class="gbs"><b>الخطوة ${k}/${n}</b> ${who(c)}: ${esc(c.action)}</span>` : `<span class="gbs">${n} خطوات</span>`;
+  return `<button type="button" class="gb" data-peek="${esc(code)}" data-step="${esc(step || '')}" style="--c:#${uc(p.owner)}" title="اضغط لعرض الإجراء كاملاً${c ? ' والخطوة الحالية' : ''}"><span class="gbi">📘</span><span class="gbt"><span class="gbh"><b class="gbc">${esc(code)}</b> ${esc(p.title)}${note ? ` <small>· ${esc(note)}</small>` : ''}</span>${where}${nx && step !== 'done' ? `<span class="gbn">التالي: ${who(nx)}</span>` : ''}</span><span class="gbo">عرض ‹</span></button>`;
 }
 
 export async function mountGov(root, tab = 'start', id = null, params) {

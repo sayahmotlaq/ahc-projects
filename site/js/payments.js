@@ -3,6 +3,7 @@ import { sb, canEdit, isAdmin, role, q, session, today } from './api.js';
 import { $, $$, esc, money, fmt, dateAr, toast, err, modal, confirm, field, inp, sel, formData, money_inp } from './ui.js';
 import { exportTable, xbtn } from './xlsx.js';
 import { threadBox, mountThread } from './thread.js';
+import { govBar, govChip, GOV } from './govlink.js';
 
 export const P_STATUS = { draft: 'مسودة', submitted: 'مقدَّم', review: 'قيد المراجعة', approved: 'معتمد', finance: 'محال للمالية', paid: 'مصروف', rejected: 'مرفوض' };
 export const P_KIND = { advance: 'دفعة مقدمة', interim: 'مستخلص جارٍ', final: 'مستخلص ختامي', retention_release: 'إفراج عن الضمان' };
@@ -87,7 +88,7 @@ async function payForm(pm, project, existing, done) {
     ${field('ملاحظات', `<textarea name="notes" rows="2" ${dis}>${esc(v.notes || '')}</textarea>`, 'wide')}
     <div class="wide paycalc" id="pc"></div>
     <div class="btnrow end wide">${pm && (isAdmin() || (canEdit() && pm.status === 'draft')) ? '<button type="button" class="btn danger" data-del>حذف</button>' : ''}<span class="sp"></span><button type="button" class="btn" data-x>${editable ? 'إلغاء' : 'إغلاق'}</button>${editable ? '<button class="btn primary">حفظ</button>' : ''}</div></form>`;
-  await modal(html, { title: pm ? `مستخلص رقم ${pm.no} — ${P_STATUS[pm.status]}` : 'مستخلص جديد', wide: true, onOpen: (w, close) => {
+  await modal(govBar(GOV.payment(pm || { status: 'draft' })) + html, { title: pm ? `مستخلص رقم ${pm.no} — ${P_STATUS[pm.status]}` : 'مستخلص جديد', wide: true, onOpen: (w, close) => {
     const form = $('#f', w);
     const preview = () => { const f = formData(form); const c = calcPay(f); const pct = project.contract_value ? Math.round((num(f.cumulative_work) / Number(project.contract_value)) * 100) : null;
       $('#pc', w).innerHTML = `<div class="kvs"><div class="kv"><span>قيمة الأعمال</span><b>${fmt(c.work)}</b></div><div class="kv"><span>+ الضريبة</span><b>${fmt(c.vat)}</b></div><div class="kv"><span>− حجز الضمان</span><b>${fmt(c.retention)}</b></div><div class="kv"><span>− استرداد المقدمة</span><b>${fmt(num(f.advance_recovery))}</b></div><div class="kv"><span>− غرامات وخصومات</span><b>${fmt(num(f.penalty) + num(f.other_deductions))}</b></div><div class="kv net"><span>الصافي المستحق</span><b>${fmt(c.net)} ر.س</b></div></div>${pct !== null ? `<p class="muted small">الإنجاز المالي التراكمي ${pct}% من قيمة العقد (${money(project.contract_value)} ر.س)${project.progress_actual != null && project.stage === 'execution' && pct > Number(project.progress_actual) + 10 ? ' — <b class="bad">تنبيه: الإنجاز المالي يفوق الإنجاز الفعلي (' + project.progress_actual + '%) بأكثر من 10%</b>' : ''}</p>` : ''}`; };
@@ -111,7 +112,7 @@ export async function payDetail(pm, project, existing, done) {
   const nm = id => profs.find(p => p.id === id)?.full_name || '—';
   const acts = actions(pm);
   const V = (k, v) => `<div class="kv"><span>${k}</span><b>${v}</b></div>`;
-  await modal(`<div class="kvs">${V('المشروع', esc(project.name))}${V('النوع', P_KIND[pm.kind])}${V('الحالة', pBadge(pm.status))}${V('الفترة', `${dateAr(pm.period_from)} ← ${dateAr(pm.period_to)}`)}${V('فاتورة المقاول', esc(pm.contractor_invoice_no || '—'))}${V('الأعمال التراكمية', fmt(pm.cumulative_work) + ' ر.س')}${V('قيمة أعمال المستخلص', fmt(pm.work_amount))}${V('الضريبة ' + pm.vat_pct + '%', fmt(pm.vat_amount))}${V('حجز الضمان ' + pm.retention_pct + '%', '− ' + fmt(pm.retention_amount))}${V('استرداد المقدمة', '− ' + fmt(pm.advance_recovery))}${V('غرامة / خصومات', '− ' + fmt(Number(pm.penalty) + Number(pm.other_deductions)))}<div class="kv net"><span>الصافي المستحق</span><b>${fmt(pm.net_amount)} ر.س</b></div></div>
+  await modal(`${govBar(GOV.payment(pm), P_STATUS[pm.status])}<div class="kvs">${V('المشروع', esc(project.name))}${V('النوع', P_KIND[pm.kind])}${V('الحالة', pBadge(pm.status))}${V('الفترة', `${dateAr(pm.period_from)} ← ${dateAr(pm.period_to)}`)}${V('فاتورة المقاول', esc(pm.contractor_invoice_no || '—'))}${V('الأعمال التراكمية', fmt(pm.cumulative_work) + ' ر.س')}${V('قيمة أعمال المستخلص', fmt(pm.work_amount))}${V('الضريبة ' + pm.vat_pct + '%', fmt(pm.vat_amount))}${V('حجز الضمان ' + pm.retention_pct + '%', '− ' + fmt(pm.retention_amount))}${V('استرداد المقدمة', '− ' + fmt(pm.advance_recovery))}${V('غرامة / خصومات', '− ' + fmt(Number(pm.penalty) + Number(pm.other_deductions)))}<div class="kv net"><span>الصافي المستحق</span><b>${fmt(pm.net_amount)} ر.س</b></div></div>
     <div class="mt8 kvs" >${V('تاريخ التقديم', dateAr(pm.submitted_on))}${V('تاريخ الاعتماد', dateAr(pm.approved_on))}${V('الإحالة للمالية', dateAr(pm.sent_finance_on))}${V('تاريخ الصرف', dateAr(pm.paid_on))}${V('أمر الدفع', esc(pm.payment_order_no || '—'))}${pm.reject_reason ? V('سبب الرفض', `<span class="bad">${esc(pm.reject_reason)}</span>`) : ''}</div>
     ${pm.notes ? `<p class="pre">${esc(pm.notes)}</p>` : ''}
     <h3 class="sub-h">سجل الإجراءات</h3>${log.length ? `<table class="lst"><thead><tr><th>التاريخ</th><th>الإجراء</th><th>بواسطة</th><th>ملاحظة</th></tr></thead><tbody>${log.map(l => `<tr><td>${dateAr(l.at)}</td><td>${l.from_status ? P_STATUS[l.from_status] + ' ← ' : ''}${P_STATUS[l.to_status] || l.to_status}</td><td>${esc(nm(l.by_user))}</td><td class="muted">${esc(l.note || '')}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">—</p>'}
@@ -146,14 +147,14 @@ function payRows(rows, opts = {}) {
 export async function projectPayments(t, p) {
   const rows = await q(sb.from('payments').select('*').eq('project_id', p.id).order('no'));
   const s = paySummary(p, rows);
-  t.innerHTML = `<div class="pcard"><div class="toolbar"><h2><span class="ic"></span>المستخلصات المالية <span class="muted">(${rows.length})</span></h2><span class="sp"></span>${canEdit() ? '<button class="btn primary" id="pmNew">＋ مستخلص جديد</button>' : ''}</div>${s.html}${rows.length ? payRows(rows, { totals: true }) : '<p class="muted">لا توجد مستخلصات على هذا المشروع بعد.</p>'}</div>`;
+  t.innerHTML = `<div class="pcard"><div class="toolbar"><h2><span class="ic"></span>المستخلصات المالية <span class="muted">(${rows.length})</span></h2><span class="sp"></span>${govChip('P-07')}${canEdit() ? '<button class="btn primary" id="pmNew">＋ مستخلص جديد</button>' : ''}</div>${s.html}${rows.length ? payRows(rows, { totals: true }) : '<p class="muted">لا توجد مستخلصات على هذا المشروع بعد.</p>'}</div>`;
   if (canEdit()) $('#pmNew').onclick = () => payForm(null, p, rows, () => projectPayments(t, p));
   $$('[data-p]', t).forEach(b => b.onclick = () => payDetail(rows.find(x => x.id === +b.getAttribute('data-p')), p, rows, () => projectPayments(t, p)));
 }
 
 // ---------- الصفحة العامة
 export async function mountPayments(root, params) {
-  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">المستخلصات المالية</h1><span class="sp"></span>${xbtn()}</div>
+  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">المستخلصات المالية</h1><span class="sp"></span>${govChip('P-07')}${xbtn()}</div>
     <div class="filters"><input id="fq" placeholder="بحث باسم المشروع أو رقم الفاتورة…"><select id="fSt"><option value="">قيد الإجراء (مقدَّم ← لدى المالية)</option><option value="all">الكل</option>${Object.entries(P_STATUS).map(([k, v]) => `<option value="${k}" ${params.get('st') === k ? 'selected' : ''}>${v}</option>`).join('')}</select><select id="fK"><option value="">كل الأنواع</option>${Object.entries(P_KIND).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div><div id="kp"></div><div id="pl"><p class="muted">…</p></div>`;
   const all = await q(sb.from('payments').select('*, projects(name,contract_value)').order('id', { ascending: false }));
   const sum = arr => arr.reduce((a, r) => a + Number(r.net_amount || 0), 0);

@@ -3,6 +3,7 @@ import { sb, REF, canEdit, q, session, itemDetail } from './api.js';
 import { $, $$, esc, norm, fmt, money, toast, err, confirm, modal, field, inp, sel, formData, debounce } from './ui.js';
 import { exportExcel } from './excel.js';
 import { loadLS, activeLS, LS_DEFAULT_NOTES, UNITS } from './lumpsum.js';
+import { govBar, govChip, GOV } from './govlink.js';
 
 const STATUS = { draft: 'مسودة', approved: 'معتمد', tender: 'طرح', awarded: 'ترسية', final: 'ختامي' };
 let LOGO_B64 = null;
@@ -48,11 +49,12 @@ export async function mountBoq(root, boqId, project, onBack) {
     <div class="toolbar">
       <button class="btn" id="bBack">‹ المشروع</button>
       <div class="titleblock"><b>${esc(project.name)}</b><span class="muted">جدول الكميات: ${esc(boq.name)} · <span class="badge skel">${STATUS[boq.status] || boq.status}</span></span></div>
+
       <span class="sp"></span>
       <button class="btn primary" id="bExcel">⬇ تصدير Excel</button>
       ${edit ? `<button class="btn" id="bSettings">إعدادات الجدول</button><button class="btn" id="bRefresh" title="تحديث أسعار البنود من المرجع الحالي">تحديث الأسعار</button>` : ''}
       <button class="btn" onclick="window.print()">طباعة</button>
-    </div>
+    </div>${govBar(GOV.boq(boq), 'حالة الجدول: ' + (STATUS[boq.status] || boq.status))}
     ${edit ? `<div class="pcard noprint"><h2><span class="ic"></span>إضافة بند من المرجع</h2>
       <div class="qsearch"><input id="qk" type="text" placeholder="بحث سريع: اسم البند أو الخيار أو الكود (مثال: سبليت 2 طن، HEPA، 26 51)…" autocomplete="off"><div class="drop" id="qkDrop"></div></div>
       <div class="cascade">

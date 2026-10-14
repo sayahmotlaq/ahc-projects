@@ -4,6 +4,7 @@ import { $, $$, esc, dateAr, toast, err, modal, confirm, field, inp, sel, formDa
 import { exportTable, xbtn } from './xlsx.js';
 import { threadBox, mountThread } from './thread.js';
 import { attachBox, mountAttachBox } from './attach.js';
+import { govBar, govChip, GOV } from './govlink.js';
 
 export const T_STATUS = { open: 'مفتوحة', in_progress: 'قيد التنفيذ', done: 'منجزة', cancelled: 'ملغاة' };
 export const R_STATUS = { new: 'جديد', in_review: 'قيد المراجعة', approved: 'معتمد', rejected: 'مرفوض', done: 'منفذ' };
@@ -37,7 +38,7 @@ export async function taskForm(t, project, done, preset = null) {
       ${field('الحالة', sel('status', [['open', 'مفتوحة'], ['in_progress', 'قيد التنفيذ'], ['done', 'منجزة']], t.status))}
       ${field('ملاحظة الإنجاز', `<textarea name="progress_note" rows="3">${esc(t.progress_note || '')}</textarea>`, 'wide')}
       <div class="btnrow end wide">${t?.due_date ? calBtn({ uid: 'task-' + t.id, title: 'مهمة: ' + t.title, date: t.due_date, desc: project?.name || '', url: '#/project/' + t.project_id + '/tasks' }, 'btn') : ''}<span class="sp"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">تحديث</button></div></form>`;
-  await modal(html + (t ? threadBox('task', t.id) : ''), { title: t ? (admin ? 'تعديل المهمة' : 'تحديث حالة المهمة') : 'مهمة جديدة', wide: true, onOpen: (w, close) => {
+  await modal(govBar(GOV.task(t)) + html + (t ? threadBox('task', t.id) : ''), { title: t ? (admin ? 'تعديل المهمة' : 'تحديث حالة المهمة') : 'مهمة جديدة', wide: true, onOpen: (w, close) => {
     bindCal(w); if (t) mountThread(w, 'task', t.id, { projectId: t.project_id || project?.id });
     $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target);
       try {
@@ -67,7 +68,7 @@ export async function requestForm(r, project, done) {
       ${canEditBody ? `${field('نوع الطلب', sel('kind', Object.entries(R_KIND), r?.kind || 'approval'))}${field('الأولوية', sel('priority', Object.entries(PRIO), r?.priority || 'normal'))}${field('عنوان الطلب *', inp('title', r?.title || '', 'required'), 'wide')}${field('التفاصيل / المبررات', `<textarea name="details" rows="3">${esc(r?.details || '')}</textarea>`, 'wide')}${field('المطلوب قبل', inp('due_date', r?.due_date || '', 'type="date"'))}` : ''}
       ${admin && r ? `${field('حالة الطلب', sel('status', Object.entries(R_STATUS), r.status))}${field('رد الإدارة', `<textarea name="response" rows="3">${esc(r.response || '')}</textarea>`, 'wide')}` : ''}
       <div class="btnrow end wide">${r && (admin || mine) ? '<button type="button" class="btn danger" data-del>حذف</button>' : ''}<span class="sp"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">${r ? 'حفظ' : 'إرسال الطلب'}</button></div></form>${r ? attachBox('مرفقات الطلب') + threadBox('request', r.id) : '<p class="muted small">بعد الإرسال يمكنك إرفاق ملفات (PDF وغيرها) من نافذة الطلب.</p>'}</div>`;
-  await modal(html, { title: r ? 'الطلب #' + r.id : (project ? 'طلب جديد إلى الإدارة' : 'طلب عام إلى الإدارة'), wide: true, onOpen: (w, close) => {
+  await modal(govBar(GOV.request(r)) + html, { title: r ? 'الطلب #' + r.id : (project ? 'طلب جديد إلى الإدارة' : 'طلب عام إلى الإدارة'), wide: true, onOpen: (w, close) => {
     if (r) { mountThread(w, 'request', r.id, { projectId: r.project_id }); mountAttachBox(w, 'request:' + r.id, { projectId: r.project_id }); }
     $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target);
       try {
@@ -89,7 +90,7 @@ export async function projectTasks(t, p) {
   await loadProfiles();
   const rows = await q(sb.from('tasks').select('*').eq('project_id', p.id).order('status').order('due_date', { ascending: true, nullsFirst: false }).order('id', { ascending: false }));
   const open = rows.filter(r => !['done', 'cancelled'].includes(r.status));
-  t.innerHTML = `<div class="pcard"><div class="toolbar"><h2><span class="ic"></span>المهام <span class="muted">(${open.length} مفتوحة من ${rows.length})</span></h2><span class="sp"></span>${isAdmin() ? '<button class="btn primary" id="tNew">＋ مهمة جديدة</button>' : ''}</div>${rows.length ? taskRows(rows) : '<p class="muted">لا توجد مهام على هذا المشروع.</p>'}</div>`;
+  t.innerHTML = `<div class="pcard"><div class="toolbar"><h2><span class="ic"></span>المهام <span class="muted">(${open.length} مفتوحة من ${rows.length})</span></h2><span class="sp"></span>${govChip('P-10')}${isAdmin() ? '<button class="btn primary" id="tNew">＋ مهمة جديدة</button>' : ''}</div>${rows.length ? taskRows(rows) : '<p class="muted">لا توجد مهام على هذا المشروع.</p>'}</div>`;
   if (isAdmin()) $('#tNew').onclick = () => taskForm(null, p, () => projectTasks(t, p));
   $$('[data-t]', t).forEach(b => b.onclick = () => taskForm(rows.find(x => x.id === +b.getAttribute('data-t')), p, () => projectTasks(t, p)));
 }
@@ -97,7 +98,7 @@ export async function projectRequests(t, p) {
   await loadProfiles();
   const rows = await q(sb.from('requests').select('*').eq('project_id', p.id).order('id', { ascending: false }));
   const pending = rows.filter(r => ['new', 'in_review'].includes(r.status));
-  t.innerHTML = `<div class="pcard"><div class="toolbar"><h2><span class="ic"></span>الطلبات إلى الإدارة <span class="muted">(${pending.length} بانتظار الرد من ${rows.length})</span></h2><span class="sp"></span>${canEdit() ? '<button class="btn primary" id="rNew">＋ طلب جديد</button>' : ''}</div>${rows.length ? requestRows(rows) : '<p class="muted">لا توجد طلبات على هذا المشروع.</p>'}</div>`;
+  t.innerHTML = `<div class="pcard"><div class="toolbar"><h2><span class="ic"></span>الطلبات إلى الإدارة <span class="muted">(${pending.length} بانتظار الرد من ${rows.length})</span></h2><span class="sp"></span>${govChip('P-10')}${canEdit() ? '<button class="btn primary" id="rNew">＋ طلب جديد</button>' : ''}</div>${rows.length ? requestRows(rows) : '<p class="muted">لا توجد طلبات على هذا المشروع.</p>'}</div>`;
   if (canEdit()) $('#rNew').onclick = () => requestForm(null, p, () => projectRequests(t, p));
   $$('[data-r]', t).forEach(b => b.onclick = () => requestForm(rows.find(x => x.id === +b.getAttribute('data-r')), p, () => projectRequests(t, p)));
 }
@@ -106,7 +107,7 @@ export async function projectRequests(t, p) {
 export async function mountTasks(root, params) {
   await loadProfiles();
   const me = session.user.id;
-  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">المهام</h1><span class="sp"></span>${xbtn()}</div>
+  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">المهام</h1><span class="sp"></span>${govChip('P-10')}${xbtn()}</div>
     <div class="filters"><input id="fq" placeholder="بحث…"><select id="fSt"><option value="">المفتوحة وقيد التنفيذ</option><option value="all">الكل</option>${Object.entries(T_STATUS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select><select id="fAs"><option value="">كل المكلفين</option>${!isAdmin() ? '' : ''}${profiles.filter(p => ['admin', 'engineer'].includes(p.role)).map(p => `<option value="${p.id}" ${params.get('me') && p.id === me ? 'selected' : ''}>${esc(p.full_name)}</option>`).join('')}</select><label class="chk"><input type="checkbox" id="fLate"> المتأخرة فقط</label></div><div id="tl"><p class="muted">…</p></div>`;
   const all = await q(sb.from('tasks').select('*, projects(name)').order('due_date', { ascending: true, nullsFirst: false }).order('id', { ascending: false }));
   const render = () => { const qs = $('#fq').value.toLowerCase(), st = $('#fSt').value, as = $('#fAs').value, late = $('#fLate').checked;
@@ -118,7 +119,7 @@ export async function mountTasks(root, params) {
 }
 export async function mountRequests(root, params) {
   await loadProfiles();
-  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">الطلبات</h1><span class="sp"></span>${canEdit() ? '<button class="btn primary" id="rNew">＋ طلب عام (بلا مشروع)</button>' : ''}</div>
+  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">الطلبات</h1><span class="sp"></span>${govChip('P-10')}${canEdit() ? '<button class="btn primary" id="rNew">＋ طلب عام (بلا مشروع)</button>' : ''}</div>
     <div class="filters"><input id="fq" placeholder="بحث…"><select id="fSt"><option value="">بانتظار الرد</option><option value="all">الكل</option>${Object.entries(R_STATUS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select><select id="fK"><option value="">كل الأنواع</option>${Object.entries(R_KIND).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div><div id="rl"><p class="muted">…</p></div>`;
   const all = await q(sb.from('requests').select('*, projects(name)').order('id', { ascending: false }));
   const render = () => { const qs = $('#fq').value.toLowerCase(), st = $('#fSt').value, k = $('#fK').value;

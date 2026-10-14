@@ -995,8 +995,8 @@ table.bq tr.freerow td .spec{color:var(--grey);font-size:12px;line-height:1.65;m
 @media print{ .tabs,.toolbar .btn,.snav,.topbar{display:none!important} }
 
 /* نافذة الإحالات الجانبية (الحوكمة) */
-#gpeek .gpeek-bg{position:fixed;inset:0;background:rgba(13,43,69,.28);z-index:170;opacity:0;transition:opacity .2s}
-#gpeek .gpeek{position:fixed;top:0;bottom:0;inset-inline-end:0;width:min(560px,100vw);background:var(--bg,#F3F5F8);z-index:171;box-shadow:0 0 40px rgba(13,43,69,.25);display:flex;flex-direction:column;transform:translateX(-105%);transition:transform .22s ease}
+#gpeek .gpeek-bg{position:fixed;inset:0;background:rgba(13,43,69,.28);z-index:300;opacity:0;transition:opacity .2s}
+#gpeek .gpeek{position:fixed;top:0;bottom:0;inset-inline-end:0;width:min(560px,100vw);background:var(--bg,#F3F5F8);z-index:301;box-shadow:0 0 40px rgba(13,43,69,.25);display:flex;flex-direction:column;transform:translateX(-105%);transition:transform .22s ease}
 #gpeek.on .gpeek-bg{opacity:1} #gpeek.on .gpeek{transform:none}
 .gpk-top{display:flex;gap:6px;align-items:center;padding:10px 14px;background:var(--surface,#fff);border-bottom:1px solid var(--line)}
 .gpk-body{overflow:auto;padding:14px 16px 28px;flex:1} .gpk-body h3{margin:6px 0 8px;font-size:17px;color:var(--navy)}
@@ -1013,3 +1013,20 @@ table.bq tr.freerow td .spec{color:var(--grey);font-size:12px;line-height:1.65;m
 .gmb.on{background:var(--c);color:#fff;border-color:var(--c)} .gmb.on b{background:rgba(255,255,255,.22);color:#fff}
 .gmb.nil{opacity:.6} .gmb:active{transform:scale(.97)}
 .gman-nil{border:1px dashed var(--line);border-radius:12px;padding:14px;color:var(--muted,#6B7A88);font-size:13px;background:var(--surface,#fff)}
+
+/* شريط الإجراء الحاكم داخل شاشات المنصة */
+.govbar{margin:0 0 12px} .govbar:not(.on){display:none}
+.gb{--c:#123B5C;display:flex;align-items:center;gap:10px;width:100%;text-align:start;font:inherit;cursor:pointer;background:color-mix(in srgb,#27A8DF 7%,#fff);border:1px solid color-mix(in srgb,#27A8DF 28%,#fff);border-inline-start:4px solid #27A8DF;border-radius:10px;padding:8px 12px;color:var(--ink,#1d2b36);transition:background .15s}
+.gb:hover{background:color-mix(in srgb,#27A8DF 13%,#fff)}
+.gbi{font-size:18px;flex:none} .gbt{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.gbh{font-size:13px;font-weight:700;color:var(--navy,#123B5C)} .gbh small{font-weight:500;color:var(--muted,#6B7A88)}
+.gbc{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#1B6CA8;unicode-bidi:isolate}
+.gbs{font-size:12.5px;color:var(--ink,#1d2b36);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical} .gbs.ok{color:#2E8B57;font-weight:700}
+.gbn{font-size:11.5px;color:var(--muted,#6B7A88)} .gbo{flex:none;font-size:12px;font-weight:700;color:#1B6CA8}
+.gchip{font-family:inherit;font-size:12px;cursor:pointer}
+@media (max-width:700px){.gbo{display:none}}
+.gpk-now{display:flex;flex-direction:column;gap:4px;background:#EAF6FC;border:1px solid #BFE3F5;border-inline-start:4px solid #27A8DF;border-radius:10px;padding:10px 12px;margin:0 0 10px;font-size:13px;line-height:1.7}
+.gpk-now>b{color:var(--navy,#123B5C)} .gpk-now .nx{color:var(--muted,#55636f)} .gpk-now.done{background:#EDF7F0;border-color:#C5E5CF;border-inline-start-color:#2E8B57}
+.gstep.cur .gsb{outline:2px solid #27A8DF;outline-offset:1px;background:#F3FAFE} .gstep.past{opacity:.6}
+.gfs.cur{box-shadow:0 0 0 2px #27A8DF}
+@media print{.govbar,.gchip{display:none!important}}

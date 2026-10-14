@@ -2,6 +2,7 @@
 import { sb, q, session, isAdmin, today, STAGES, stageOf } from './api.js';
 import { $, $$, esc, money, dateAr, toast, err, modal, field, inp, formData, ico } from './ui.js';
 import { threadBox, mountThread } from './thread.js';
+import { govBar, govChip, GOV } from './govlink.js';
 
 let profiles = [];
 async function loadProfiles() { if (!profiles.length) profiles = await q(sb.from('profiles').select('id,full_name,role')); return profiles; }
@@ -40,7 +41,7 @@ async function quickReport(id, done) {
   const admin = isAdmin(); const items = Array.isArray(r.items) ? r.items : [];
   const cut = (t, n = 600) => t && t.length > n ? esc(t.slice(0, n)) + '…' : esc(t || '');
   const P = (k, v) => v ? `<h3 class="sub-h">${k}</h3><div class="pre small" style="max-height:160px;overflow:auto">${cut(v)}</div>` : '';
-  await modal(`<div class="qrep"><div class="kvs"><div class="kv"><span>المشروع</span><b>${esc(r.projects?.name || '')}</b></div><div class="kv"><span>النوع</span><b>${TR_KIND[r.kind] || r.kind}</b></div><div class="kv"><span>التاريخ</span><b>${dateAr(r.report_date)}</b></div><div class="kv"><span>المهندس</span><b>${esc(pname(r.created_by))}</b></div>${r.progress_seen != null ? `<div class="kv"><span>الإنجاز المشاهد</span><b>${r.progress_seen}%</b></div>` : ''}</div>
+  await modal(`${govBar(GOV.treport(r))}<div class="qrep"><div class="kvs"><div class="kv"><span>المشروع</span><b>${esc(r.projects?.name || '')}</b></div><div class="kv"><span>النوع</span><b>${TR_KIND[r.kind] || r.kind}</b></div><div class="kv"><span>التاريخ</span><b>${dateAr(r.report_date)}</b></div><div class="kv"><span>المهندس</span><b>${esc(pname(r.created_by))}</b></div>${r.progress_seen != null ? `<div class="kv"><span>الإنجاز المشاهد</span><b>${r.progress_seen}%</b></div>` : ''}</div>
       ${P(r.kind === 'meeting' ? 'ما دار في الاجتماع' : 'الملخص', r.summary)}${P('الملاحظات والمخالفات', r.findings)}${P('التوصيات / المطلوب', r.recommendations)}
       ${items.length ? `<h3 class="sub-h">القرارات والتكليفات (${items.length})</h3><ul class="rlist small">${items.slice(0, 6).map(it => `<li>${esc(it.text)}${it.owner ? ` — <span class="muted">${esc(it.owner)}</span>` : ''}${it.due ? ` <span class="muted">· ${dateAr(it.due)}</span>` : ''}</li>`).join('')}</ul>` : ''}
       ${photos.length ? `<h3 class="sub-h">الصور (${photos.length})</h3><div class="qphotos">${photos.map(p => `<a href="${urls[p.path] || '#'}" target="_blank"><img src="${urls[p.path] || ''}" alt="" loading="lazy"></a>`).join('')}</div>` : ''}

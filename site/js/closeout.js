@@ -2,6 +2,7 @@
 import { sb, canEdit, isAdmin, q, session, today, SETTINGS } from './api.js';
 import { $, $$, esc, money, fmt, dateAr, toast, err, modal, confirm, field, inp, sel, formData, money_inp, ico } from './ui.js';
 import { threadBox, mountThread } from './thread.js';
+import { govBar, govChip, GOV } from './govlink.js';
 
 export const CO_KIND = { cost: 'مالي (زيادة / تخفيض)', time: 'زمني (تمديد مدة)', both: 'مالي وزمني' };
 export const CO_STATUS = { draft: 'مسودة', submitted: 'بانتظار الاعتماد', approved: 'معتمد', rejected: 'مرفوض' };
@@ -18,7 +19,7 @@ export async function projectChanges(t, p) {
   const appr = rows.filter(r => r.status === 'approved'); const pend = rows.filter(r => r.status === 'submitted');
   const sumA = appr.reduce((a, r) => a + Number(r.amount || 0), 0), sumD = appr.reduce((a, r) => a + Number(r.days || 0), 0);
   const base = Number(p.contract_base ?? (Number(p.contract_value || 0) - Number(p.contract_extra || 0)));
-  t.innerHTML = `<div class="pcard"><div class="toolbar"><h2>أوامر التغيير والتمديدات <span class="muted">(${rows.length}${pend.length ? ` · ${pend.length} بانتظار الاعتماد` : ''})</span></h2><span class="sp"></span>${canEdit() ? '<button class="btn primary" id="coNew">＋ أمر تغيير</button>' : ''}</div>
+  t.innerHTML = `<div class="pcard"><div class="toolbar"><h2>أوامر التغيير والتمديدات <span class="muted">(${rows.length}${pend.length ? ` · ${pend.length} بانتظار الاعتماد` : ''})</span></h2><span class="sp"></span>${govChip('P-08')}${canEdit() ? '<button class="btn primary" id="coNew">＋ أمر تغيير</button>' : ''}</div>
     <div class="kpis fin"><div class="kpi"><span>قيمة العقد الأصلية</span><b>${money(base)}</b></div><div class="kpi"><span>أوامر تغيير معتمدة (${appr.length})</span><b class="${sumA < 0 ? 'bad' : ''}">${signed(sumA)}</b></div><div class="kpi"><span>إجمالي العقد الحالي</span><b>${money(base + sumA)}</b></div><div class="kpi"><span>تمديدات معتمدة</span><b>${sumD} <small>يوم</small></b></div><div class="kpi"><span>الانتهاء المعدّل</span><b style="font-size:16px">${dateAr(p.revised_end_date || p.end_date)}</b></div></div>
     <p class="muted small" style="margin:-4px 0 12px">الإجمالي والمدة الإضافية والانتهاء المعدّل تُحدَّث تلقائياً من الأوامر المعتمدة فقط.</p>
     ${rows.length ? `<table class="lst"><thead><tr><th class="c">رقم</th><th>العنوان</th><th>النوع</th><th class="c">المبلغ (ر.س)</th><th class="c">الأيام</th><th>مقدّمه</th><th>التاريخ</th><th>الحالة</th><th></th></tr></thead><tbody>${rows.map(r => `<tr class="${r.status === 'rejected' ? 'off' : ''}"><td class="c"><b>${r.no}</b></td><td><b>${esc(r.title)}</b>${r.reason ? `<br><small class="muted">${esc(r.reason.slice(0, 80))}</small>` : ''}</td><td>${CO_KIND[r.kind]}</td><td class="c n ${Number(r.amount) < 0 ? 'bad' : ''}">${r.kind === 'time' ? '—' : signed(r.amount)}</td><td class="c">${r.kind === 'cost' ? '—' : r.days}</td><td>${esc(r.requested_by || '')}</td><td>${dateAr(r.requested_on)}</td><td>${coBadge(r.status)}</td><td><button class="btn sm" data-co="${r.id}">فتح</button></td></tr>`).join('')}</tbody></table>` : '<p class="muted">لا توجد أوامر تغيير على هذا المشروع.</p>'}</div>`;
@@ -29,7 +30,7 @@ async function coForm(c, p, rows, done) {
   const v = c || { kind: 'cost', requested_on: today(), requested_by: p.contractor || '' };
   const nextNo = rows.length ? Math.max(...rows.map(x => x.no)) + 1 : 1;
   const editable = isAdmin() || !c || ['draft', 'submitted', 'rejected'].includes(c.status);
-  await modal(`<form id="f" class="pgrid">
+  await modal(`${govBar(GOV.change(c))}<form id="f" class="pgrid">
     ${field('رقم الأمر', inp('no', v.no || nextNo, 'type="number" min="1" required'))}
     ${field('النوع *', sel('kind', Object.entries(CO_KIND), v.kind, 'id="coKind"'))}
     ${field('العنوان *', inp('title', v.title || '', 'required placeholder="مثال: أعمال إضافية لتمديدات الغازات الطبية"'), 'wide')}
@@ -51,7 +52,7 @@ async function coForm(c, p, rows, done) {
 }
 export async function coDetail(c, p, rows, done) {
   const V = (k, v) => `<div class="kv"><span>${k}</span><b>${v}</b></div>`;
-  await modal(`<div class="kvs">${V('النوع', CO_KIND[c.kind])}${V('الحالة', coBadge(c.status))}${c.kind !== 'time' ? V('المبلغ', `<span class="${Number(c.amount) < 0 ? 'bad' : ''}">${signed(c.amount)} ر.س</span>`) : ''}${c.kind !== 'cost' ? V('أيام التمديد', c.days) : ''}${V('مقدّمه', esc(c.requested_by || '—'))}${V('تاريخ الطلب', dateAr(c.requested_on))}${c.decided_at ? V('القرار', `${esc(pname(c.decided_by))} · ${dateAr(c.decided_at)}`) : ''}</div>
+  await modal(`${govBar(GOV.change(c), CO_STATUS[c.status])}<div class="kvs">${V('النوع', CO_KIND[c.kind])}${V('الحالة', coBadge(c.status))}${c.kind !== 'time' ? V('المبلغ', `<span class="${Number(c.amount) < 0 ? 'bad' : ''}">${signed(c.amount)} ر.س</span>`) : ''}${c.kind !== 'cost' ? V('أيام التمديد', c.days) : ''}${V('مقدّمه', esc(c.requested_by || '—'))}${V('تاريخ الطلب', dateAr(c.requested_on))}${c.decided_at ? V('القرار', `${esc(pname(c.decided_by))} · ${dateAr(c.decided_at)}`) : ''}</div>
     ${c.description ? `<h3 class="sub-h">الوصف</h3><p class="pre">${esc(c.description)}</p>` : ''}${c.reason ? `<h3 class="sub-h">المبرر</h3><p class="pre">${esc(c.reason)}</p>` : ''}${c.decision_note ? `<h3 class="sub-h">ملاحظة القرار</h3><p class="pre">${esc(c.decision_note)}</p>` : ''}
     ${threadBox('change', c.id)}
     <div class="mt12 btnrow end wrap" >${(isAdmin() || ['draft', 'submitted', 'rejected'].includes(c.status)) && canEdit() ? '<button class="btn" data-edit>تعديل</button>' : ''}${isAdmin() && c.status === 'submitted' ? '<button class="btn primary" data-dec="approved">اعتماد</button><button class="btn danger" data-dec="rejected">رفض</button>' : ''}${isAdmin() && c.status === 'approved' ? '<button class="btn" data-dec="submitted">إلغاء الاعتماد</button>' : ''}<span class="sp"></span><button class="btn" data-x>إغلاق</button></div>`, { title: `أمر التغيير رقم ${c.no} — ${c.title}`, wide: true, onOpen: (w, close) => {
@@ -74,7 +75,7 @@ export async function projectCloseout(t, p) {
   const avg = CRIT.map(([k]) => Number(r[k])).filter(x => x > 0); const overall = avg.length ? (avg.reduce((a, b) => a + b, 0) / avg.length).toFixed(1) : null;
   const stars = n => '★'.repeat(Math.round(n)) + '☆'.repeat(5 - Math.round(n));
   const inHandover = ['handover', 'warranty', 'closed'].includes(p.stage);
-  t.innerHTML = `${!inHandover ? '<div class="alert warn">هذا القسم يُستخدم بعد الاستلام الابتدائي. يمكنك تعبئته مسبقاً، ويصبح فعّالاً عند نقل المشروع إلى مرحلة «استلام ابتدائي».</div>' : ''}
+  t.innerHTML = `${govBar(GOV.closeout(p))}${!inHandover ? '<div class="alert warn">هذا القسم يُستخدم بعد الاستلام الابتدائي. يمكنك تعبئته مسبقاً، ويصبح فعّالاً عند نقل المشروع إلى مرحلة «استلام ابتدائي».</div>' : ''}
   <div class="g3"><div class="stack">
     <div class="pcard"><h2>قائمة تحقق الإغلاق <span class="badge ${pct === 100 ? 'full' : pct ? 'ovr' : 'skel'}">${done}/${items.length}</span></h2><div class="mb12 bar" ><i style="width:${pct}%;${pct === 100 ? 'background:var(--sage)' : ''}"></i></div>
       ${items.length ? items.map(i => `<div class="cl-item ${i.done ? 'done' : ''}"><label class="chk"><input type="checkbox" data-ci="${i.id}" ${i.done ? 'checked' : ''} ${canEdit() ? '' : 'disabled'}> <b>${esc(i.label)}</b></label><span class="muted small">${i.done ? `${dateAr(i.done_on)} · ${esc(pname(i.by_user))}` : ''}${i.note ? ' · ' + esc(i.note) : ''}</span>${canEdit() ? `<button class="btn sm ghost" data-cn="${i.id}" title="ملاحظة">${ico('edit')}</button>` : ''}</div>`).join('') : '<p class="muted">لا توجد بنود.</p>'}

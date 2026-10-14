@@ -1,6 +1,7 @@
 // ===== الجدول الزمني: حزم الأعمال والمعالم، منحنى S، الخط الأساس =====
 import { sb, canEdit, isAdmin, q, session, today } from './api.js';
 import { $, $$, esc, dateAr, toast, err, modal, confirm, field, inp, sel, formData, ico, calBtn, bindCal } from './ui.js';
+import { govBar, govChip, GOV } from './govlink.js';
 
 const D1 = 864e5;
 const dstr = d => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -39,7 +40,7 @@ export async function projectSchedule(t, p) {
   const baselined = !!p.schedule_baseline_at;
   const sched = p.progress_mode === 'schedule';
   const hasGuide = !items.length;
-  t.innerHTML = `<div class="sched">
+  t.innerHTML = `${govBar(GOV.schedule(baselined), baselined ? 'خط الأساس معتمد' : 'قبل اعتماد خط الأساس')}<div class="sched">
     <div class="toolbar"><h2 class="m0">الجدول الزمني ${baselined ? '<span class="badge full">خط أساس معتمد ' + dateAr(p.schedule_baseline_at) + '</span>' : items.length ? '<span class="badge ovr">مسودة — لم يُعتمد الخط الأساس</span>' : ''}</h2><span class="sp"></span><button class="btn" id="sGuide">${ico('book')} كيف أستخدمه؟</button>${own ? `<button class="btn" id="sTpl">قالب جاهز</button><button class="btn" id="sPaste">لصق من Excel</button><button class="btn" id="sMs">＋ معلم</button><button class="btn primary" id="sPk">＋ حزمة أعمال</button>` : ''}</div>
     <div id="sGuideBox" class="pcard guide" ${hasGuide ? '' : 'hidden'}>${guideHtml()}</div>
     ${items.length ? `<div class="kpis hero" style="margin-top:0"><div class="kpi"><span>المخطط اليوم</span><b>${c.planned}%</b><span>يتحرك يومياً من تواريخ الحزم</span></div><div class="kpi"><span>الفعلي من الجدول</span><b>${c.actual}%</b><span>من نسب الحزم × أوزانها</span></div><div class="kpi ${c.planned !== null && c.actual < c.planned - 5 ? 'bad' : ''}"><span>الانحراف</span><b>${c.planned === null ? '—' : (c.actual - c.planned > 0 ? '+' : '') + (Math.round((c.actual - c.planned) * 10) / 10)} <small>نقطة</small></b><span>${delayDays !== null ? (delayDays > 0 ? `متأخر ${delayDays} يوماً` : delayDays < 0 ? `متقدم ${-delayDays} يوماً` : 'على الجدول') : ''}</span></div><div class="kpi"><span>الانتهاء المتوقع</span><b style="font-size:18px">${forecast ? dateAr(forecast) : '—'}</b><span>المخطط ${dateAr(pEnd)}</span></div><div class="kpi ${lateMs.length ? 'bad' : ''}"><span>معالم متأخرة</span><b>${lateMs.length}</b><span>من ${ms.length}</span></div></div>

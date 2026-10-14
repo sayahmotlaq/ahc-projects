@@ -4,6 +4,7 @@ import { $, $$, esc, dateAr, toast, err, download, ico } from './ui.js';
 import { DISC, DWG_ST, TENDER_CAT, dwgBadge, fileCell, bindFiles, docForm, dwgForm, BUCKET } from './docs.js';
 import { BOQ_STATUS, boqExportData, logo } from './boq.js';
 import { buildExcel } from './excel.js';
+import { govBar, govChip, GOV } from './govlink.js';
 
 // ---------- البيانات والجاهزية (تُستخدم من التبويب ومن ملخص المشروع)
 export async function tenderData(p, pre = {}) {
@@ -44,7 +45,7 @@ export async function projectTender(t, p) {
   const refresh = () => projectTender(t, p);
   const byCat = Object.keys(TENDER_CAT).map(c => [c, T.tdocs.filter(d => d.category === c)]).filter(([, a]) => a.length);
   const dwgGroups = Object.keys(DISC).map(k => [k, T.tdw.filter(x => x.d.discipline === k)]).filter(([, a]) => a.length);
-  t.innerHTML = `<div class="pcard tender"><div class="toolbar"><h2><span class="ic"></span>حزمة الطرح</h2><span class="sp"></span>
+  t.innerHTML = `${govBar(GOV.tender())}<div class="pcard tender"><div class="toolbar"><h2><span class="ic"></span>حزمة الطرح</h2><span class="sp"></span>
       <button class="btn primary" id="tZip" ${T.tboqs.length || T.tdw.length || T.tdocs.length ? '' : 'disabled'}>⬇ تنزيل الحزمة (ZIP)</button>
       ${docsOk ? `<button class="btn" id="tDoc">＋ مستند طرح</button>` : ''}${edit ? `<button class="btn" id="tDwg">＋ مخطط للطرح</button>` : ''}</div>
     <p class="muted small mb10">كل مستند يبقى في مكانه الطبيعي (جداول الكميات، المخططات، المستندات الرسمية) ويُجمع هنا تلقائياً بوسم الطرح: جدول بحالة «طرح»، مراجعة مخطط بحالة «للطرح»، ومستندات من أنواع الطرح. عند التنفيذ يضيف المهندس مراجعات جديدة على نفس المخططات ولا يُنقل شيء.</p>
