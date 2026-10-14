@@ -5,7 +5,7 @@
 -- ---------- 1) الأدوار والانتماء للأقسام
 -- tech: موظف قسم فني (يعمل على أعمال قسمه) · requester: مُبلّغ من المنشأة (يرفع البلاغات ويتابع بلاغاته فقط)
 alter table public.profiles drop constraint if exists profiles_role_check;
-alter table public.profiles add constraint profiles_role_check check (role in ('admin','engineer','viewer','finance','clerk','facility','tech','requester','pending','disabled'));
+alter table public.profiles add constraint profiles_role_check check (role in ('admin','engineer','viewer','finance','clerk','facility','tech','head','requester','pending','disabled'));
 alter table public.profiles add column if not exists unit text references public.gov_units(code) on update cascade on delete set null;
 alter table public.profiles add column if not exists facility_id bigint references public.facilities(id) on delete set null;
 update public.profiles set unit = 'PRJ' where unit is null and role in ('engineer','clerk');

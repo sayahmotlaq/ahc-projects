@@ -157,10 +157,11 @@ async function cellDetail(fid, code, re) {
 
 // ---------- الجولة الشهرية
 async function viewRound(t, params, re) {
-  const fid = +(params.get('f') || 0) || null;
+  const myF = (session.profile?.fac_ids || []).map(Number);
+  const fid = +(params.get('f') || 0) || (myF.length === 1 ? myF[0] : null);
   const period = (params.get('p') || thisMonth().slice(0, 7)) + '-01';
   const pickers = `<div class="pcard fmpick"><label class="fld"><span>المنشأة</span>${sel('f', [['', '— اختر المنشأة —'], ...D.fac.map(f => [f.id, f.name])], fid || '')}</label><label class="fld"><span>الشهر</span><input type="month" name="p" value="${period.slice(0, 7)}" max="${thisMonth().slice(0, 7)}"></label>
-    <div class="fmpick-st">${D.fac.map(f => { const r = D.rounds.find(x => x.facility_id === f.id && x.period === period); return `<a href="#/fm/round?f=${f.id}&p=${period.slice(0, 7)}" class="${f.id === fid ? 'on' : ''} ${r ? (r.status === 'submitted' ? 'ok' : 'dr') : ''}" title="${r ? (r.status === 'submitted' ? 'معتمدة' : 'مسودة') : 'لم تبدأ'}">${esc(f.name)}</a>`; }).join('')}</div></div>`;
+    <div class="fmpick-st">${[...D.fac].sort((a, b) => myF.includes(b.id) - myF.includes(a.id)).map(f => { const r = D.rounds.find(x => x.facility_id === f.id && x.period === period); return `<a href="#/fm/round?f=${f.id}&p=${period.slice(0, 7)}" class="${f.id === fid ? 'on' : ''} ${r ? (r.status === 'submitted' ? 'ok' : 'dr') : ''}" title="${r ? (r.status === 'submitted' ? 'معتمدة' : 'مسودة') : 'لم تبدأ'}${myF.includes(f.id) ? ' — منشأتك' : ''}">${myF.includes(f.id) ? '★ ' : ''}${esc(f.name)}</a>`; }).join('')}</div></div>`;
   if (!fid) { t.innerHTML = pickers + '<div class="empty-boq">اختر المنشأة لبدء جولة الشهر أو مراجعتها. الأخضر: معتمدة، الذهبي: مسودة.</div>'; bindPick(t); return; }
   const round = D.rounds.find(r => r.facility_id === fid && r.period === period) || null;
   const checks = round ? await q(sb.from('fm_checks').select('*').eq('round_id', round.id)) : [];

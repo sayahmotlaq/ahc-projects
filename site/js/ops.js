@@ -14,7 +14,7 @@ export const PR = {
   p3: { ar: 'عادي', c: '#1B6CA8', sla: 'خلال 5 أيام عمل' }, p4: { ar: 'مخطط', c: '#6F7F52', sla: 'يُجدول مع الأعمال المخططة' },
 };
 const SRC = { portal: 'مركز البلاغات', phone: 'بلاغ هاتفي', round: 'جولة ميدانية', ppm: 'صيانة مخططة', item: 'إحالة من قسم آخر', fm: 'متابعة الأنظمة', project: 'مشروع', other: 'أخرى' };
-const STAFF_ROLES = ['admin', 'engineer', 'clerk', 'facility', 'tech'];
+const STAFF_ROLES = ['admin', 'engineer', 'clerk', 'facility', 'tech', 'head'];
 export const isOpen = i => OPEN.includes(i.status);
 export const isLate = i => isOpen(i) && i.due_at && new Date(i.due_at) < new Date();
 const hrs = ms => Math.round(ms / 36e5);
@@ -24,6 +24,7 @@ const snip = (t, n = 110) => t && t.length > n ? t.slice(0, n) + '…' : (t || '
 export const me = () => session.profile || {};
 // هل المستخدم من فريق القسم؟ (يطابق ops_staff في قاعدة البيانات)
 export const staffOf = u => isAdmin() || (STAFF_ROLES.includes(role()) && (me().unit === u || (role() === 'facility' && !me().unit && ['FAC', 'MNT', 'SAF'].includes(u))));
+export const myFacs = () => (me().fac_ids || []).map(Number);
 export const isStaff = () => STAFF_ROLES.includes(role());
 export const canFile = () => canRead() || ['facility', 'tech', 'requester'].includes(role());
 
@@ -278,19 +279,19 @@ export async function openItem(id, re) {
 
 // ---------- قائمة بمرشحات (تُستخدم في المركز وفي صفحة القسم)
 export function listView(t, items, { params = new URLSearchParams(), showUnit = true, re, units = true } = {}) {
-  const st = { q: params.get('q') || '', u: params.get('u') || '', f: params.get('f') || '', s: params.get('s') || 'open', p: '', who: params.get('who') || '', late: params.get('late') === '1', view: params.get('v') || (() => { try { return sessionStorage.getItem('ops_view') || 'list'; } catch (e) { return 'list'; } })() };
+  const st = { q: params.get('q') || '', u: params.get('u') || '', f: params.get('f') || '', s: params.get('s') || 'open', p: '', who: params.get('who') || (role() === 'facility' && myFacs().length ? 'fac' : ''), late: params.get('late') === '1', view: params.get('v') || (() => { try { return sessionStorage.getItem('ops_view') || 'list'; } catch (e) { return 'list'; } })() };
   t.innerHTML = `<div class="filters ofilt"><input id="lq" placeholder="بحث بالعنوان أو الرقم أو الموقع…" value="${esc(st.q)}">
     ${units ? sel('lu', [['', 'كل الأقسام'], ...O.G.units.filter(u => u.kind === 'unit').map(u => [u.code, u.short])], st.u) : ''}
     ${sel('lf', [['', 'كل المنشآت'], ...O.fac.map(f => [f.id, f.name])], st.f)}
     ${sel('ls', [['open', 'المفتوحة'], ['', 'الكل'], ...Object.entries(ST).map(([k, v]) => [k, v.ar])], st.s)}
     ${sel('lp', [['', 'كل الأولويات'], ...Object.entries(PR).map(([k, v]) => [k, v.ar])], '')}
-    ${sel('lw', [['', 'الجميع'], ['me', 'المكلّف بها أنا'], ['mine', 'رفعتها أنا']], st.who)}
+    ${sel('lw', [['', 'الجميع'], ['me', 'المكلّف بها أنا'], ['mine', 'رفعتها أنا'], ...(myFacs().length ? [['fac', 'منشآتي']] : [])], st.who)}
     <label class="chk"><input type="checkbox" id="ll" ${st.late ? 'checked' : ''}> المتأخرة فقط</label><span class="sp"></span>
     <div class="oview"><button data-v="list" class="${st.view === 'list' ? 'on' : ''}">قائمة</button><button data-v="board" class="${st.view === 'board' ? 'on' : ''}">لوحة</button></div></div><div class="ostats" id="lS"></div><div id="lL"></div>`;
   const render = () => {
     const nq = st.q.toLowerCase();
     let l = items.filter(i => (!st.u || i.unit === st.u) && (!st.f || i.facility_id === +st.f) && (st.s === 'open' ? isOpen(i) : !st.s || i.status === st.s) && (!st.p || i.priority === st.p)
-      && (!st.who || (st.who === 'me' ? i.assignee_id === session.user.id : (i.created_by === session.user.id || i.requester_id === session.user.id))) && (!st.late || isLate(i))
+      && (!st.who || (st.who === 'me' ? i.assignee_id === session.user.id : st.who === 'fac' ? myFacs().includes(i.facility_id) : (i.created_by === session.user.id || i.requester_id === session.user.id))) && (!st.late || isLate(i))
       && (!nq || `${i.title} ${i.ref} ${i.location} ${i.asset} ${i.details} ${O.F[i.facility_id]?.name || ''}`.toLowerCase().includes(nq)));
     l.sort((a, b) => isOpen(b) - isOpen(a) || isLate(b) - isLate(a) || a.priority.localeCompare(b.priority) || b.id - a.id);
     const base = items.filter(i => (!st.u || i.unit === st.u) && (!st.f || i.facility_id === +st.f));

@@ -19,7 +19,7 @@ const ALIAS = { treport: 'treports', project: 'projects' };
 const OPS_ROLES = ['facility', 'tech'];
 const allow = a => { const r = role(); if (!a || a === 'any') return true; if (a === 'read') return canRead(); if (a === 'ops') return canRead() || OPS_ROLES.includes(r); return Array.isArray(a) ? a.includes(r) : r === a; };
 const ROUTE_ACCESS = { tsd: 'ops', dept: 'ops', ops: 'any', fm: 'ops', gov: 'ops', settings: 'any', open: 'read' };
-const home = () => { const r = role(); if (r === 'requester') return 'ops'; if (OPS_ROLES.includes(r)) return session.profile?.unit ? 'dept/' + session.profile.unit : 'fm'; return isAdmin() ? 'tsd' : 'today'; };
+const home = () => { const r = role(); if (r === 'requester') return 'ops'; if (r === 'head' && session.profile?.unit) return 'dept/' + session.profile.unit; if (OPS_ROLES.includes(r)) return session.profile?.unit ? 'dept/' + session.profile.unit : 'fm'; return isAdmin() ? 'tsd' : 'today'; };
 const bottomFor = () => { const r = role(), u = session.profile?.unit;
   if (r === 'requester') return [['ops/mine', 'طلباتي', 'inbox'], ['ops/new', 'طلب جديد', 'plus'], ['settings', 'الإعدادات', 'cog'], ['more', 'المزيد', 'menu']];
   if (OPS_ROLES.includes(r)) return [[u ? 'dept/' + u : 'tsd', 'قسمي', 'dash'], ['ops', 'البلاغات', 'inbox'], ['fm', 'الأنظمة', 'pulse'], ['more', 'المزيد', 'menu']];

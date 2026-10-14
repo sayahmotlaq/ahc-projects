@@ -8,6 +8,47 @@ export async function mountAdmin(root, tab = 'users') {
   const t = $('#atab');
   if (tab === 'users') users(t); else if (tab === 'quality') quality(t); else if (tab === 'prices') prices(t); else if (tab === 'audit') audit(t); else if (tab === 'lumpsum') (await import('./lumpsum.js')).mountLsAdmin(t).catch(err); else if (tab === 'facilities') (await import('./map.js')).mountFacilities(t).catch(err); else if (tab === 'kinds') kinds(t).catch(err); else settings(t);
 }
+// ---------- توزيع الأدوار: دليل الأدوار + السجل المعتمد مسبقاً (يأخذ الموظف دوره تلقائياً عند تسجيله بإيميله)
+const ROLE_GUIDE = [
+  ['admin', 'مدير النظام', 'كل شيء: الأقسام والمشاريع والإعدادات والمستخدمين والنماذج.', 'صالح'],
+  ['viewer', 'القيادة والاطلاع', 'يرى كل الأقسام والمشاريع والتقارير ولوحة الإدارة، بلا تعديل.', 'م. أيمن، نائب الرئيس'],
+  ['head', 'رئيس قسم + القسم', 'يرى المنصة كاملة، ويدير أعمال قسمه (استلام، تكليف، إغلاق، اعتمادات قسمه، الأصول والخطط)، وتصله أعمال قسمه.', 'رؤساء الأقسام الثمانية'],
+  ['engineer', 'مهندس مشاريع', 'ينشئ مشاريعه ويعدّلها، ويعمل على طلبات قسم المشاريع.', 'مهندسو قسم المشاريع'],
+  ['tech', 'موظف قسم فني + القسم', 'أعمال قسمه وأصوله وخططه، ومتابعة الأنظمة، والحوكمة؛ لا يرى المشاريع والمالية.', 'فنيو ومهندسو الأقسام'],
+  ['facility', 'مدير مرفق + منشآته', 'الجولة الشهرية لمنشآته، أعمال منشآته وإشعاراتها، فرز الطلبات الواردة (المرافق قناة الاستقبال الموحدة)، والإغلاقات والمواقع؛ لا يرى المشاريع.', 'مدراء المرافق في المستشفيات'],
+  ['clerk', 'إداري', 'اطلاع على المشاريع وطباعة ورفع مستندات.', 'السكرتارية'],
+  ['finance', 'مالية', 'تسجيل صرف المستخلصات فقط.', 'المالية'],
+  ['requester', 'مُبلّغ + منشأته', 'يرفع البلاغات والطلبات ويتابعها ويؤكد معالجتها ويقيّمها فقط.', 'موظفو المنشآت'],
+];
+async function roster(t) {
+  const [rows, units, facs, profs] = await Promise.all([q(sb.from('role_roster').select('*').order('role').order('full_name')), q(sb.from('gov_units').select('code,short,kind').eq('kind', 'unit').order('sort')), q(sb.from('facilities').select('id,name').eq('active', true).order('sort')), q(sb.from('profiles').select('email,role'))]);
+  const U = Object.fromEntries(units.map(u => [u.code, u.short])), F = Object.fromEntries(facs.map(f => [f.id, f.name])), P = Object.fromEntries(profs.map(p => [(p.email || '').toLowerCase(), p]));
+  const box = document.createElement('div'); box.className = 'pcard'; t.prepend(box);
+  box.innerHTML = `<h2>توزيع الأدوار</h2>
+    <details class="mb10"><summary class="small"><b>دليل الأدوار</b> — من يرى ماذا ومن يفعل ماذا</summary><table class="lst mt8 nocard"><thead><tr><th>الدور</th><th>الصلاحيات</th><th>لمن</th></tr></thead><tbody>${ROLE_GUIDE.map(([k, n, d, w]) => `<tr><td><b>${esc(n)}</b></td><td class="small">${esc(d)}</td><td class="small muted">${esc(w)}</td></tr>`).join('')}</tbody></table></details>
+    <div class="toolbar m0"><b>السجل المعتمد مسبقاً <span class="muted">(${rows.length})</span></b><span class="muted small">يأخذ الموظف دوره وقسمه ومنشآته تلقائياً لحظة تسجيله بإيميله، بلا انتظار اعتماد.</span><span class="sp"></span><button class="btn sm" id="rBulk">إضافة مجمّعة</button><button class="btn sm primary" id="rAdd">＋ موظف</button></div>
+    ${rows.length ? `<table class="lst"><thead><tr><th>الاسم</th><th>الإيميل</th><th>الدور</th><th>القسم</th><th>المنشآت</th><th>الحالة</th><th></th></tr></thead><tbody>${rows.map(r => { const p = P[r.email]; return `<tr><td><b>${esc(r.full_name)}</b>${r.title ? `<div class="muted small">${esc(r.title)}</div>` : ''}</td><td class="ltr small">${esc(r.email)}</td><td>${esc(ROLES[r.role] || r.role)}</td><td>${esc(U[r.unit] || '—')}</td><td class="small">${(r.fac_ids || []).map(i => esc(F[i] || '#' + i)).join('، ') || (r.role === 'facility' ? '<span class="bad">لم تُربط</span>' : '—')}</td><td>${p ? `<span class="badge full">مسجّل</span>` : '<span class="badge skel">لم يسجّل بعد</span>'}</td><td><button class="btn sm" data-r="${esc(r.email)}">تعديل</button></td></tr>`; }).join('')}</tbody></table>` : '<p class="muted">لا أحد بعد.</p>'}
+    <p class="muted small mt8">أرسل للموظف رابط المنصة ليُنشئ حساباً بإيميله الرسمي نفسه المسجل هنا.</p>`;
+  const form = async r0 => {
+    const v = r0 || { email: '', full_name: '', role: 'tech', unit: '', fac_ids: [], title: '' };
+    await modal(`<form id="rf" class="pgrid">${field('الاسم *', inp('full_name', v.full_name, 'required'))}${field('الإيميل *', inp('email', v.email, `required type="email" dir="ltr" ${r0 ? 'readonly' : ''}`))}
+      ${field('الدور', sel('role', ROLE_GUIDE.map(([k, n]) => [k, n]), v.role))}${field('القسم', sel('unit', [['', '—'], ...units.map(u => [u.code, u.short])], v.unit || ''))}${field('المسمى', inp('title', v.title || ''))}
+      <div class="fld wide"><span>المنشآت (لمدير المرفق والمُبلّغ)</span><div class="chips">${facs.map(f => `<label class="chip"><input type="checkbox" name="f_${f.id}" ${(v.fac_ids || []).map(Number).includes(f.id) ? 'checked' : ''}> ${esc(f.name)}</label>`).join('')}</div></div>
+      <div class="btnrow end wide">${r0 ? '<button type="button" class="btn danger" id="rDel">حذف من السجل</button><span class="sp"></span>' : ''}<button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">حفظ</button></div></form>`,
+      { title: r0 ? 'تعديل' : 'موظف في السجل', wide: true, onOpen: (w, c) => {
+        $('#rDel', w) && ($('#rDel', w).onclick = async () => { try { await q(sb.from('role_roster').delete().eq('email', r0.email)); c(); users(t); } catch (e) { err(e); } });
+        $('#rf', w).onsubmit = async e => { e.preventDefault(); const x = formData(e.target); const row = { email: x.email.trim().toLowerCase(), full_name: x.full_name.trim(), role: x.role, unit: x.unit || null, title: x.title.trim(), fac_ids: facs.filter(f => x['f_' + f.id]).map(f => f.id) };
+          try { await q(sb.from('role_roster').upsert(row, { onConflict: 'email' })); toast('حُفظ — يُطبَّق فوراً إن كان مسجلاً'); c(); users(t); } catch (er) { err(er); } }; } });
+  };
+  $('#rAdd', box).onclick = () => form(null);
+  $$('[data-r]', box).forEach(b => b.onclick = () => form(rows.find(r => r.email === b.dataset.r)));
+  $('#rBulk', box).onclick = () => modal(`<form id="bf"><p class="muted small m0">سطر لكل موظف (لصق من Excel): <b>الاسم | الإيميل | الدور | القسم</b><br>الأدوار: ${ROLE_GUIDE.map(([k, n]) => `${esc(n)} = <span dir="ltr">${k}</span>`).join('، ')}<br>الأقسام: ${units.map(u => `${esc(u.short)} = ${u.code}`).join('، ')}</p><textarea name="t" rows="10" dir="auto"></textarea><div class="btnrow end"><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">إضافة</button></div></form>`,
+    { title: 'إضافة مجمّعة للسجل', wide: true, onOpen: (w, c) => { $('#bf', w).onsubmit = async e => { e.preventDefault();
+      const byName = Object.fromEntries([...ROLE_GUIDE.map(([k, n]) => [n.split(' +')[0], k]), ...units.map(u => [u.short, u.code])]);
+      const rs = e.target.t.value.split(/\n/).map(l => l.split(/\t|\|/).map(x => x.trim())).filter(a => a[1] && a[1].includes('@')).map(([n, em, r = 'tech', u = '']) => ({ full_name: n, email: em.toLowerCase(), role: ROLE_GUIDE.some(g => g[0] === r) ? r : (byName[r] || 'tech'), unit: units.some(x => x.code === u) ? u : (byName[u] || null) }));
+      if (!rs.length) return toast('لا أسطر صالحة', 'bad');
+      try { await q(sb.from('role_roster').upsert(rs, { onConflict: 'email' })); toast(`أُضيف ${rs.length}`); c(); users(t); } catch (er) { err(er); } }; } });
+}
 async function users(t) {
   const rows = await q(sb.from('profiles').select('*').order('created_at'));
   const UNITS = (await q(sb.from('gov_units').select('code,short,kind').eq('kind', 'unit').order('sort'))).map(u => [u.code, u.short]);
@@ -18,7 +59,8 @@ async function users(t) {
   t.innerHTML = `<div class="pcard"><h2><span class="ic"></span>المستخدمون <span class="muted">(${rows.length})</span></h2>
     ${pending.length ? `<div class="notice">يوجد ${pending.length} مستخدم بانتظار الاعتماد — حدد دوره ليتمكن من الدخول.</div>` : ''}
     <p class="mb10 muted" >كيف ينضم مستخدم جديد: يفتح رابط المنصة ← «إنشاء حساب» بإيميله ← يظهر هنا بحالة «بانتظار الاعتماد» ← تحدد له الدور والقسم. موظفو الأقسام الفنية: «موظف قسم فني» مع قسمه (يعمل على أعمال قسمه)، وموظفو المنشآت: «مُبلّغ من المنشأة» مع منشأته (يرفع البلاغات ويتابعها).</p>
-    <table class="lst"><thead><tr><th>الاسم</th><th>البريد</th><th>الدور</th><th>القسم</th><th>المسمى</th><th>الجوال</th><th>منذ</th><th></th></tr></thead><tbody>${rows.map(r => `<tr class="${r.role === 'pending' ? 'hl' : ''}"><td><b>${esc(r.full_name || '—')}</b>${r.role === 'requester' && r.facility_id ? `<div class="muted small">${esc(FAC[r.facility_id] || '')}</div>` : ''}</td><td class="ltr">${esc(r.email)}</td><td>${sel('role', Object.entries(ROLES), r.role, `data-role="${r.id}" ${r.id === session.user.id ? 'disabled' : ''}`)}</td><td>${sel('unit', [['', '—'], ...UNITS], r.unit || '', `data-unit="${r.id}"`)}</td><td>${esc(r.title || '—')}</td><td class="ltr">${esc(r.phone || '—')}</td><td>${dateAr(r.created_at)}</td><td><button class="btn sm" data-edit="${r.id}">تعديل</button></td></tr>`).join('')}</tbody></table></div>`;
+    <table class="lst"><thead><tr><th>الاسم</th><th>البريد</th><th>الدور</th><th>القسم</th><th>المسمى</th><th>الجوال</th><th>منذ</th><th></th></tr></thead><tbody>${rows.map(r => `<tr class="${r.role === 'pending' ? 'hl' : ''}"><td><b>${esc(r.full_name || '—')}</b>${(r.fac_ids || []).length ? `<div class="muted small">${(r.fac_ids || []).map(i => esc(FAC[i] || '')).join('، ')}</div>` : r.role === 'requester' && r.facility_id ? `<div class="muted small">${esc(FAC[r.facility_id] || '')}</div>` : ''}</td><td class="ltr">${esc(r.email)}</td><td>${sel('role', Object.entries(ROLES), r.role, `data-role="${r.id}" ${r.id === session.user.id ? 'disabled' : ''}`)}</td><td>${sel('unit', [['', '—'], ...UNITS], r.unit || '', `data-unit="${r.id}"`)}</td><td>${esc(r.title || '—')}</td><td class="ltr">${esc(r.phone || '—')}</td><td>${dateAr(r.created_at)}</td><td><button class="btn sm" data-edit="${r.id}">تعديل</button></td></tr>`).join('')}</tbody></table></div>`;
+  roster(t).catch(err);
   t.insertAdjacentHTML('beforeend', `<div class="pcard"><h2>مشاريع غير مربوطة بحساب مهندس <span class="badge ${unlinked.length ? 'ovr' : 'full'}">${unlinked.length}</span></h2><p class="mb10 muted small" >اختر حساب المهندس لكل مشروع حتى تصله إشعاراته وتُحسب مؤشراته ويستطيع تعديل بياناته.</p>${unlinked.length ? `<table class="lst"><thead><tr><th>المشروع</th><th>الاسم المكتوب</th><th>حساب المهندس</th></tr></thead><tbody>${unlinked.map(p => `<tr><td><b>${esc(p.name)}</b></td><td class="muted">${esc(p.engineer_name || '—')}</td><td><select data-link="${p.id}"><option value="">— اختر —</option>${engs.map(e => `<option value="${e.id}">${esc(e.full_name)}</option>`).join('')}</select></td></tr>`).join('')}</tbody></table>` : '<p class="muted">جميع المشاريع مربوطة بحسابات.</p>'}</div>`);
   $$('[data-link]', t).forEach(sl => sl.onchange = async () => { if (!sl.value) return; try { const e = engs.find(x => x.id === sl.value); await q(sb.from('projects').update({ engineer_id: sl.value, engineer_name: e.full_name }).eq('id', sl.getAttribute('data-link'))); toast('تم الربط'); sl.closest('tr').remove(); } catch (er) { err(er); } });
   $$('[data-unit]', t).forEach(s => s.onchange = async () => { try { await q(sb.from('profiles').update({ unit: s.value || null }).eq('id', s.getAttribute('data-unit'))); toast('تم تحديث القسم'); } catch (e) { err(e); } });
