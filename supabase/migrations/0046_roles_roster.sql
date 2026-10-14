@@ -101,3 +101,7 @@ from (values
   ('aalanazi485@moh.gov.sa', 'عبدالله مدسوس العنزي', array['مركز صحي%', '%الرعاية الصحية الأولية%'])
 ) as v(email, name, pats)
 on conflict (email) do nothing;
+
+-- مستشفى الشيخ حسن (العفالق) لعبدالله العبدالقادر (يُضاف لمنشآته إن لم يكن مربوطاً)
+update public.role_roster r set fac_ids = r.fac_ids || f.id from public.facilities f
+  where r.email = 'amalabdulgader@moh.gov.sa' and f.name like '%الشيخ حسن%' and not f.id = any(r.fac_ids);

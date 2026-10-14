@@ -16,11 +16,13 @@ do $$ declare t text; begin
 drop policy if exists p_fm_read on public.profiles;
 create policy p_fm_read on public.profiles for select using (public.my_role() = 'facility' and role in ('admin','facility'));
 
+-- مستشفى العفالق هو مستشفى الشيخ حسن (تأكيد المستخدم 14 أكتوبر)
+update public.facilities set name = 'مستشفى الشيخ حسن (العفالق)' where name = 'مستشفى العفالق';
 -- ---------- المنشآت الناقصة من ملف متابعة الأنظمة (الإحداثيات تُضبط من «الإدارة ← المرافق والخريطة»)
 insert into public.facilities(name, kind, sort)
 select v.name, v.kind, v.sort from (values
   ('مركز الكلى', 'center', 20), ('مركز الأمير سلطان لمعالجة أمراض وجراحة القلب', 'center', 21), ('مستشفى الجفر العام', 'hospital', 22),
-  ('مركز أمراض الدم الوراثية', 'center', 23), ('مستشفى العفالق', 'hospital', 24)
+  ('مركز أمراض الدم الوراثية', 'center', 23), ('مستشفى الشيخ حسن (العفالق)', 'hospital', 24)
 ) as v(name, kind, sort) where not exists (select 1 from public.facilities f where f.name = v.name);
 
 -- ---------- سجل الأنظمة
