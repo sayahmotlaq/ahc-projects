@@ -8,6 +8,8 @@ const CODES = { A: ['يعتمد', 'A'], R: ['ينفّذ', 'R'], V: ['يراجع'
 const ROLES_PRJ = { EXEC: 'الإدارة التنفيذية', DIR: 'مدير الإدارة', HEAD: 'رئيس القسم', ENG: 'مهندس المشروع', CLERK: 'المنسق الإداري' };
 const TABS = [['start', 'ابدأ من هنا'], ['map', 'الهيكل والعلاقات'], ['router', 'موجّه الطلبات'], ['matrix', 'مصفوفة الصلاحيات'], ['sop', 'الإجراءات'], ['rules', 'القواعد الحاكمة']];
 let G = null;
+// الطباعة تعرض الدليل كاملاً: تفتح الأقسام المطوية
+addEventListener('beforeprint', () => $$('details.gdx').forEach(d => d.open = true));
 async function load(force) {
   if (G && !force) return G;
   const [units, handoffs, rules, acts, procs, router, faq] = await Promise.all([
@@ -22,7 +24,10 @@ const refLink = code => /^[A-QS-Z]-\d/.test(code) ? `<a class="gref" data-peek="
 // نص مع تحويل أكواد الإجراءات والقواعد (G-05، P-03، R-01) إلى إحالات قابلة للنقر
 const linkify = s => esc(s).replace(/\b([A-Z]-\d{2})\b/g, m => (G?.P?.[m] || G?.R?.[m]) ? refLink(m).replace('class="gref"', 'class="gref in"') : m);
 
-const stepHtml = (s, i, cur) => `<div class="gstep ${s.kind === 'decision' ? 'dec' : ''} ${cur === i + 1 ? 'cur' : ''} ${typeof cur === 'number' && i + 1 < cur ? 'past' : ''}" style="--c:#${uc(s.unit)}"><span class="gno"><i>${i + 1}</i></span><div class="gsb"><div class="gsh">${chip(s.unit)}${s.role ? `<small class="muted">${esc(s.role)}</small>` : ''}${s.kind === 'decision' ? '<span class="badge ovr">قرار</span>' : ''}${cur === i + 1 ? '<span class="badge info">أنت هنا</span>' : ''}</div><p>${linkify(s.action)}</p><div class="gsm">${s.sla ? `<span>${ico('clock')} ${esc(s.sla)}</span>` : ''}${s.where && s.where !== '—' ? `<span>${ico('pin')} ${esc(s.where)}</span>` : ''}</div></div></div>`;
+// طبقة التفصيل للخطوة (اختيارية): تفاصيل التنفيذ، معيار القرار، التصعيد، السجل — مطوية افتراضياً
+const hasX = s => !!((s.detail || []).length || s.criteria || s.escalate || s.record);
+const stepX = s => hasX(s) ? `<div class="gsx">${(s.detail || []).length ? `<ul>${s.detail.map(d => `<li>${linkify(d)}</li>`).join('')}</ul>` : ''}${s.criteria ? `<div class="gsx-r crit"><b>معيار القرار</b><span>${linkify(s.criteria)}</span></div>` : ''}${s.escalate ? `<div class="gsx-r esc"><b>التصعيد</b><span>${linkify(s.escalate)}</span></div>` : ''}${s.record ? `<div class="gsx-r rec"><b>السجل الناتج</b><span>${esc(s.record)}</span></div>` : ''}</div>` : '';
+const stepHtml = (s, i, cur) => `<div class="gstep ${s.kind === 'decision' ? 'dec' : ''} ${cur === i + 1 ? 'cur' : ''} ${typeof cur === 'number' && i + 1 < cur ? 'past' : ''}" style="--c:#${uc(s.unit)}"><span class="gno"><i>${i + 1}</i></span><div class="gsb"><div class="gsh">${chip(s.unit)}${s.role ? `<small class="muted">${esc(s.role)}</small>` : ''}${s.kind === 'decision' ? '<span class="badge ovr">قرار</span>' : ''}${cur === i + 1 ? '<span class="badge info">أنت هنا</span>' : ''}</div><p>${linkify(s.action)}</p><div class="gsm">${s.sla ? `<span>${ico('clock')} ${esc(s.sla)}</span>` : ''}${s.where && s.where !== '—' ? `<span>${ico('pin')} ${esc(s.where)}</span>` : ''}${hasX(s) ? `<button type="button" class="gsxb" onclick="this.closest('.gstep').classList.toggle('open')">التفاصيل</button>` : ''}</div>${stepX(s)}</div></div>`;
 const flowHtml = (p, cur) => `<div class="gflow">${(p.steps || []).map((s, i) => `<span class="gfi">${i ? '<i class="gfa">←</i>' : ''}<span class="gfs ${s.kind === 'decision' ? 'dec' : ''} ${cur === i + 1 ? 'cur' : ''}" style="--c:#${uc(s.unit)}"><b><i>${i + 1}</i></b>${esc(un(s.unit))}</span></span>`).join('')}</div>`;
 const who = s => esc(un(s.unit)) + (s.role && s.role !== un(s.unit) ? ' / ' + esc(s.role) : '');
 
@@ -167,7 +172,7 @@ function viewSops(t, params) {
   const depts = G.units.filter(u => u.kind === 'unit' && u.active !== false);
   let fil = params?.get?.('u') || '';
   t.innerHTML = `<div class="toolbar"><input id="sq" placeholder="ابحث في الإجراءات…" style="min-width:240px"><span class="sp"></span>${isAdmin() ? '<button class="btn sm primary" id="pNew">＋ إجراء</button>' : ''}</div><div class="gman" id="gman"></div><div id="sl"></div>`;
-  const card = p => `<a class="gproc" href="#/gov/sop/${p.code}" style="--c:#${uc(p.owner)}"><div class="gpc"><b>${esc(p.code)}</b><span class="badge ${p.status === 'approved' ? 'full' : 'skel'}">${p.status === 'approved' ? 'معتمد' : 'مسودة'} v${esc(p.version || '1.0')}</span></div><h3>${esc(p.title)}</h3><p>${esc(p.goal)}</p><div class="gpu">${(p.units || []).map(chip).join('')}</div><small class="muted">${(p.steps || []).length} خطوة</small></a>`;
+  const card = p => `<a class="gproc" href="#/gov/sop/${p.code}" style="--c:#${uc(p.owner)}"><div class="gpc"><b>${esc(p.code)}</b><span class="badge ${p.status === 'approved' ? 'full' : 'skel'}">${p.status === 'approved' ? 'معتمد' : 'مسودة'} v${esc(p.version || '1.0')}</span></div><h3>${esc(p.title)}</h3><p>${esc(p.goal)}</p><div class="gpu">${(p.units || []).map(chip).join('')}</div><small class="muted">${(p.steps || []).length} خطوة${hasDoc(p) ? ' · <b class="gdeep">دليل مفصّل</b>' : ''}</small></a>`;
   const render = () => {
     const s = ($('#sq', t).value || '').trim();
     const all = G.procs.filter(p => p.active !== false), ps = all.filter(p => !s || (p.code + ' ' + p.title + ' ' + p.goal + ' ' + JSON.stringify(p.steps)).includes(s));
@@ -221,28 +226,100 @@ async function implBox(t, p) {
     $$('.gsteps .gstep', t).forEach((el, i) => { const n = steps[i + 1]; if (n) el.querySelector('.gsh')?.insertAdjacentHTML('beforeend', `<span class="badge info" title="أعمال متوقفة عند هذه الخطوة الآن">${n} هنا الآن</span>`); });
   } catch (e) { box.innerHTML = ''; }
 }
+// ---------- الدليل التفصيلي للإجراء (doc): طبقات — ملخص ظاهر، وكل ما سواه عند الطلب
+const hasDoc = p => !!(p.doc && (p.doc.purpose || p.doc.scope || (p.doc.kpis || []).length));
+const DOC_LISTS = {
+  definitions: [['t', 'المصطلح'], ['d', 'التعريف']],
+  roles: [['role', 'الدور'], ['resp', 'المسؤولية']],
+  risks: [['risk', 'الخطر'], ['control', 'الضابط']],
+  exceptions: [['case', 'الحالة'], ['action', 'التصرف']],
+  records: [['name', 'السجل'], ['where', 'مكان الحفظ'], ['keep', 'مدة الحفظ']],
+  refs: [['std', 'المرجع'], ['title', 'الموضوع']],
+  kpis: [['name', 'المؤشر'], ['formula', 'طريقة الحساب'], ['target', 'المستهدف'], ['freq', 'الدورية'], ['source', 'المصدر'], ['auto', 'رمز الحساب الآلي']],
+};
+const tbl = (rows, cols) => rows?.length ? `<div class="tblwrap"><table class="gdt"><thead><tr>${cols.map(c => `<th>${esc(c[1])}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${cols.map(c => `<td>${linkify(r[c[0]] || '')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>` : '';
+// مؤشرات تُحسب آلياً من بيانات المنصة (آخر 90 يوماً) — الرمز في doc.kpis[].auto
+const D90 = () => new Date(Date.now() - 90 * 864e5).toISOString();
+const pct = (a, b) => b ? { v: Math.round(100 * a / b) + '٪', n: `${a} من ${b}` } : null;
+const opsQ = (kind, cols) => q(sb.from('ops_items').select(cols).eq('kind', kind).gte('created_at', D90()).limit(2000));
+const OPEN_S = ['new', 'accepted', 'in_progress', 'on_hold', 'verify'];
+const closedAt = i => i.resolved_at || i.closed_at;
+const AUTO = {
+  permit_ontime: async () => { const r = (await opsQ('permit', 'status,data,resolved_at,closed_at')).filter(i => closedAt(i) && i.data?.to); return pct(r.filter(i => new Date(closedAt(i)) <= new Date(new Date(i.data.to).getTime() + 2 * 36e5)).length, r.length); },
+  impair_ontime: async () => { const r = (await opsQ('impair', 'status,data,resolved_at,closed_at')).filter(i => closedAt(i) && i.data?.to); return pct(r.filter(i => new Date(closedAt(i)) <= new Date(i.data.to)).length, r.length); },
+  impair_open: async () => { const r = await q(sb.from('ops_items').select('id,data').eq('kind', 'impair').in('status', OPEN_S)); const late = r.filter(i => i.data?.to && new Date(i.data.to) < new Date()).length; return { v: String(r.length), n: late ? `${late} تجاوز موعد الإعادة` : 'لا متأخر' }; },
+  emerg_response: async () => { const r = await opsQ('emerg', 'created_at,accepted_at,started_at'); return pct(r.filter(i => (i.accepted_at || i.started_at) && new Date(i.accepted_at || i.started_at) - new Date(i.created_at) <= 2 * 36e5).length, r.length); },
+  emerg_close_avg: async () => { const r = (await opsQ('emerg', 'created_at,resolved_at,closed_at')).filter(closedAt); if (!r.length) return null; const h = r.reduce((a, i) => a + (new Date(closedAt(i)) - new Date(i.created_at)), 0) / r.length / 36e5; return { v: h < 48 ? h.toFixed(1) + ' ساعة' : (h / 24).toFixed(1) + ' يوم', n: `${r.length} بلاغ مغلق` }; },
+  ppm_month: async () => { const d = new Date(), m0 = new Date(d.getFullYear(), d.getMonth(), 1), m1 = new Date(d.getFullYear(), d.getMonth() + 1, 1); const r = await q(sb.from('ops_items').select('status,plan_id,kind').or('kind.eq.ppm,plan_id.not.is.null').gte('due_at', m0.toISOString()).lt('due_at', m1.toISOString()).limit(5000)); return pct(r.filter(i => !OPEN_S.includes(i.status) && i.status !== 'cancelled').length, r.filter(i => i.status !== 'cancelled').length); },
+  ppm_late: async () => { const r = await q(sb.from('ops_items').select('id').or('kind.eq.ppm,plan_id.not.is.null').in('status', OPEN_S).lt('due_at', new Date().toISOString()).limit(5000)); return { v: String(r.length), n: 'أمر مفتوح تجاوز موعده' }; },
+  handover_2w: async () => { const r = (await q(sb.from('ops_items').select('created_at,resolved_at,closed_at').eq('kind', 'handover').gte('created_at', new Date(Date.now() - 365 * 864e5).toISOString()))).filter(closedAt); return pct(r.filter(i => new Date(closedAt(i)) - new Date(i.created_at) <= 14 * 864e5).length, r.length); },
+  trips_ontime: async () => { const r = await q(sb.from('vehicle_trips').select('back_at,expected_back').eq('status', 'returned').gte('out_at', D90()).limit(5000)); const x = r.filter(i => i.expected_back); return pct(x.filter(i => new Date(i.back_at) <= new Date(new Date(i.expected_back).getTime() + 15 * 6e4)).length, x.length); },
+  trips_late: async () => { const r = await q(sb.from('vehicle_trips').select('id').eq('status', 'out').lt('expected_back', new Date().toISOString())); return { v: String(r.length), n: 'سيارة خارج المقر بعد موعدها' }; },
+};
+async function fillKpis(t) {
+  for (const el of $$('[data-auto]', t)) {
+    const f = AUTO[el.dataset.auto]; if (!f) { el.remove(); continue; }
+    try { const r = await f(); el.innerHTML = r ? `<b>${esc(r.v)}</b><small>${esc(r.n)}</small>` : '<small>لا بيانات كافية بعد</small>'; } catch (e) { el.innerHTML = '<small>تعذر الحساب</small>'; }
+  }
+}
+function docPanes(p) {
+  const d = p.doc || {};
+  const intro = `<div class="gdintro">${d.purpose ? `<p class="gdpur"><b>الغرض</b>${linkify(d.purpose)}</p>` : ''}
+    ${d.scope || d.out_of_scope || (d.definitions || []).length ? `<details class="gdx"><summary>النطاق والتعريفات</summary><div class="gdxb">${d.scope ? `<p><b>يشمل:</b> ${linkify(d.scope)}</p>` : ''}${d.out_of_scope ? `<p><b>لا يشمل:</b> ${linkify(d.out_of_scope)}</p>` : ''}${(d.definitions || []).length ? `<dl class="gddl">${d.definitions.map(x => `<dt>${esc(x.t)}</dt><dd>${linkify(x.d)}</dd>`).join('')}</dl>` : ''}</div></details>` : ''}</div>`;
+  const roles = `${(d.roles || []).length ? `<h3 class="sub-h">الأدوار والمسؤوليات</h3>${tbl(d.roles, DOC_LISTS.roles)}` : ''}${(d.risks || []).length ? `<h3 class="sub-h">المخاطر وضوابطها</h3>${tbl(d.risks, DOC_LISTS.risks)}` : ''}${(d.exceptions || []).length ? `<h3 class="sub-h">الحالات الاستثنائية</h3>${tbl(d.exceptions, DOC_LISTS.exceptions)}` : ''}`;
+  const kpis = (d.kpis || []).length ? `<div class="gdk">${d.kpis.map(k => `<div class="gdkc"><div class="gdkh"><b>${esc(k.name)}</b>${k.auto ? `<span class="gdkv" data-auto="${esc(k.auto)}"><small>…</small></span>` : ''}</div><p>${esc(k.formula)}</p><div class="gdkm"><span>المستهدف: <b>${esc(k.target)}</b></span><span>${esc(k.freq)}</span><span>${esc(k.source)}</span></div></div>`).join('')}</div><p class="muted small">القيم الحية محسوبة من المنصة (آخر 90 يوماً، وشهر التقويم الحالي لمؤشر الصيانة المخططة)، وما لا قيمة له يُقاس من مصدره المذكور.</p>` : '';
+  const recs = `${(d.records || []).length ? `<h3 class="sub-h">السجلات والنماذج</h3>${tbl(d.records, DOC_LISTS.records)}` : ''}${(d.refs || []).length ? `<h3 class="sub-h">المراجع والمعايير</h3>${tbl(d.refs, DOC_LISTS.refs)}` : ''}${d.review ? `<p class="mt12"><b>مراجعة الإجراء:</b> ${esc(d.review)}</p>` : ''}`;
+  const tabs = [['steps', 'الخطوات'], roles && ['roles', 'الأدوار والضوابط'], kpis && ['kpis', 'المؤشرات'], recs && ['recs', 'السجلات والمراجع']].filter(Boolean);
+  return { intro, tabs, panes: { roles, kpis, recs } };
+}
 function viewProc(t, code) {
   const p = G.P[code]; if (!p) return t.innerHTML = '<div class="empty-boq">الإجراء غير موجود</div>';
-  const lanes = [...new Set(p.steps.map(s => s.unit))];
-  t.innerHTML = `<div class="toolbar"><a class="btn sm ghost" href="#/gov/sop">→ الإجراءات</a><h2 class="m0">${esc(p.code)} — ${esc(p.title)}</h2><span class="badge ${p.status === 'approved' ? 'full' : 'skel'}">${p.status === 'approved' ? 'معتمد' : 'مسودة'} v${esc(p.version || '1.0')}</span><span class="sp"></span><button class="btn sm" onclick="print()">${ico('print')} طباعة</button>${isAdmin() ? `<button class="btn sm" id="pEd">تعديل</button>${p.status !== 'approved' ? '<button class="btn sm primary" id="pApp">اعتماد</button>' : ''}` : ''}</div>
-    <div class="gpgrid"><div class="gkv"><span>المالك</span><b>${chip(p.owner)}</b></div><div class="gkv"><span>الأقسام المشاركة</span><b>${(p.units || []).map(chip).join('')}</b></div><div class="gkv wide"><span>الهدف</span><b>${esc(p.goal)}</b></div><div class="gkv"><span>متى يبدأ</span><b>${esc(p.trigger)}</b></div><div class="gkv"><span>المدخلات</span><b>${esc(p.inputs)}</b></div><div class="gkv"><span>المخرجات</span><b>${esc(p.outputs)}</b></div><div class="gkv"><span>مؤشر الأداء</span><b>${esc(p.kpi)}</b></div></div>
-    <div id="gimpl"></div>
-    <h3 class="sub-h">الخطوات <span class="muted small">— لون كل خطوة بلون القسم المسؤول عنها</span></h3>
+  const lanes = [...new Set(p.steps.map(s => s.unit))], deep = hasDoc(p), D = deep ? docPanes(p) : null, anyX = p.steps.some(hasX);
+  const steps = `<div class="gdsh"><h3 class="sub-h m0">الخطوات <span class="muted small">— لون كل خطوة بلون القسم المسؤول عنها</span></h3>${anyX ? '<button type="button" class="btn sm ghost" id="gxAll">توسيع كل التفاصيل</button>' : ''}</div>
     ${flowHtml(p)}
     <div class="gswim"><div class="glanes">${lanes.map(u => `<div class="glane" style="--c:#${uc(u)}"><span>${esc(un(u))}</span></div>`).join('')}</div><div class="gsteps">${p.steps.map(stepHtml).join('')}</div></div>
-    ${p.notes ? `<div class="notice mt12"><b>ملاحظات:</b> ${linkify(p.notes)}</div>` : ''}
+    ${p.notes ? `<div class="notice mt12"><b>ملاحظات:</b> ${linkify(p.notes)}</div>` : ''}`;
+  t.innerHTML = `<div class="toolbar"><a class="btn sm ghost" href="#/gov/sop">→ الإجراءات</a><h2 class="m0">${esc(p.code)} — ${esc(p.title)}</h2><span class="badge ${p.status === 'approved' ? 'full' : 'skel'}">${p.status === 'approved' ? 'معتمد' : 'مسودة'} v${esc(p.version || '1.0')}</span><span class="sp"></span><button class="btn sm" onclick="print()">${ico('print')} طباعة</button>${isAdmin() ? `<button class="btn sm" id="pEd">تعديل</button><button class="btn sm" id="pDoc">الدليل التفصيلي</button>${p.status !== 'approved' ? '<button class="btn sm primary" id="pApp">اعتماد</button>' : ''}` : ''}</div>
+    <div class="gpgrid"><div class="gkv"><span>المالك</span><b>${chip(p.owner)}</b></div><div class="gkv"><span>الأقسام المشاركة</span><b>${(p.units || []).map(chip).join('')}</b></div><div class="gkv wide"><span>الهدف</span><b>${esc(p.goal)}</b></div><div class="gkv"><span>متى يبدأ</span><b>${esc(p.trigger)}</b></div><div class="gkv"><span>المدخلات</span><b>${esc(p.inputs)}</b></div><div class="gkv"><span>المخرجات</span><b>${esc(p.outputs)}</b></div><div class="gkv"><span>مؤشر الأداء</span><b>${esc(p.kpi)}</b></div></div>
+    ${deep ? D.intro : ''}
+    <div id="gimpl"></div>
+    ${deep ? `<div class="gdseg" role="tablist">${D.tabs.map(([k, l], i) => `<button type="button" role="tab" data-pane="${k}" class="${i ? '' : 'on'}">${l}</button>`).join('')}</div>
+      <div class="gdpane on" data-p="steps">${steps}</div>${D.tabs.slice(1).map(([k, l]) => `<div class="gdpane" data-p="${k}"><h2 class="gdpt">${l}</h2>${D.panes[k]}</div>`).join('')}` : steps}
     <p class="muted small mt12">${p.approved_by ? `اعتُمد بواسطة ${esc(p.approved_by)} في ${dateAr(p.approved_at)}` : 'مسودة بانتظار الاعتماد'} · آخر تحديث ${dateAr(p.updated_at)}</p>`;
   implBox(t, p);
-  $('#pEd', t) && ($('#pEd', t).onclick = () => editProc(p, () => load(true).then(() => mountGov(t.closest('#main') || document.body, 'sop', code))));
+  $$('.gdseg button', t).forEach(b => b.onclick = () => { $$('.gdseg button', t).forEach(x => x.classList.toggle('on', x === b)); $$('.gdpane', t).forEach(x => x.classList.toggle('on', x.dataset.p === b.dataset.pane)); });
+  const xa = $('#gxAll', t); if (xa) xa.onclick = () => { const open = !xa.classList.contains('on'); xa.classList.toggle('on', open); xa.textContent = open ? 'طي التفاصيل' : 'توسيع كل التفاصيل'; $$('.gsteps .gstep', t).forEach(el => el.querySelector('.gsx') && el.classList.toggle('open', open)); };
+  if (deep) fillKpis(t);
+  const again = () => load(true).then(() => mountGov(t.closest('#main') || document.body, 'sop', code));
+  $('#pEd', t) && ($('#pEd', t).onclick = () => editProc(p, again));
+  $('#pDoc', t) && ($('#pDoc', t).onclick = () => editDoc(p, again));
   $('#pApp', t) && ($('#pApp', t).onclick = async () => { if (!await confirm('اعتماد هذا الإجراء بإصداره الحالي؟', 'اعتماد')) return; await q(sb.from('gov_processes').update({ status: 'approved', approved_by: session.profile?.full_name || '', approved_at: new Date().toISOString().slice(0, 10) }).eq('code', code)); toast('اعتُمد'); await load(true); mountGov(t.closest('#main') || document.body, 'sop', code); });
+}
+// محرر الدليل التفصيلي: الجداول تُكتب سطراً لكل صف وتُفصل الأعمدة بـ « | »
+function editDoc(p, done) {
+  const d = p.doc || {};
+  const toL = (k) => (d[k] || []).map(r => DOC_LISTS[k].map(([c]) => r[c] || '').join(' | ').replace(/( \| )+$/, '')).join('\n');
+  const fromL = (k, txt) => String(txt || '').split('\n').map(x => x.trim()).filter(Boolean).map(line => { const parts = line.split('|').map(x => x.trim()), o = {}; DOC_LISTS[k].forEach(([c], i) => { if (parts[i]) o[c] = parts[i]; }); return o; }).filter(o => Object.keys(o).length);
+  const ta = (k, lbl, rows = 4) => field(`${lbl} <small class="muted">— سطر لكل صف: ${DOC_LISTS[k].map(c => c[1]).join(' | ')}</small>`, `<textarea name="${k}" rows="${rows}">${esc0(toL(k))}</textarea>`, 'wide');
+  modal(`<form id="f" class="pgrid">${field('الغرض', `<textarea name="purpose" rows="2">${esc0(d.purpose || '')}</textarea>`, 'wide')}${field('النطاق (يشمل)', `<textarea name="scope" rows="2">${esc0(d.scope || '')}</textarea>`, 'wide')}${field('لا يشمل', `<textarea name="out_of_scope" rows="2">${esc0(d.out_of_scope || '')}</textarea>`, 'wide')}
+    ${ta('definitions', 'التعريفات', 3)}${ta('roles', 'الأدوار والمسؤوليات')}${ta('risks', 'المخاطر وضوابطها')}${ta('exceptions', 'الحالات الاستثنائية', 3)}${ta('kpis', 'المؤشرات')}${ta('records', 'السجلات والنماذج', 3)}${ta('refs', 'المراجع والمعايير', 3)}
+    ${field('مراجعة الإجراء', inp('review', d.review || ''), 'wide')}
+    <p class="muted small wide">رموز الحساب الآلي المتاحة للمؤشرات: ${Object.keys(AUTO).map(k => `<bdi>${k}</bdi>`).join('، ')}. تفاصيل كل خطوة (معيار القرار، التصعيد، السجل) تُحرَّر من «تعديل».</p>
+    <div class="btnrow end wide"><span class="sp"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">حفظ</button></div></form>`, { title: `الدليل التفصيلي — ${p.code}`, wide: true, onOpen: (w, close) => {
+    $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target);
+      const doc = { purpose: f.purpose.trim(), scope: f.scope.trim(), out_of_scope: f.out_of_scope.trim(), review: f.review.trim() };
+      Object.keys(DOC_LISTS).forEach(k => doc[k] = fromL(k, f[k]));
+      Object.keys(doc).forEach(k => { if (!doc[k] || (Array.isArray(doc[k]) && !doc[k].length)) delete doc[k]; });
+      try { await q(sb.from('gov_processes').update({ doc, updated_at: new Date().toISOString() }).eq('code', p.code)); close(); toast('حُفظ'); done(); } catch (er) { err(er); } };
+  } });
 }
 function editProc(p, done) {
   const opts = G.units.map(u => [u.code, u.short]); const v = p || { code: '', title: '', owner: 'PRJ', units: [], goal: '', trigger: '', inputs: '', outputs: '', kpi: '', steps: [], notes: '', version: '1.0' };
-  const stepRow = (s = {}, i) => `<div class="gserow" data-i="${i}"><select name="s_unit">${opts.map(([c, n]) => `<option value="${c}" ${s.unit === c ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select><input name="s_role" placeholder="الدور (اختياري)" value="${esc0(s.role || '')}" style="max-width:130px"><input name="s_action" placeholder="الإجراء" value="${esc(s.action || '')}"><input name="s_sla" placeholder="المهلة" value="${esc(s.sla || '')}" style="max-width:120px"><input name="s_where" placeholder="أين (شاشة/نموذج)" value="${esc(s.where || '')}" style="max-width:150px"><label class="chk"><input type="checkbox" name="s_dec" ${s.kind === 'decision' ? 'checked' : ''}> قرار</label><button type="button" class="btn sm ghost" data-rm>✕</button></div>`;
+  const stepRow = (s = {}, i) => `<div class="gserow" data-i="${i}"><select name="s_unit">${opts.map(([c, n]) => `<option value="${c}" ${s.unit === c ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select><input name="s_role" placeholder="الدور (اختياري)" value="${esc0(s.role || '')}" style="max-width:130px"><input name="s_action" placeholder="الإجراء" value="${esc(s.action || '')}"><input name="s_sla" placeholder="المهلة" value="${esc(s.sla || '')}" style="max-width:120px"><input name="s_where" placeholder="أين (شاشة/نموذج)" value="${esc(s.where || '')}" style="max-width:150px"><label class="chk"><input type="checkbox" name="s_dec" ${s.kind === 'decision' ? 'checked' : ''}> قرار</label><button type="button" class="btn sm ghost" data-rm>✕</button><details class="gsedx"><summary>تفاصيل الخطوة${hasX(s) ? ' ●' : ''}</summary><textarea name="s_detail" rows="3" placeholder="تفاصيل التنفيذ — سطر لكل نقطة">${esc0((s.detail || []).join('\n'))}</textarea><input name="s_crit" placeholder="معيار القرار (اختياري)" value="${esc0(s.criteria || '')}"><input name="s_esc" placeholder="التصعيد (اختياري)" value="${esc0(s.escalate || '')}"><input name="s_rec" placeholder="السجل الناتج (اختياري)" value="${esc0(s.record || '')}"></details></div>`;
   modal(`<form id="f" class="pgrid">${field('الكود', inp('code', v.code, p ? 'readonly' : 'required placeholder="G-13 أو F-06 أو M-06"'))}${field('الإصدار', inp('version', v.version || '1.0'))}${field('العنوان', inp('title', v.title, 'required'), 'wide')}${field('المالك', sel('owner', opts, v.owner))}${field('الأقسام المشاركة', `<div class="chips">${opts.map(([c, n]) => `<label class="chip"><input type="checkbox" name="u_${c}" ${(v.units || []).includes(c) ? 'checked' : ''}> ${esc(n)}</label>`).join('')}</div>`, 'wide')}${field('الهدف', `<textarea name="goal" rows="2">${esc(v.goal)}</textarea>`, 'wide')}${field('متى يبدأ', inp('trigger', v.trigger), 'wide')}${field('المدخلات', inp('inputs', v.inputs))}${field('المخرجات', inp('outputs', v.outputs))}${field('مؤشر الأداء', inp('kpi', v.kpi), 'wide')}<div class="fld wide"><span>الخطوات</span><div id="gse">${(v.steps || []).map(stepRow).join('')}</div><button type="button" class="btn sm" id="sAdd">＋ خطوة</button></div>${field('ملاحظات', `<textarea name="notes" rows="2">${esc(v.notes)}</textarea>`, 'wide')}<div class="btnrow end wide">${p ? '<button type="button" class="btn ghost" id="pDel" style="color:#A6503B">حذف</button>' : ''}<span class="sp"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">حفظ</button></div></form>`, { title: p ? 'تعديل إجراء' : 'إجراء جديد', wide: true, onOpen: (w, close) => {
     const box = $('#gse', w); const bindRm = () => $$('[data-rm]', box).forEach(b => b.onclick = () => b.closest('.gserow').remove()); bindRm();
     $('#sAdd', w).onclick = () => { box.insertAdjacentHTML('beforeend', stepRow({}, box.children.length)); bindRm(); };
-    $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target); const steps = $$('.gserow', box).map(r => ({ unit: $('[name=s_unit]', r).value, action: $('[name=s_action]', r).value.trim().replace(/→/g, '←'), sla: $('[name=s_sla]', r).value.trim(), where: $('[name=s_where]', r).value.trim(), kind: $('[name=s_dec]', r).checked ? 'decision' : 'step', role: $('[name=s_role]', r).value.trim() || undefined })).filter(s => s.action);
+    $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target); const steps = $$('.gserow', box).map(r => ({ unit: $('[name=s_unit]', r).value, action: $('[name=s_action]', r).value.trim().replace(/→/g, '←'), sla: $('[name=s_sla]', r).value.trim(), where: $('[name=s_where]', r).value.trim(), kind: $('[name=s_dec]', r).checked ? 'decision' : 'step', role: $('[name=s_role]', r).value.trim() || undefined, detail: $('[name=s_detail]', r).value.split('\n').map(x => x.trim()).filter(Boolean), criteria: $('[name=s_crit]', r).value.trim() || undefined, escalate: $('[name=s_esc]', r).value.trim() || undefined, record: $('[name=s_rec]', r).value.trim() || undefined })).filter(s => s.action).map(s => { if (!s.detail.length) delete s.detail; return s; });
       const row = { title: f.title.trim(), version: f.version.trim(), owner: f.owner, units: opts.map(([c]) => c).filter(c => f['u_' + c]), goal: f.goal.trim(), trigger: f.trigger.trim(), inputs: f.inputs.trim(), outputs: f.outputs.trim(), kpi: f.kpi.trim(), steps, notes: f.notes.trim(), updated_at: new Date().toISOString() };
       try { if (p) await q(sb.from('gov_processes').update(row).eq('code', p.code)); else await q(sb.from('gov_processes').insert({ ...row, code: f.code.trim(), sort: 50 })); close(); toast('حُفظ'); done(); } catch (er) { err(er); } };
     $('#pDel', w) && ($('#pDel', w).onclick = async () => { if (!await confirm('حذف الإجراء؟', 'حذف', true)) return; await q(sb.from('gov_processes').delete().eq('code', p.code)); close(); done(); });
