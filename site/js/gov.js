@@ -22,7 +22,7 @@ const un = c => G.U[c]?.short || c, uc = c => G.U[c]?.color || '6B7A88';
 const chip = c => c ? `<span class="uchip" style="--c:#${uc(c)}">${esc(un(c))}</span>` : '';
 const refLink = code => /^[A-QS-Z]-\d/.test(code) ? `<a class="gref" data-peek="${esc(code)}" href="#/gov/sop/${code}">${esc(code)}</a>` : /^R-/.test(code) ? `<a class="gref" data-peek="${esc(code)}" href="#/gov/rules/${code}">${esc(code)}</a>` : esc(code);
 // نص مع تحويل أكواد الإجراءات والقواعد (G-05، P-03، R-01) إلى إحالات قابلة للنقر
-const FSEG = { auth: 'auth', comm: 'comm', cal: 'cal', risk: 'risk' };
+const FSEG = { plan: 'plan', auth: 'auth', comm: 'comm', cal: 'cal', risk: 'risk' };
 const frameLink = (c, cls = 'gref in') => { const f = G?.F?.[c]; return f && FSEG[f.kind] ? `<a class="${cls}" href="#/gov/frame/${f.kind}?h=${c}" title="${esc(f.title)}">${esc(c)}</a>` : esc(c); };
 const linkify = s => esc(s).replace(/\b(RK-\d{2}|[A-Z]-\d{2})\b/g, m => (G?.P?.[m] || G?.R?.[m]) ? refLink(m).replace('class="gref"', 'class="gref in"') : G?.F?.[m] ? frameLink(m) : m);
 
@@ -83,7 +83,7 @@ export async function mountGov(root, tab = 'start', id = null, params) {
   root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">الحوكمة</h1><span class="muted small">إدارة الخدمات الفنية — من يفعل ماذا ومتى</span><span class="sp"></span>${isAdmin() ? '<span class="badge skel">التعديل متاح لمدير النظام بالنقر على العناصر</span>' : ''}</div>
     <div class="tabs gtabs">${TABS.map(([k, t]) => `<a href="#/gov/${k}" class="${tab === k ? 'on' : ''}">${t}</a>`).join('')}</div><div id="gtab"></div>`;
   const t = $('#gtab', root);
-  if (tab === 'map') viewMap(t); else if (tab === 'router') viewRouter(t); else if (tab === 'matrix') viewMatrix(t, params); else if (tab === 'sop') (id ? viewProc(t, id) : viewSops(t, params)); else if (tab === 'rules') viewRules(t, id); else if (tab === 'frame') viewFrame(t, id || 'auth', params); else viewStart(t);
+  if (tab === 'map') viewMap(t); else if (tab === 'router') viewRouter(t); else if (tab === 'matrix') viewMatrix(t, params); else if (tab === 'sop') (id ? viewProc(t, id) : viewSops(t, params)); else if (tab === 'rules') viewRules(t, id); else if (tab === 'frame') viewFrame(t, id || 'plan', params); else viewStart(t);
 }
 
 // ---------- ابدأ من هنا: المبادئ + أسئلة كيف
@@ -329,7 +329,7 @@ function editProc(p, done) {
 }
 
 // ---------- الإطار الإداري: حدود الاعتماد، اللجان، التقويم السنوي، سجل المخاطر (جدول gov_frame)
-const FSEGS = [['auth', 'حدود الاعتماد', 'I-AUTH'], ['comm', 'اللجان', 'I-COMM'], ['cal', 'التقويم السنوي', 'I-CAL'], ['risk', 'سجل المخاطر', 'I-RISK']];
+const FSEGS = [['plan', 'خطط المرافق', 'I-PLAN'], ['auth', 'حدود الاعتماد', 'I-AUTH'], ['comm', 'اللجان', 'I-COMM'], ['cal', 'التقويم السنوي', 'I-CAL'], ['risk', 'سجل المخاطر', 'I-RISK']];
 const MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
 // من يقترح/يراجع/يعتمد: رمز قسم ← شارة بلونه، HEAD ← رئيس القسم المختص، C-xx ← اللجنة، وغير ذلك نص
 const actor = x => x === 'HEAD' ? '<span class="uchip" style="--c:#6B7A88">رئيس القسم المختص</span>' : G.U[x] ? chip(x) : /^C-\d/.test(x) && G.F[x] ? `<a class="uchip lnk" style="--c:#123B5C" href="#/gov/frame/comm?h=${x}">${esc(G.F[x].title)}</a>` : x === '—' ? '<span class="muted">—</span>' : `<span class="gtxt">${esc(x)}</span>`;
@@ -341,24 +341,25 @@ const FFIELDS = {
   auth: [['grp', 'المجموعة', 'text'], ['propose', 'يقترح (رموز مفصولة بفاصلة: PRJ، DIR، HEAD، C-02 أو نص)', 'list'], ['review', 'يراجع', 'list'], ['approve', 'يعتمد', 'list'], ['limit', 'الحد أو الشرط', 'textarea'], ['ref', 'المرجع (أكواد)', 'text']],
   comm: [['grp', 'النوع (دائمة / مؤقتة / دوري)', 'text'], ['purpose', 'الغرض', 'textarea'], ['chair', 'الرئيس (رمز قسم أو نص)', 'text'], ['secretary', 'المقرر', 'text'], ['members', 'الأعضاء (مفصولة بفاصلة)', 'list'], ['freq', 'الانعقاد', 'text'], ['quorum', 'النصاب', 'text'], ['duties', 'المهام (سطر لكل مهمة)', 'lines'], ['outputs', 'المخرجات (سطر لكل مخرج)', 'lines'], ['reports_to', 'ترفع إلى', 'text'], ['procs', 'الإجراءات المرتبطة', 'text']],
   cal: [['grp', 'المجموعة', 'text'], ['freq', 'التكرار', 'text'], ['months', 'الأشهر (أرقام مفصولة بفاصلة 1–12)', 'list'], ['owner', 'المسؤول (رمز قسم)', 'text'], ['ref', 'المرجع', 'text'], ['note', 'ملاحظة', 'text']],
+  plan: [['owner', 'المالك (رمز قسم)', 'text'], ['purpose', 'الغرض', 'textarea'], ['scope', 'النطاق', 'textarea'], ['objectives', 'الأهداف السنوية (سطر لكل هدف)', 'lines'], ['elements', 'عناصر البرنامج — سطر لكل عنصر: العنصر | الوصف', 'rows', ['0', '1']], ['procs', 'الإجراءات (أكواد مفصولة بـ ·)', 'text'], ['risks', 'المخاطر (RK-xx)', 'text'], ['cal', 'نشاطات التقويم (K-xx)', 'text'], ['comm', 'اللجان (C-xx)', 'text'], ['kpis', 'المؤشرات — سطر لكل مؤشر: الاسم | المستهدف | الدورية | المصدر | رمز آلي', 'rows', ['name', 'target', 'freq', 'source', 'auto']], ['training', 'التدريب (سطر لكل بند)', 'lines'], ['records', 'السجلات (سطر لكل سجل)', 'lines'], ['eval', 'التقييم السنوي', 'textarea']],
   risk: [['grp', 'الفئة', 'text'], ['l', 'الاحتمال (1–5)', 'number'], ['i', 'الأثر (1–5)', 'number'], ['cause', 'السبب', 'textarea'], ['effect', 'الأثر المتوقع', 'textarea'], ['controls', 'الضوابط القائمة (سطر لكل ضابط)', 'lines'], ['plan', 'خطة المعالجة', 'textarea'], ['owner', 'المالك (رمز قسم)', 'text'], ['ref', 'المرجع', 'text']],
 };
 function editFrame(kind, row, done) {
   const d = row?.data || {}, fs = FFIELDS[kind];
-  const val = (k, type) => { const v = k === 'grp' ? row?.grp : d[k]; return type === 'lines' ? (v || []).join('\n') : type === 'list' ? (v || []).join('، ') : v ?? ''; };
+  const val = (k, type, cols) => { const v = k === 'grp' ? row?.grp : d[k]; if (type === 'rows') return (v || []).map(r => cols.map(c => r?.[c] ?? '').join(' | ').replace(/( \| )+$/, '')).join('\n'); return type === 'lines' ? (v || []).join('\n') : type === 'list' ? (v || []).join('، ') : v ?? ''; };
   modal(`<form id="f" class="pgrid">${kind === 'intro' ? '' : field('الكود', inp('code', row?.code || '', row ? 'readonly' : 'required'))}${field('العنوان', inp('title', row?.title || '', 'required'), 'wide')}
-    ${fs.map(([k, lbl, type]) => field(lbl, type === 'textarea' || type === 'lines' ? `<textarea name="${k}" rows="${type === 'lines' ? 4 : 2}">${esc0(val(k, type))}</textarea>` : inp(k, val(k, type), type === 'number' ? 'type="number" min="1" max="5"' : ''), ['textarea', 'lines', 'list'].includes(type) || k === 'ref' ? 'wide' : '')).join('')}
+    ${fs.map(([k, lbl, type, cols]) => field(lbl, type === 'textarea' || type === 'lines' || type === 'rows' ? `<textarea name="${k}" rows="${type === 'textarea' ? 2 : 4}">${esc0(val(k, type, cols))}</textarea>` : inp(k, val(k, type), type === 'number' ? 'type="number" min="1" max="5"' : ''), ['textarea', 'lines', 'list', 'rows'].includes(type) || k === 'ref' ? 'wide' : '')).join('')}
     ${field('الترتيب', inp('sort', row?.sort ?? 900, 'type="number"'))}
     <div class="btnrow end wide">${row && kind !== 'intro' ? '<button type="button" class="btn ghost" id="eDel" style="color:#A6503B">حذف</button>' : ''}<span class="sp"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">حفظ</button></div></form>`, { title: row ? `تعديل — ${row.title}` : 'إضافة', wide: true, onOpen: (w, close) => {
     $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target), data = { ...d };
-      for (const [k, , type] of fs) { let v = f[k]; if (type === 'number') v = Math.min(5, Math.max(1, Number(v) || 1)); else if (type === 'lines') v = String(v).split('\n').map(x => x.trim()).filter(Boolean); else if (type === 'list') { v = String(v).split(/[,،]/).map(x => x.trim()).filter(Boolean); if (k === 'months') v = v.map(Number).filter(n => n >= 1 && n <= 12); } else v = String(v).trim(); data[k] = v; }
+      for (const [k, , type, cols] of fs) { let v = f[k]; if (type === 'rows') { const arr = cols[0] === '0'; v = String(v).split('\n').map(x => x.trim()).filter(Boolean).map(line => { const ps = line.split('|').map(x => x.trim()); if (arr) return cols.map((c, i) => ps[i] || ''); const o = {}; cols.forEach((c, i) => { if (ps[i]) o[c] = ps[i]; }); return o; }); } else if (type === 'number') v = Math.min(5, Math.max(1, Number(v) || 1)); else if (type === 'lines') v = String(v).split('\n').map(x => x.trim()).filter(Boolean); else if (type === 'list') { v = String(v).split(/[,،]/).map(x => x.trim()).filter(Boolean); if (k === 'months') v = v.map(Number).filter(n => n >= 1 && n <= 12); } else v = String(v).trim(); data[k] = v; }
       const out = { title: f.title.trim(), grp: data.grp ?? row?.grp ?? '', sort: Number(f.sort) || 0, data, updated_at: new Date().toISOString() }; delete data.grp;
       try { if (row) await q(sb.from('gov_frame').update(out).eq('code', row.code)); else await q(sb.from('gov_frame').insert({ ...out, code: f.code.trim(), kind })); close(); toast('حُفظ'); await load(true); done(); } catch (er) { err(er); } };
     $('#eDel', w) && ($('#eDel', w).onclick = async () => { if (!await confirm('حذف هذا العنصر؟', 'حذف', true)) return; await q(sb.from('gov_frame').update({ active: false }).eq('code', row.code)); close(); await load(true); done(); });
   } });
 }
 function viewFrame(t, seg, params) {
-  if (!FSEGS.some(s => s[0] === seg)) seg = 'auth';
+  if (!FSEGS.some(s => s[0] === seg)) seg = 'plan';
   const hl = params?.get?.('h') || '', items = G.frame.filter(f => f.kind === seg), intro = G.F[FSEGS.find(s => s[0] === seg)[2]];
   const again = () => mountGov(t.closest('#main') || document.body, 'frame', seg);
   const adm = isAdmin();
@@ -367,11 +368,40 @@ function viewFrame(t, seg, params) {
     <div class="gfbody"></div>
     <p class="muted small mt12 noprint">مسودة مقترحة للاعتماد — الحدود والقيم تُضبط بقرار الإدارة. ${adm ? `<button class="btn sm" id="fNew">＋ إضافة</button>` : ''} <button class="btn sm ghost" onclick="print()">${ico('print')} طباعة</button></p>`;
   const body = $('.gfbody', t);
-  ({ auth: fAuth, comm: fComm, cal: fCal, risk: fRisk })[seg](body, items, hl);
+  ({ plan: fPlan, auth: fAuth, comm: fComm, cal: fCal, risk: fRisk })[seg](body, items, hl);
   if (adm) { $$('[data-fed]', t).forEach(b => b.onclick = e => { e.preventDefault(); e.stopPropagation(); const r = G.F[b.dataset.fed]; editFrame(r.kind, r, again); }); $('#fNew', t).onclick = () => editFrame(seg, null, again); }
-  if (hl) setTimeout(() => { const el = $(`[data-code="${hl}"]`, t); if (el) { el.classList.add('hl'); if (el.tagName === 'DETAILS') el.open = true; el.scrollIntoView({ block: 'center' }); } }, 50);
+  if (hl && seg !== 'plan') setTimeout(() => { const el = $(`[data-code="${hl}"]`, t); if (el) { el.classList.add('hl'); if (el.tagName === 'DETAILS') el.open = true; el.scrollIntoView({ block: 'center' }); } }, 50);
 }
 const edBtn = c => isAdmin() ? `<button class="btn sm ghost gfed" data-fed="${c}">تعديل</button>` : '';
+function fPlan(b, items, hl) {
+  let cur = items.find(p => p.code === hl) || items[0]; if (!cur) { b.innerHTML = '<div class="empty-boq">لا خطط بعد</div>'; return; }
+  const codes = x => String(x || '').split(/\s*·\s*/).filter(Boolean);
+  const sc = r => (r.data.l || 1) * (r.data.i || 1);
+  const stat = p => { const d = p.data; return `${codes(d.procs).length} إجراء · ${codes(d.risks).length} خطر · ${codes(d.cal).length} نشاط`; };
+  const topRisk = p => { const rs = codes(p.data.risks).map(c => G.F[c]).filter(Boolean); if (!rs.length) return ''; const m = Math.max(...rs.map(sc)), [lv, ln] = riskLvl(m); return `<span class="gfrs mini ${lv}" title="أعلى خطر مرتبط">${m} ${ln}</span>`; };
+  const detail = p => { const d = p.data;
+    const procs = codes(d.procs).map(c => G.P[c] ? `<li>${refLink(c).replace('class="gref"', 'class="gref in"')} ${esc(G.P[c].title)}</li>` : G.R[c] ? `<li>${refLink(c).replace('class="gref"', 'class="gref in"')} ${esc(G.R[c].title)}</li>` : '').join('');
+    const risks = codes(d.risks).map(c => G.F[c]).filter(Boolean).sort((a, c) => sc(c) - sc(a)).map(r => { const [lv] = riskLvl(sc(r)); return `<li><span class="gfrs mini ${lv}">${sc(r)}</span> ${frameLink(r.code)} ${esc(r.title)}</li>`; }).join('');
+    const cal = codes(d.cal).map(c => G.F[c]).filter(Boolean).map(r => `<li>${frameLink(r.code)} ${esc(r.title)} <small class="muted">— ${esc(r.data.freq || '')}${(r.data.months || []).length && (r.data.months || []).length < 12 ? ': ' + r.data.months.map(m => MONTHS[m - 1]).join('، ') : ''}</small></li>`).join('');
+    const comm = codes(d.comm).map(c => G.F[c]).filter(Boolean).map(r => `<li>${frameLink(r.code)} ${esc(r.title)} <small class="muted">— ${esc(r.data.freq || '')}</small></li>`).join('');
+    return `<div class="gfpd" style="--c:#${uc(d.owner)}" data-code="${p.code}"><div class="gfpdh"><b>${esc(p.code)}</b><h2>${esc(p.title)}</h2>${actor(d.owner)}<span class="sp"></span>${edBtn(p.code)}</div>
+      <div class="gdpur"><b>الغرض</b>${linkify(d.purpose || '')}</div>${d.scope ? `<p class="gfscope"><b>النطاق:</b> ${linkify(d.scope)}</p>` : ''}
+      <div class="gfp2"><div><h3 class="sub-h">الأهداف السنوية</h3><ul class="gfobj">${(d.objectives || []).map(x => `<li>${linkify(x)}</li>`).join('')}</ul></div>
+        <div><h3 class="sub-h">المؤشرات</h3><div class="gdk one">${(d.kpis || []).map(k => `<div class="gdkc"><div class="gdkh"><b>${esc(k.name)}</b>${k.auto ? `<span class="gdkv" data-auto="${esc(k.auto)}"><small>…</small></span>` : ''}</div><div class="gdkm"><span>المستهدف: <b>${esc(k.target || '')}</b></span><span>${esc(k.freq || '')}</span><span>${linkify(k.source || '')}</span></div></div>`).join('')}</div></div></div>
+      ${(d.elements || []).length ? `<h3 class="sub-h">عناصر البرنامج</h3><ol class="gfel">${d.elements.map(e => `<li><b>${esc(e[0])}</b><span>${linkify(e[1] || '')}</span></li>`).join('')}</ol>` : ''}
+      <h3 class="sub-h">أين تُنفَّذ الخطة</h3><div class="gflinks">${procs ? `<div><small>الإجراءات</small><ul>${procs}</ul></div>` : ''}${risks ? `<div><small>المخاطر من السجل</small><ul>${risks}</ul></div>` : ''}${cal ? `<div><small>التقويم السنوي</small><ul>${cal}</ul></div>` : ''}${comm ? `<div><small>اللجان</small><ul>${comm}</ul></div>` : ''}</div>
+      ${(d.training || []).length ? `<details class="gdx"><summary>التدريب</summary><div class="gdxb"><ul class="gfpts">${d.training.map(x => `<li>${linkify(x)}</li>`).join('')}</ul></div></details>` : ''}
+      ${(d.records || []).length ? `<details class="gdx"><summary>السجلات والوثائق</summary><div class="gdxb"><ul class="gfpts">${d.records.map(x => `<li>${linkify(x)}</li>`).join('')}</ul></div></details>` : ''}
+      ${d.eval ? `<details class="gdx"><summary>التقييم السنوي للخطة</summary><div class="gdxb"><p>${linkify(d.eval)}</p></div></details>` : ''}</div>`; };
+  const draw = () => {
+    $$('.gfpc', b).forEach(x => x.classList.toggle('on', x.dataset.pc === cur.code));
+    $('.gfpw', b).innerHTML = detail(cur); fillKpis($('.gfpw', b));
+    if (isAdmin()) $$('.gfpw [data-fed]', b).forEach(x => x.onclick = () => editFrame('plan', G.F[x.dataset.fed], () => mountGov(b.closest('#main') || document.body, 'frame', 'plan', new URLSearchParams('h=' + cur.code))));
+  };
+  b.innerHTML = `<div class="gfplans">${items.map(p => `<button type="button" class="gfpc" data-pc="${p.code}" style="--c:#${uc(p.data.owner)}"><small>${esc(p.code)}</small><b>${esc(p.title)}</b><span class="gfpcm">${actor(p.data.owner)}${topRisk(p)}</span><small class="muted">${stat(p)}</small></button>`).join('')}</div><div class="gfpw"></div>`;
+  $$('.gfpc', b).forEach(x => x.onclick = () => { cur = G.F[x.dataset.pc]; history.replaceState(null, '', `#/gov/frame/plan?h=${cur.code}`); draw(); if (innerWidth < 900) $('.gfpw', b).scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+  draw();
+}
 function fAuth(b, items) {
   const units = G.units.filter(u => u.kind !== 'ext');
   const draw = () => { const fq = ($('#faQ', b)?.value || '').trim(), fu = $('#faU', b)?.value || '';

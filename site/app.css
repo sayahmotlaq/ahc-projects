@@ -1405,3 +1405,23 @@ td.kic{color:var(--k)} td.kic svg.i{width:20px;height:20px}
 }
 @media print{ .gfmon,.gffil,.gfed,.gfseg{display:none!important} .gfc,.gfr{break-inside:avoid} .gfc summary::after{display:none} }
 .gfrf{display:inline-block;margin:1px 2px;white-space:nowrap} .gfhmx{direction:ltr}
+/* خطط إدارة المرافق */
+.gfplans{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;margin-bottom:14px}
+.gfpc{font:inherit;text-align:start;cursor:pointer;background:var(--surface);border:1px solid var(--line);border-top:4px solid var(--c);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:5px;color:var(--text)}
+.gfpc>b{font-size:14px;color:var(--navy)} .gfpc>small:first-child{color:var(--muted);font-weight:700} .gfpc.on{background:color-mix(in srgb,var(--c) 8%,#fff);border-color:var(--c);box-shadow:0 2px 8px rgba(18,59,92,.1)}
+.gfpcm{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.gfrs.mini{display:inline-flex;flex-direction:row;min-width:0;padding:1px 7px;border-radius:20px;font-size:11px;font-weight:800;gap:3px}
+.gfpd{background:var(--surface);border:1px solid var(--line);border-inline-start:5px solid var(--c);border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.gfpdh{display:flex;align-items:center;gap:10px;flex-wrap:wrap} .gfpdh h2{margin:0;font-size:19px;color:var(--navy)} .gfpdh>b{color:var(--muted)} .gfpdh .sp{flex:1}
+.gfpd .gdpur{margin:0} .gfscope{margin:0;font-size:13.5px;line-height:1.8;color:var(--text)}
+.gfp2{display:grid;grid-template-columns:1fr 1fr;gap:16px} .gdk.one{grid-template-columns:1fr}
+.gfobj{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px} .gfobj li{position:relative;padding:8px 12px 8px 12px;padding-inline-start:30px;background:var(--surface2);border-radius:10px;font-size:13.5px;line-height:1.7}
+.gfobj li::before{content:"";position:absolute;inset-inline-start:10px;top:14px;width:10px;height:10px;border-radius:50%;border:2px solid var(--c)}
+.gfel{margin:0;padding:0;list-style:none;counter-reset:el;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}
+.gfel li{counter-increment:el;background:var(--surface2);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:3px;font-size:13px;line-height:1.7}
+.gfel li b::before{content:counter(el) ". ";color:var(--c)}
+.gflinks{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+.gflinks>div{border:1px solid var(--line);border-radius:10px;padding:10px 12px} .gflinks small{color:var(--muted);font-weight:700;font-size:11.5px}
+.gflinks ul{margin:6px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:5px;font-size:13px;line-height:1.6}
+@media (max-width:900px){ .gfp2{grid-template-columns:1fr} .gfplans{grid-template-columns:1fr 1fr} .gfpd{padding:12px} }
+@media print{ .gfplans{display:none} }
