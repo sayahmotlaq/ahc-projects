@@ -7,7 +7,7 @@ import './govlink.js';
 const app = $('#app');
 const DEPTS = [['PRJ', 'المشاريع', '27A8DF'], ['FAC', 'المرافق', '2E8B57'], ['MNT', 'الصيانة', 'B8860B'], ['SAF', 'الأمن والسلامة', 'B03A48'], ['BME', 'الصيانة الطبية', 'A0522D'], ['MED', 'التجهيزات الطبية', '6B4C9A'], ['GEN', 'الخدمات العامة', '5F7A5B'], ['IT', 'تقنية المعلومات', '1B6CA8'], ['TRN', 'الحركة', '0E7C86']];
 // القائمة: الإدارة ← الأقسام (كل قسم يتفتح على صفحاته مثل المشاريع) ← النظام
-const TOP = [['tsd', 'لوحة الإدارة', 'dash', 'ops'], ['today', 'يومي', 'sun', 'read'], ['ops', 'البلاغات والطلبات', 'inbox', 'any'], ['map', 'الخريطة', 'map', 'read'], ['fm', 'متابعة أنظمة المنشآت', 'pulse', 'ops'], ['gov', 'الحوكمة والأدلة', 'book', 'ops'], ['fleet', 'سيارات المقر', 'car', 'any']];
+const TOP = [['tsd', 'لوحة الإدارة', 'dash', 'ops'], ['today', 'يومي', 'sun', 'read'], ['ops', 'البلاغات والطلبات', 'inbox', 'any'], ['map', 'الخريطة', 'map', 'read'], ['fm', 'متابعة أنظمة المنشآت', 'pulse', 'ops'], ['gov', 'الحوكمة والأدلة', 'book', 'ops'], ['manuals', 'أدلة المنشآت', 'file', 'any'], ['fleet', 'سيارات المقر', 'car', 'any']];
 const SYS = [['leaves', 'الإجازات والتغطية', 'clock', 'read'], ['report', 'التقارير', 'chart', 'read'], ['briefs', 'العروض التنفيذية', 'print', 'read'], ['performance', 'الأداء والإنجازات', 'users', 'admin'], ['me', 'إنجازاتي', 'users', ['engineer', 'clerk']], ['ref', 'المرجع الفني', 'book', 'read'], ['settings', 'الإعدادات والإشعارات', 'bell', 'any'], ['admin', 'الإدارة', 'cog', 'admin']];
 const ASSET_U = ['MNT', 'BME', 'IT', 'MED', 'SAF', 'GEN'], PLAN_U = ['MNT', 'BME', 'SAF', 'IT', 'GEN', 'FAC', 'TRN'];
 const SUBS = c => c === 'PRJ' ? [['dept/PRJ/work', 'طلبات وأعمال القسم', 'inbox', 'ops'], ['dashboard', 'لوحة المشاريع', 'chart', 'read'], ['projects', 'المشاريع', 'folder', 'read'], ['tasks', 'المهام', 'check', 'read'], ['requests', 'طلبات المشاريع', 'inbox', 'read'], ['challenges', 'التحديات والمخاطر', 'alert', 'read'], ['treports', 'التقارير الفنية والمحاضر', 'file', 'read'], ['submittals', 'الاعتمادات', 'stamp', 'read'], ['documents', 'المستندات الرسمية', 'doc', 'read'], ['drawings', 'المخططات', 'draw', 'read'], ['payments', 'المستخلصات', 'coins', 'read'], ['dept/PRJ/manual', 'دليل القسم', 'book', 'ops'], ['dept/PRJ/team', 'الفريق', 'users', 'ops']]
@@ -162,6 +162,7 @@ async function route() {
     else if (parts[0] === 'fleet') { const { mountMyFleet } = await import('./fleet.js'); await mountMyFleet(m); }
     else if (parts[0] === 'ops') { const { mountOps } = await import('./ops.js'); await mountOps(m, parts[1] || '', params); }
     else if (parts[0] === 'fm') { const { mountFM } = await import('./fm.js'); await mountFM(m, parts[1] || 'dash', params); }
+    else if (parts[0] === 'manuals') { const { mountManuals } = await import('./manuals.js'); await mountManuals(m, parts[1] || null, params); }
     else if (parts[0] === 'gov') { const { mountGov } = await import('./gov.js'); await mountGov(m, parts[1] || 'start', parts[2] || null, params); }
     else if (parts[0] === 'map') { const { mountMap } = await import('./map.js'); await mountMap(m, params); }
     else if (parts[0] === 'briefs') { const br = await import('./briefs.js'); if (parts[1]) await br.mountBrief(m, +parts[1], params); else await br.mountBriefs(m, params); }

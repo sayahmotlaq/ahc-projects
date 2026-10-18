@@ -193,7 +193,7 @@ function viewSops(t, params) {
 }
 // ---------- أين يُنفَّذ الإجراء في المنصة: النماذج (من ops_kinds.proc) والشاشات، والأعمال الجارية عليه وعلى كل خطوة
 const IMPL = {
-  'G-01': [['#/ops/new', 'مركز البلاغات والطلبات'], ['#/ops/list', 'الاستقبال الموحد — كل الأعمال']], 'G-02': [['#/projects', 'المشاريع']], 'G-04': [['#/projects', 'المشاريع (الاستلام الابتدائي)']],
+  'G-01': [['#/ops/new', 'مركز البلاغات والطلبات'], ['#/ops/list', 'الاستقبال الموحد — كل الأعمال']], 'G-02': [['#/projects', 'المشاريع']], 'G-04': [['#/projects', 'المشاريع (الاستلام الابتدائي)'], ['#/manuals', 'أدلة المنشآت (R-42)']],
   'G-06': [['#/dept/MNT/plans', 'الأعمال المخططة — الصيانة']], 'G-11': [['#/tsd', 'لوحة الإدارة — نافذ الآن']],
   'F-02': [['#/fm/round', 'الجولة الشهرية لمتابعة الأنظمة'], ['#/fm', 'متابعة أنظمة المنشآت']], 'F-03': [['#/dept/FAC/locations', 'سجل المواقع والغرف']], 'F-04': [['#/tsd/report', 'التقرير الشهري للإدارة'], ['#/fm/report', 'تقرير حالة الأنظمة']],
   'M-03': [['#/dept/MNT/plans', 'الأعمال المخططة — الصيانة'], ['#/fm', 'متابعة الأنظمة الحرجة']], 'M-04': [['#/dept/MNT/assets', 'أصول الصيانة']],
@@ -302,7 +302,7 @@ function editDoc(p, done) {
   const d = p.doc || {};
   const toL = (k) => (d[k] || []).map(r => DOC_LISTS[k].map(([c]) => r[c] || '').join(' | ').replace(/( \| )+$/, '')).join('\n');
   const fromL = (k, txt) => String(txt || '').split('\n').map(x => x.trim()).filter(Boolean).map(line => { const parts = line.split('|').map(x => x.trim()), o = {}; DOC_LISTS[k].forEach(([c], i) => { if (parts[i]) o[c] = parts[i]; }); return o; }).filter(o => Object.keys(o).length);
-  const ta = (k, lbl, rows = 4) => field(`${lbl} <small class="muted">— سطر لكل صف: ${DOC_LISTS[k].map(c => c[1]).join(' | ')}</small>`, `<textarea name="${k}" rows="${rows}">${esc0(toL(k))}</textarea>`, 'wide');
+  const ta = (k, lbl, rows = 4) => field(`${lbl} — سطر لكل صف: ${DOC_LISTS[k].map(c => c[1]).join(' | ')}`, `<textarea name="${k}" rows="${rows}">${esc0(toL(k))}</textarea>`, 'wide');
   modal(`<form id="f" class="pgrid">${field('الغرض', `<textarea name="purpose" rows="2">${esc0(d.purpose || '')}</textarea>`, 'wide')}${field('النطاق (يشمل)', `<textarea name="scope" rows="2">${esc0(d.scope || '')}</textarea>`, 'wide')}${field('لا يشمل', `<textarea name="out_of_scope" rows="2">${esc0(d.out_of_scope || '')}</textarea>`, 'wide')}
     ${ta('definitions', 'التعريفات', 3)}${ta('roles', 'الأدوار والمسؤوليات')}${ta('risks', 'المخاطر وضوابطها')}${ta('exceptions', 'الحالات الاستثنائية', 3)}${ta('kpis', 'المؤشرات')}${ta('records', 'السجلات والنماذج', 3)}${ta('refs', 'المراجع والمعايير', 3)}
     ${field('مراجعة الإجراء', inp('review', d.review || ''), 'wide')}
