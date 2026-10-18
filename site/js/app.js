@@ -162,7 +162,7 @@ async function route() {
     else if (parts[0] === 'fleet') { const { mountMyFleet } = await import('./fleet.js'); await mountMyFleet(m); }
     else if (parts[0] === 'ops') { const { mountOps } = await import('./ops.js'); await mountOps(m, parts[1] || '', params); }
     else if (parts[0] === 'fm') { const { mountFM } = await import('./fm.js'); await mountFM(m, parts[1] || 'dash', params); }
-    else if (parts[0] === 'manuals') { const { mountManuals } = await import('./manuals.js'); await mountManuals(m, parts[1] || null, params); }
+    else if (parts[0] === 'manuals') { const { mountManuals } = await import('./manuals.js'); await mountManuals(m, parts[1] || null, params, parts[2]); }
     else if (parts[0] === 'gov') { const { mountGov } = await import('./gov.js'); await mountGov(m, parts[1] || 'start', parts[2] || null, params); }
     else if (parts[0] === 'map') { const { mountMap } = await import('./map.js'); await mountMap(m, params); }
     else if (parts[0] === 'briefs') { const br = await import('./briefs.js'); if (parts[1]) await br.mountBrief(m, +parts[1], params); else await br.mountBriefs(m, params); }

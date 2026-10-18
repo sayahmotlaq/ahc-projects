@@ -1459,3 +1459,9 @@ td.kic{color:var(--k)} td.kic svg.i{width:20px;height:20px}
 .mn-wrap>*{min-width:0} .mn-doc .gref{white-space:nowrap} .mn-doc{overflow-wrap:anywhere}
 @media (max-width:900px){ .mn-kv{grid-template-columns:1fr 1fr} }
 .mn-t td,.mn-t th{overflow-wrap:normal;word-break:normal;min-width:84px} .mn-t td:first-child{min-width:110px} .mn-sec h3 .btn{white-space:nowrap}
+.mn-card.gen .mn-k{background:#EEF0FA;color:#4C5BA8} .mn-card.ex{border-style:dashed}
+.notice.info{background:var(--sky2);border-color:#BFE2F4;color:#0E4F73}
+.mn-procs{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;margin:10px 0}
+.mn-procs a{display:flex;flex-direction:column;gap:2px;text-decoration:none;color:var(--text);background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13px;line-height:1.5} .mn-procs a:hover{border-color:var(--lblue)} .mn-procs b{color:var(--skytx);font-size:12px} .mn-procs small{color:var(--muted);font-size:11px}
+@media print{ .mn-procs a{break-inside:avoid} }
+.mn-card{grid-template-rows:auto} .mn-card>.mn-k{grid-row:1 / span 3} .mn-card>*:not(.mn-k){grid-column:2}
