@@ -26,7 +26,7 @@ const CRIT = { critical: 'حرجة', high: 'عالية', medium: 'متوسطة',
 export async function mountManuals(root, id, params, sub) {
   if (id === 'example') return viewManual(root, null, sampleOf(sub === 'user' ? 'user' : 'om'));
   if (id === 'g') return viewGuide(root, sub);
-  if (id === 'card') return viewCard(root, sub, params?.get?.('lang') || 'en');
+  if (id === 'card') return viewCard(root, sub, params?.get?.('lang') || 'ar', params?.get?.('ar') === '1');
   if (id) return viewManual(root, +id);
   let [rows, gens, facs, projs] = await Promise.all([
     q(sb.from('facility_manuals').select('id,kind,facility_id,project_id,title,status,version,updated_at,issued_at').order('updated_at', { ascending: false })),
@@ -212,19 +212,50 @@ const LBL = { ar: ['معدات الوقاية الإلزامية', 'الخطوا
 const PPE = { gloves: ['قفازات', 'Gloves', 'دستانے', 'গ্লাভস', 'दस्ताने', 'Guwantes'], gloves_red: ['قفازات حمراء', 'Red gloves', 'سرخ دستانے', 'লাল গ্লাভস', 'लाल दस्ताने', 'Pulang guwantes'], goggles: ['نظارة واقية', 'Goggles', 'حفاظتی چشمہ', 'সুরক্ষা চশমা', 'सुरक्षा चश्मा', 'Goggles'], mask: ['كمامة', 'Mask', 'ماسک', 'মাস্ক', 'मास्क', 'Mask'], boots: ['حذاء سلامة', 'Safety shoes', 'حفاظتی جوتے', 'নিরাপত্তা জুতা', 'सुरक्षा जूते', 'Safety na sapatos'], gown: ['رداء واقٍ', 'Gown', 'گاؤن', 'গাউন', 'गाउन', 'Gown'], harness: ['حزام أمان', 'Harness', 'حفاظتی بیلٹ', 'নিরাপত্তা বেল্ট', 'सुरक्षा बेल्ट', 'Harness'], ear: ['واقي سمع', 'Ear protection', 'کان کی حفاظت', 'কানের সুরক্ষা', 'कान सुरक्षा', 'Proteksyon sa tainga'], ladder: ['سلّم معتمد', 'Approved ladder', 'منظور سیڑھی', 'অনুমোদিত মই', 'मंज़ूर सीढ़ी', 'Aprubadong hagdan'], wetsign: ['لافتة أرضية مبللة', 'Wet floor sign', 'گیلے فرش کا بورڈ', 'ভেজা মেঝে সাইন', 'गीला फर्श बोर्ड', 'Karatulang basa'] };
 const LI = { ar: 0, en: 1, ur: 2, bn: 3, hi: 4, tl: 5 };
 function ensureFonts() { if (document.getElementById('wiFonts')) return; const l = document.createElement('link'); l.id = 'wiFonts'; l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@500;700&family=Noto+Sans+Bengali:wght@500;700&family=Noto+Sans+Devanagari:wght@500;700&display=swap'; document.head.appendChild(l); }
-async function viewCard(root, code, lang) {
-  if (!LANGS[lang] && lang !== 'ar') lang = 'en';
+const WT = {
+  'WI-C01': ['Vinyl floor cleaning and care', 'ونائل فرش کی صفائی اور دیکھ بھال', 'ভিনাইল মেঝে পরিষ্কার ও যত্ন', 'विनाइल फर्श की सफाई और देखभाल', 'Paglilinis at pag-aalaga ng vinyl na sahig'],
+  'WI-C02': ['Toilet cleaning and disinfection', 'ٹوائلٹ کی صفائی اور جراثیم کشی', 'টয়লেট পরিষ্কার ও জীবাণুমুক্তকরণ', 'शौचालय की सफाई और कीटाणुशोधन', 'Paglilinis at pag-disinfect ng CR'],
+  'WI-C03': ['Janitor room: organization and use', 'جینیٹر روم: ترتیب اور استعمال', 'জ্যানিটর রুম: গোছানো ও ব্যবহার', 'जैनिटर रूम: व्यवस्था और उपयोग', 'Janitor room: pag-aayos at paggamit'],
+  'WI-C04': ['Daily cleaning of clinics and exam rooms', 'کلینک اور معائنہ کمروں کی روزانہ صفائی', 'ক্লিনিক ও পরীক্ষা কক্ষের দৈনিক পরিষ্কার', 'क्लिनिक और जांच कक्षों की दैनिक सफाई', 'Araw-araw na paglilinis ng klinika'],
+  'WI-C05': ['Terminal cleaning of isolation and procedure rooms', 'آئسولیشن اور پروسیجر کمروں کی آخری صفائی', 'আইসোলেশন ও প্রসিডিউর কক্ষের চূড়ান্ত পরিষ্কার', 'आइसोलेशन और प्रक्रिया कक्षों की अंतिम सफाई', 'Terminal cleaning ng isolation at procedure room'],
+  'WI-C06': ['Blood and body fluid spills', 'خون اور جسمانی رطوبت کا گرنا', 'রক্ত ও শরীরের তরল ছিটকে পড়া', 'खून और शरीर के तरल का फैलना', 'Natapong dugo at likido ng katawan'],
+  'WI-C07': ['Cleaning glass facades and signs', 'شیشے کے اگلے حصے اور بورڈ کی صفائی', 'কাচের সম্মুখভাগ ও সাইন পরিষ্কার', 'कांच के अग्रभाग और बोर्ड की सफाई', 'Paglilinis ng salaming harapan at karatula'],
+  'WI-C08': ['Collecting and moving waste inside the facility', 'سہولت کے اندر کچرا جمع اور منتقل کرنا', 'ফ্যাসিলিটির ভেতরে বর্জ্য সংগ্রহ ও পরিবহন', 'सुविधा के अंदर कचरा इकट्ठा करना और ले जाना', 'Pagkolekta at paglipat ng basura sa loob'],
+  'WI-C09': ['Color-coded cleaning tools', 'صفائی کے اوزاروں کا رنگ نظام', 'পরিষ্কারের সরঞ্জামের রঙ পদ্ধতি', 'सफाई औजारों की रंग प्रणाली', 'Sistema ng kulay ng gamit panlinis'],
+  'WI-M01': ['Periodic maintenance of split air conditioners', 'اسپلٹ اے سی کی باقاعدہ دیکھ بھال', 'স্প্লিট এসির নিয়মিত রক্ষণাবেক্ষণ', 'स्प्लिट एसी का नियमित रखरखाव', 'Regular na maintenance ng split aircon'],
+  'WI-M02': ['Periodic maintenance of ducted split and package units', 'ڈکٹ اسپلٹ اور پیکج یونٹ کی دیکھ بھال', 'ডাক্টেড স্প্লিট ও প্যাকেজ ইউনিটের রক্ষণাবেক্ষণ', 'डक्टेड स्प्लिट और पैकेज यूनिट का रखरखाव', 'Maintenance ng ducted split at package unit'],
+  'WI-M03': ['Periodic maintenance of VRF systems', 'وی آر ایف سسٹم کی دیکھ بھال', 'ভিআরএফ সিস্টেমের রক্ষণাবেক্ষণ', 'वीआरएफ सिस्टम का रखरखाव', 'Maintenance ng VRF system'],
+  'WI-M04': ['Periodic maintenance of AHU and FCU', 'اے ایچ یو اور ایف سی یو کی دیکھ بھال', 'এএইচইউ ও এফসিইউ রক্ষণাবেক্ষণ', 'एएचयू और एफसीयू का रखरखाव', 'Maintenance ng AHU at FCU'],
+  'WI-M05': ['Chiller operation and maintenance', 'چلر کا آپریشن اور دیکھ بھال', 'চিলার পরিচালনা ও রক্ষণাবেক্ষণ', 'चिलर संचालन और रखरखाव', 'Operasyon at maintenance ng chiller'],
+  'WI-M06': ['Monthly generator load test', 'جنریٹر کا ماہانہ لوڈ ٹیسٹ', 'জেনারেটরের মাসিক লোড টেস্ট', 'जनरेटर का मासिक लोड टेस्ट', 'Buwanang load test ng generator'],
+  'WI-M07': ['Cleaning and disinfecting water tanks', 'پانی کی ٹنکیوں کی صفائی اور جراثیم کشی', 'পানির ট্যাংক পরিষ্কার ও জীবাণুমুক্তকরণ', 'पानी की टंकियों की सफाई और कीटाणुशोधन', 'Paglilinis at pag-disinfect ng tangke ng tubig'],
+  'WI-S01': ['Monthly fire extinguisher check', 'آگ بجھانے والے آلات کا ماہانہ معائنہ', 'অগ্নিনির্বাপকের মাসিক পরীক্ষা', 'अग्निशामक की मासिक जांच', 'Buwanang pagsusuri ng fire extinguisher'],
+  'WI-S02': ['Emergency lighting and exit sign check', 'ایمرجنسی لائٹ اور ایگزٹ بورڈ کا معائنہ', 'জরুরি আলো ও এক্সিট সাইন পরীক্ষা', 'आपातकालीन लाइट और एग्ज़िट बोर्ड की जांच', 'Pagsusuri ng emergency light at exit sign'],
+};
+const KICK = { ar: 'تعليمات عمل', en: 'Work instruction', ur: 'کام کی ہدایات', bn: 'কাজের নির্দেশনা', hi: 'कार्य निर्देश', tl: 'Tagubilin sa trabaho' };
+const ORG = { ar: 'تجمع الأحساء الصحي · إدارة الخدمات الفنية', en: 'Al-Ahsa Health Cluster · Technical Services', ur: 'الاحساء ہیلتھ کلسٹر · تکنیکی خدمات', bn: 'আল-আহসা হেলথ ক্লাস্টার · কারিগরি সেবা', hi: 'अल-अहसा हेल्थ क्लस्टर · तकनीकी सेवाएं', tl: 'Al-Ahsa Health Cluster · Teknikal na Serbisyo' };
+// بطاقة العامل: تضغط اللغة فتتحول البطاقة كاملة لها؛ «مع العربية» يضيف العربية تحت كل سطر
+async function viewCard(root, code, lang, withAr) {
+  if (!LANGS[lang] && lang !== 'ar') lang = 'ar';
+  if (withAr === undefined) withAr = new URLSearchParams(location.hash.split('?')[1] || '').get('ar') === '1';
   ensureFonts();
   const [tpl, { pic }] = await Promise.all([q(sb.from('manual_templates').select('code,title,card,unit,ver,status').eq('code', code).single()), import('./wi_art.js')]);
-  const c = tpl.card || {}, two = lang !== 'ar', L = LBL[lang] || LBL.en, dir = LANGS[lang]?.[1] || 'rtl';
-  const tx = (o, k) => `<span class="ar">${esc(o.t?.ar || '')}</span>${two && o.t?.[k] ? `<span class="tr" lang="${k}" dir="${dir}">${esc(o.t[k])}</span>` : ''}`;
-  root.innerHTML = `<div class="toolbar noprint"><a class="btn sm ghost" href="#/manuals/g/${code}">→ التعليمات الكاملة</a><h2 class="m0">بطاقة العامل — ${esc(tpl.title)}</h2><span class="sp"></span><div class="wlangs">${[['ar', 'العربية فقط'], ...Object.entries(LANGS).map(([k, v]) => [k, 'العربية + ' + v[0]])].map(([k, l]) => `<a class="${k === lang ? 'on' : ''}" href="#/manuals/card/${code}?lang=${k}">${esc(l)}</a>`).join('')}</div><button class="btn sm primary" onclick="print()">${ico('print')} طباعة / PDF</button></div>
-    <p class="muted small noprint">اطبع البطاقة على ورقة A4 وعلّقها في موقع العمل، أو احفظها PDF من نافذة الطباعة (اختر «حفظ بصيغة PDF»). الترجمات تُراجع مع متحدث باللغة قبل التعميم.</p>
-    <article class="wcard">
-      <header><img src="assets/logo.png" alt="" onerror="this.remove()"><div><small>${esc(tpl.code)} · تعليمات عمل</small><h1>${esc(tpl.title)}</h1></div></header>
-      ${(c.ppe || []).length ? `<section class="wppe"><h3>${esc(LBL.ar[0])}${two ? ` <span lang="${lang}" dir="${dir}">· ${esc(L[0])}</span>` : ''}</h3><div>${c.ppe.map(k => `<figure>${pic(k)}<figcaption><span class="ar">${esc(PPE[k]?.[0] || '')}</span>${two ? `<span class="tr" lang="${lang}" dir="${dir}">${esc(PPE[k]?.[LI[lang]] || '')}</span>` : ''}</figcaption></figure>`).join('')}</div></section>` : ''}
-      <section class="wsteps"><h3>${esc(LBL.ar[1])}${two ? ` <span lang="${lang}" dir="${dir}">· ${esc(L[1])}</span>` : ''}</h3><ol>${(c.steps || []).map((s, i) => `<li><i>${i + 1}</i>${pic(s.i)}<p>${tx(s, lang)}</p></li>`).join('')}</ol></section>
-      ${(c.donts || []).length ? `<section class="wdonts"><h3>${esc(LBL.ar[2])}${two ? ` <span lang="${lang}" dir="${dir}">· ${esc(L[2])}</span>` : ''}</h3><ul>${c.donts.map(s => `<li>${pic(s.i)}<p>${tx(s, lang)}</p></li>`).join('')}</ul></section>` : ''}
-      <footer><span>تجمع الأحساء الصحي · إدارة الخدمات الفنية</span><span>${esc(tpl.code)}${tpl.ver ? ' · إصدار ' + tpl.ver : ' · مسودة'}</span></footer>
+  const c = tpl.card || {}, isAr = lang === 'ar', both = !isAr && withAr, L = LBL[lang] || LBL.ar, dir = isAr ? 'rtl' : LANGS[lang][1], li = LI[lang];
+  const title = isAr ? tpl.title : (WT[code]?.[li - 1] || tpl.title);
+  const line = (main, ar) => `<span class="mn1" lang="${lang}" dir="${dir}">${esc(main || ar || '')}</span>${both && ar ? `<span class="mn2" lang="ar" dir="rtl">${esc(ar)}</span>` : ''}`;
+  const tx = o => line(o.t?.[lang], o.t?.ar);
+  const H = k => line(L[k], LBL.ar[k]);
+  const langs = [['ar', 'العربية'], ...Object.entries(LANGS).map(([k, v]) => [k, v[0]])];
+  root.innerHTML = `<div class="toolbar noprint"><a class="btn sm ghost" href="#/manuals/g/${code}">→ التعليمات الكاملة</a><h2 class="m0">بطاقة العامل</h2><span class="sp"></span><div class="wlangs" role="tablist" aria-label="لغة البطاقة">${langs.map(([k, l]) => `<button type="button" role="tab" data-lang="${k}" class="${k === lang ? 'on' : ''}" lang="${k}">${esc(l)}</button>`).join('')}</div>${!isAr ? `<label class="chk wwith"><input type="checkbox" id="wAr" ${withAr ? 'checked' : ''}> مع العربية</label>` : ''}<button class="btn sm primary" onclick="print()">${ico('print')} طباعة / PDF</button></div>
+    <p class="muted small noprint">اختر لغة العامل فتتحول البطاقة كاملة لها، ثم اطبعها على A4 أو احفظها PDF من نافذة الطباعة. الترجمات تُراجع مع متحدث باللغة قبل التعميم.</p>
+    <article class="wcard" dir="${dir}" lang="${lang}">
+      <header><img src="assets/logo.png" alt="" onerror="this.remove()"><div><small>${esc(tpl.code)} · ${esc(KICK[lang])}</small><h1>${esc(title)}</h1>${both ? `<div class="mn2h" dir="rtl">${esc(tpl.title)}</div>` : ''}</div></header>
+      ${(c.ppe || []).length ? `<section class="wppe"><h3>${H(0)}</h3><div>${c.ppe.map(k => `<figure>${pic(k)}<figcaption>${line(PPE[k]?.[li], PPE[k]?.[0])}</figcaption></figure>`).join('')}</div></section>` : ''}
+      <section class="wsteps"><h3>${H(1)}</h3><ol>${(c.steps || []).map((s, i) => `<li><i>${i + 1}</i>${pic(s.i)}<p>${tx(s)}</p></li>`).join('')}</ol></section>
+      ${(c.donts || []).length ? `<section class="wdonts"><h3>${H(2)}</h3><ul>${c.donts.map(s => `<li>${pic(s.i)}<p>${tx(s)}</p></li>`).join('')}</ul></section>` : ''}
+      <footer><span>${esc(ORG[lang])}</span><span>${esc(tpl.code)}${tpl.ver ? ' · v' + tpl.ver : ''}</span></footer>
     </article>`;
+  const go = (l, a) => { history.replaceState(null, '', `#/manuals/card/${code}?lang=${l}${a ? '&ar=1' : ''}`); viewCard(root, code, l, a); };
+  root.querySelectorAll('[data-lang]').forEach(b => b.onclick = () => go(b.dataset.lang, withAr));
+  const cb = root.querySelector('#wAr'); if (cb) cb.onchange = () => go(lang, cb.checked);
 }

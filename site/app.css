@@ -1498,3 +1498,9 @@ td.kic{color:var(--k)} td.kic svg.i{width:20px;height:20px}
 @media print{ .wcard{border:0;padding:0;max-width:none;margin:0} .wsteps ol{gap:6px} .wsteps li,.wdonts li{padding:6px 8px} .wsteps .wpic{width:44px;height:44px} .wart,.wflow>div,.wcolors>div{break-inside:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact} .mn-chk li::before{-webkit-print-color-adjust:exact} }
 .wart{direction:ltr}
 @media print{ html,body,.app2,.mainwrap,#main{background:#fff!important} }
+.wlangs button{font:inherit;font-size:12.5px;cursor:pointer;color:var(--muted);border:1px solid var(--line);border-radius:20px;padding:5px 12px;background:var(--surface)} .wlangs button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.wlangs button[lang=bn]{font-family:'Noto Sans Bengali','Nirmala UI',sans-serif} .wlangs button[lang=hi]{font-family:'Noto Sans Devanagari','Nirmala UI',sans-serif} .wlangs button[lang=ur]{font-family:'Noto Naskh Arabic',Tahoma,sans-serif}
+.wwith{font-size:12.5px;white-space:nowrap}
+.wcard .mn1{font-size:15px;font-weight:700;line-height:1.45} .wcard .mn2{font-size:12.5px;color:#5E6E7E;line-height:1.4} .wcard .mn2h{font-size:13px;color:#9FD6F1;margin-top:2px}
+.wcard [lang=bn]{font-family:'Noto Sans Bengali','Nirmala UI',sans-serif} .wcard [lang=hi]{font-family:'Noto Sans Devanagari','Nirmala UI',sans-serif} .wcard [lang=ur]{font-family:'Noto Naskh Arabic',Tahoma,sans-serif} .wcard [lang=en],.wcard [lang=tl]{font-family:Tajawal,Arial,sans-serif} .wcard [lang=ar]{font-family:Tajawal,sans-serif}
+.wcard h3 .mn1{font-size:15px} .wcard h3 .mn2{font-weight:600} .wppe figcaption .mn1{font-size:12.5px}
