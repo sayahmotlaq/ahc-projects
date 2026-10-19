@@ -26,12 +26,14 @@ const CRIT = { critical: 'حرجة', high: 'عالية', medium: 'متوسطة',
 export async function mountManuals(root, id, params, sub) {
   if (id === 'example') return viewManual(root, null, sampleOf(sub === 'user' ? 'user' : 'om'));
   if (id === 'g') return viewGuide(root, sub);
+  if (id === 'card') return viewCard(root, sub, params?.get?.('lang') || 'en');
   if (id) return viewManual(root, +id);
-  const [rows, gens, facs, projs] = await Promise.all([
+  let [rows, gens, facs, projs] = await Promise.all([
     q(sb.from('facility_manuals').select('id,kind,facility_id,project_id,title,status,version,updated_at,issued_at').order('updated_at', { ascending: false })),
-    q(sb.from('manual_templates').select('code,title,audience,icon,status,ver,scope,sections').eq('scope', 'general').order('sort')).catch(() => []),
+    q(sb.from('manual_templates').select('code,title,audience,icon,status,ver,scope,sections,cat,unit').in('scope', ['general', 'wi']).order('sort')).catch(() => []),
     q(sb.from('facilities').select('id,name').eq('active', true).order('sort')),
     q(sb.from('projects').select('id,name,facility_id,stage').eq('archived', false).order('name')).catch(() => [])]);
+  const wis = gens.filter(g => g.scope === 'wi'); gens = gens.filter(g => g.scope !== 'wi');
   const F = Object.fromEntries(facs.map(f => [f.id, f.name])), PJ = Object.fromEntries(projs.map(p => [p.id, p.name]));
   const byFac = {}; rows.forEach(r => (byFac[r.facility_id] ||= []).push(r));
   root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">أدلة المنشآت</h1><span class="muted small">دليلان لكل منشأة تُسلَّم: للتشغيل والصيانة، ولمستخدميها — لا تسليم بلا دليل (<a class="gref in" href="#/gov/rules/R-42">R-42</a>)</span><span class="sp"></span>${isAdmin() ? `<button class="btn sm ghost" id="mTpl">${ico('edit')} قوالب الأدلة</button>` : ''}${canWrite() ? `<button class="btn sm primary" id="mNew">＋ أدلة منشأة</button>` : ''}</div>
@@ -39,6 +41,8 @@ export async function mountManuals(root, id, params, sub) {
     <h2 class="gh2">${ico('star')} أمثلة للاطلاع <span class="muted small">— منشأة افتراضية توضح شكل الدليلين بعد تعبئتهما</span></h2>
     <div class="mn-list">${['om', 'user'].map(k => `<a class="mn-card ${k} ex" href="#/manuals/example/${k}"><span class="mn-k">${ico(k === 'om' ? 'wrench' : 'users')}</span><div><b>${KIND[k]}</b><small class="muted">مركز صحي النموذج — بيانات توضيحية</small></div><span class="badge info">مثال</span><small class="muted">${k === 'om' ? '15 قسماً: الأنظمة وخرائط الإغلاق، الأصول، الضمانات، الصيانة، الطوارئ' : '11 قسماً: كيف أبلّغ، أرقام مهمة، الاستخدام، السلامة، افعل ولا تفعل'}</small></a>`).join('')}</div>
     ${gens.length ? `<h2 class="gh2">${ico('book')} الأدلة العامة للإدارة <span class="muted small">— دليل واحد لكل الإدارة، يُعتمد ويُصدر برقم إصدار</span></h2><div class="mn-list">${gens.map(g => `<a class="mn-card gen" href="#/manuals/g/${g.code}"><span class="mn-k">${ico(g.icon || 'book')}</span><div><b>${esc(g.title)}</b><small class="muted">${esc(g.audience)}</small></div><span class="badge ${STATUS[g.status]?.[1] || 'skel'}">${STATUS[g.status]?.[0] || 'مسودة'}${g.ver ? ' — إصدار ' + g.ver : ''}</span><small class="muted">${(g.sections || []).length} قسماً</small></a>`).join('')}</div>` : ''}
+    ${wis.length ? `<h2 class="gh2" id="mn-wi">${ico('clipok')} تعليمات العمل <span class="muted small">— كيف يُنفذ العمل خطوة بخطوة، ولكل تعليمات بطاقة للعامل بالأيقونات وبأكثر من لغة</span></h2>
+      <div class="mn-wis">${[...new Set(wis.map(w => w.cat))].map(c => `<div class="mn-wig"><h4>${esc(c)}</h4>${wis.filter(w => w.cat === c).map(w => `<div class="mn-wi"><a href="#/manuals/g/${w.code}"><small>${esc(w.code)}</small><b>${esc(w.title)}</b></a><a class="btn sm ghost" href="#/manuals/card/${w.code}" title="بطاقة العامل">${ico('users')} بطاقة العامل</a></div>`).join('')}</div>`).join('')}</div>` : ''}
     <h2 class="gh2">${ico('hospital')} أدلة المنشآت المسلَّمة</h2>
     ${rows.length ? Object.entries(byFac).map(([fid, list]) => `<h3 class="sub-h">${esc(F[fid] || 'منشأة')}</h3><div class="mn-list">${list.map(r => `<a class="mn-card ${r.kind}" href="#/manuals/${r.id}"><span class="mn-k">${ico(r.kind === 'om' ? 'wrench' : 'users')}</span><div><b>${KIND[r.kind]}</b><small class="muted">${r.project_id && PJ[r.project_id] ? esc(PJ[r.project_id]) : 'بلا مشروع مرتبط'}</small></div><span class="badge ${STATUS[r.status][1]}">${STATUS[r.status][0]}${r.version ? ' — إصدار ' + r.version : ''}</span><small class="muted">آخر تحديث ${dateAr(r.updated_at)}</small></a>`).join('')}</div>`).join('') : '<div class="empty-boq">لا أدلة بعد. عند استلام أي مشروع يُنشئ قسم المشاريع أدلة المنشأة من زر «＋ أدلة منشأة»، أو من صفحة الإغلاق في المشروع.</div>'}`;
   const create = (pre = {}) => modal(`<form id="f" class="pgrid">${field('المنشأة', sel('facility_id', [['', '— اختر —'], ...facs.map(f => [f.id, f.name])], pre.facility_id || '', 'required'))}${field('المشروع الذي سُلّمت بموجبه (اختياري)', sel('project_id', [['', '— بلا —'], ...projs.map(p => [p.id, p.name])], pre.project_id || ''))}
@@ -51,6 +55,7 @@ export async function mountManuals(root, id, params, sub) {
       try { const out = await q(sb.from('facility_manuals').insert(kinds.map(kind => ({ kind, facility_id: +f.facility_id, project_id: f.project_id || null, title: `${KIND[kind]} — ${F[f.facility_id]}` }))).select('id')); close(); toast('أُنشئت الأدلة'); location.hash = '#/manuals/' + out[0].id; } catch (er) { err(er); } };
   } });
   $('#mNew', root) && ($('#mNew', root).onclick = () => create());
+  if (params?.get?.('sec') === 'wi') setTimeout(() => $('#mn-wi', root)?.scrollIntoView({ block: 'start' }), 60);
   const pq = params?.get?.('project');
   if (pq) { const mine = rows.filter(r => r.project_id === pq); if (mine.length) { if (mine.length === 1) location.hash = '#/manuals/' + mine[0].id; else $$('.mn-card', root).forEach(c => mine.some(r => c.getAttribute('href') === '#/manuals/' + r.id) && c.classList.add('hl')); } else if (canWrite()) { const p = projs.find(x => x.id === pq); create({ project_id: p?.id, facility_id: p?.facility_id }); } }
   $('#mTpl', root) && ($('#mTpl', root).onclick = () => editTemplates());
@@ -144,16 +149,20 @@ async function viewGuide(root, code) {
   const U = Object.fromEntries(units.map(u => [u.code, u.short])), codes = procsOf(tpl.sections);
   const procs = codes.length ? await q(sb.from('gov_processes').select('code,title,owner').in('code', codes)).catch(() => []) : [];
   const P = Object.fromEntries(procs.map(p => [p.code, p]));
-  const st = STATUS[tpl.status] || STATUS.draft;
+  const st = STATUS[tpl.status] || STATUS.draft, isWi = tpl.scope === 'wi';
+  const { ART } = isWi ? await import('./wi_art.js') : { ART: {} };
+  const UN = Object.fromEntries(units.map(u => [u.code, u.short]));
+  const secs0 = [...tpl.sections]; if (isWi) { const at = secs0.findIndex(x => x.key === 'steps'); secs0.splice(at < 0 ? 1 : at + 1, 0, ...(ART[code] ? [{ key: 'art', title: 'توضيح مصوّر' }] : []), { key: 'photos', title: 'صور من الميدان' }); }
   root.innerHTML = docShell({
-    toolbar: `<a class="btn sm ghost" href="#/manuals">→ أدلة المنشآت</a><h2 class="m0">${esc(tpl.title)}</h2><span class="badge ${st[1]}">${st[0]}${tpl.ver ? ' — إصدار ' + tpl.ver : ''}</span><span class="sp"></span><button class="btn sm" onclick="print()">${ico('print')} طباعة / PDF</button>${isAdmin() ? `<button class="btn sm ghost" id="gEd">${ico('edit')} تحرير النص</button><button class="btn sm primary" id="gIssue">${tpl.status === 'issued' ? 'إصدار جديد' : 'اعتماد وإصدار'}</button>` : ''}`,
+    toolbar: `<a class="btn sm ghost" href="#/manuals${isWi ? '?sec=wi' : ''}">→ أدلة المنشآت</a><h2 class="m0">${esc(tpl.title)}</h2><span class="badge ${st[1]}">${st[0]}${tpl.ver ? ' — إصدار ' + tpl.ver : ''}</span><span class="sp"></span>${isWi ? `<a class="btn sm" href="#/manuals/card/${code}">${ico('users')} بطاقة العامل</a>` : ''}<button class="btn sm" onclick="print()">${ico('print')} طباعة / PDF</button>${isAdmin() ? `<button class="btn sm ghost" id="gEd">${ico('edit')} تحرير النص</button><button class="btn sm primary" id="gIssue">${tpl.status === 'issued' ? 'إصدار جديد' : 'اعتماد وإصدار'}</button>` : ''}`,
     notice: tpl.status !== 'issued' ? '<div class="notice noprint">مسودة بانتظار اعتماد مدير الإدارة؛ يمكن تعديل أي قسم من «تحرير النص».</div>' : '',
-    title: tpl.title, sub: 'دليل عام — إدارة الخدمات الفنية', audience: tpl.audience,
+    title: tpl.title, sub: isWi ? `تعليمات عمل ${tpl.code} — ${UN[tpl.unit] || ''}` : 'دليل عام — إدارة الخدمات الفنية', audience: tpl.audience,
     meta: `<span>${tpl.ver ? 'الإصدار ' + tpl.ver + ' — ' + dateAr(tpl.issued_at) : 'مسودة — ' + dateAr(tpl.updated_at)}</span>${tpl.issued_by ? `<span>اعتمده: ${esc(tpl.issued_by)}</span>` : ''}`,
-    secs: [...tpl.sections, { key: 'log', title: 'سجل الإصدارات' }],
-    sectionHtml: (s, i) => s.key === 'log' && !s.body ? `<h3><i>${i + 1}</i>سجل الإصدارات</h3>${tbl(['الإصدار', 'التاريخ', 'اعتمده', 'ملاحظة'], (tpl.log || []).map(l => [String(l.v), dateAr(l.at), esc(l.by || ''), esc(l.note || '')]), 'لم يصدر الدليل بعد — هذه مسودة.')}`
+    secs: [...secs0, { key: 'log', title: 'سجل الإصدارات' }],
+    sectionHtml: (s, i) => s.key === 'art' ? `<h3><i>${i + 1}</i>توضيح مصوّر</h3>${ART[code]()}` : s.key === 'photos' ? `<h3><i>${i + 1}</i>صور من الميدان</h3><p class="muted small">صور فعلية من منشآت التجمع توضح الطريقة الصحيحة؛ اسم الملف يظهر وصفاً للصورة.</p><div class="mn-photos" id="wiPh"><p class="mn-empty">…</p></div>` : s.auto === 'checklist' ? `<h3><i>${i + 1}</i>${esc(s.title)}</h3>${fmt(s.body, {})}<ul class="mn-chk">${(tpl.checklist || []).map(c => `<li>${esc(c)}</li>`).join('')}</ul>` : s.key === 'log' && !s.body ? `<h3><i>${i + 1}</i>سجل الإصدارات</h3>${tbl(['الإصدار', 'التاريخ', 'اعتمده', 'ملاحظة'], (tpl.log || []).map(l => [String(l.v), dateAr(l.at), esc(l.by || ''), esc(l.note || '')]), 'لم يصدر الدليل بعد — هذه مسودة.')}`
       : `<h3><i>${i + 1}</i>${esc(s.title)}</h3>${fmt(s.body, {})}${s.auto === 'procs' ? `<div class="mn-procs">${String(s.procs || '').split(/\s*·\s*/).filter(c => P[c]).map(c => `<a href="#/gov/sop/${c}"><b>${c}</b>${esc(P[c].title)}<small>${esc(U[P[c].owner] || '')}</small></a>`).join('')}</div>` : ''}` });
   bindToc(root);
+  if (isWi) wiPhotos($('#wiPh', root), code);
   $('#gEd', root) && ($('#gEd', root).onclick = () => editTemplates(code));
   $('#gIssue', root) && ($('#gIssue', root).onclick = () => modal(`<form id="f" class="pgrid">${field('ملاحظة الإصدار', '<textarea name="note" rows="2"></textarea>', 'wide')}<p class="muted small wide">يصدر الدليل برقم ${(tpl.ver || 0) + 1} باسمك وتاريخ اليوم.</p><div class="btnrow end wide"><span class="sp"></span><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">اعتماد وإصدار</button></div></form>`, { title: 'اعتماد الدليل وإصداره', onOpen: (w, close) => {
     $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target), by = session.profile?.full_name || '', at = new Date().toISOString(), v = (tpl.ver || 0) + 1;
@@ -180,4 +189,42 @@ function sampleOf(kind) {
     warranties: [{ item: 'المولد', supplier: 'الوكيل (مثال)', until: '2028-09-01', contact: '05xxxxxxxx', note: 'ضمان الوكيل سنتان' }, { item: 'العزل المائي للسطح', supplier: 'مقاول العزل (مثال)', until: '2036-09-01', contact: '—', note: 'عشر سنوات' }] };
   const m = { id: 0, kind, facility_id: 0, project_id: null, status: 'issued', version: 1, issued_at: '2026-09-01', issued_by: 'مدير الإدارة (مثال)', updated_at: '2026-09-01', data: { rows }, log: [{ v: 1, at: '2026-09-01', by: 'مدير الإدارة (مثال)', note: 'الإصدار الأول عند الاستلام الابتدائي' }] };
   return { m, fac, proj, D };
+}
+
+// ---------- صور الميدان على تعليمات العمل (مرفقات بالمفتاح wi:CODE)
+async function wiPhotos(box, code) {
+  if (!box) return;
+  const at = await import('./attach.js');
+  const canAdd = isAdmin() || canEdit() || ['GEN', 'MNT', 'SAF', 'FAC', 'BME', 'IT'].includes(session.profile?.unit);
+  const draw = async () => {
+    const list = (await at.loadAttachments(['wi:' + code]).catch(() => [])).filter(a => /^image\//.test(a.mime || '') || /\.(jpe?g|png|webp)$/i.test(a.name));
+    const urls = await Promise.all(list.map(a => sb.storage.from('project-files').createSignedUrl(a.path, 3600).then(r => r.data?.signedUrl).catch(() => null)));
+    box.innerHTML = `${list.length ? list.map((a, i) => `<figure>${urls[i] ? `<img src="${urls[i]}" alt="${esc(a.name)}" loading="lazy">` : ''}<figcaption>${esc(a.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' '))}</figcaption>${at.canDel(a) ? `<button class="btn sm ghost noprint" data-del="${a.id}">حذف</button>` : ''}</figure>`).join('') : '<p class="mn-empty">لا صور بعد.' + (canAdd ? ' أضف صوراً من الميدان تبيّن الطريقة الصحيحة؛ سمِّ الملف بوصف الصورة قبل رفعه.' : '') + '</p>'}${canAdd ? `<label class="btn sm noprint mn-phadd">${ico('camera')} إضافة صور<input type="file" accept="image/*" multiple hidden></label>` : ''}`;
+    const inpF = box.querySelector('input[type=file]'); if (inpF) inpF.onchange = async () => { try { for (const f of inpF.files) await at.uploadAttachment(f, 'wi:' + code); toast('أُضيفت الصور'); draw(); } catch (er) { err(er); } };
+    box.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => { if (!await confirm('حذف الصورة؟', 'حذف', true)) return; const a = list.find(x => x.id === +b.dataset.del); try { await at.deleteAttachment(a); draw(); } catch (er) { err(er); } });
+  };
+  draw();
+}
+
+// ---------- بطاقة العامل: أيقونات وخطوات قصيرة بالعربية ولغة ثانية، صفحة واحدة للطباعة PDF
+const LANGS = { en: ['English', 'ltr'], ur: ['اردو', 'rtl'], bn: ['বাংলা', 'ltr'], hi: ['हिन्दी', 'ltr'], tl: ['Filipino', 'ltr'] };
+const LBL = { ar: ['معدات الوقاية الإلزامية', 'الخطوات', 'ممنوع'], en: ['Required protection', 'Steps', 'Do not'], ur: ['لازمی حفاظتی سامان', 'مراحل', 'منع ہے'], bn: ['প্রয়োজনীয় সুরক্ষা', 'ধাপ', 'নিষেধ'], hi: ['ज़रूरी सुरक्षा', 'चरण', 'मना है'], tl: ['Kailangang proteksyon', 'Mga hakbang', 'Bawal'] };
+const PPE = { gloves: ['قفازات', 'Gloves', 'دستانے', 'গ্লাভস', 'दस्ताने', 'Guwantes'], gloves_red: ['قفازات حمراء', 'Red gloves', 'سرخ دستانے', 'লাল গ্লাভস', 'लाल दस्ताने', 'Pulang guwantes'], goggles: ['نظارة واقية', 'Goggles', 'حفاظتی چشمہ', 'সুরক্ষা চশমা', 'सुरक्षा चश्मा', 'Goggles'], mask: ['كمامة', 'Mask', 'ماسک', 'মাস্ক', 'मास्क', 'Mask'], boots: ['حذاء سلامة', 'Safety shoes', 'حفاظتی جوتے', 'নিরাপত্তা জুতা', 'सुरक्षा जूते', 'Safety na sapatos'], gown: ['رداء واقٍ', 'Gown', 'گاؤن', 'গাউন', 'गाउन', 'Gown'], harness: ['حزام أمان', 'Harness', 'حفاظتی بیلٹ', 'নিরাপত্তা বেল্ট', 'सुरक्षा बेल्ट', 'Harness'], ear: ['واقي سمع', 'Ear protection', 'کان کی حفاظت', 'কানের সুরক্ষা', 'कान सुरक्षा', 'Proteksyon sa tainga'], ladder: ['سلّم معتمد', 'Approved ladder', 'منظور سیڑھی', 'অনুমোদিত মই', 'मंज़ूर सीढ़ी', 'Aprubadong hagdan'], wetsign: ['لافتة أرضية مبللة', 'Wet floor sign', 'گیلے فرش کا بورڈ', 'ভেজা মেঝে সাইন', 'गीला फर्श बोर्ड', 'Karatulang basa'] };
+const LI = { ar: 0, en: 1, ur: 2, bn: 3, hi: 4, tl: 5 };
+function ensureFonts() { if (document.getElementById('wiFonts')) return; const l = document.createElement('link'); l.id = 'wiFonts'; l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@500;700&family=Noto+Sans+Bengali:wght@500;700&family=Noto+Sans+Devanagari:wght@500;700&display=swap'; document.head.appendChild(l); }
+async function viewCard(root, code, lang) {
+  if (!LANGS[lang] && lang !== 'ar') lang = 'en';
+  ensureFonts();
+  const [tpl, { pic }] = await Promise.all([q(sb.from('manual_templates').select('code,title,card,unit,ver,status').eq('code', code).single()), import('./wi_art.js')]);
+  const c = tpl.card || {}, two = lang !== 'ar', L = LBL[lang] || LBL.en, dir = LANGS[lang]?.[1] || 'rtl';
+  const tx = (o, k) => `<span class="ar">${esc(o.t?.ar || '')}</span>${two && o.t?.[k] ? `<span class="tr" lang="${k}" dir="${dir}">${esc(o.t[k])}</span>` : ''}`;
+  root.innerHTML = `<div class="toolbar noprint"><a class="btn sm ghost" href="#/manuals/g/${code}">→ التعليمات الكاملة</a><h2 class="m0">بطاقة العامل — ${esc(tpl.title)}</h2><span class="sp"></span><div class="wlangs">${[['ar', 'العربية فقط'], ...Object.entries(LANGS).map(([k, v]) => [k, 'العربية + ' + v[0]])].map(([k, l]) => `<a class="${k === lang ? 'on' : ''}" href="#/manuals/card/${code}?lang=${k}">${esc(l)}</a>`).join('')}</div><button class="btn sm primary" onclick="print()">${ico('print')} طباعة / PDF</button></div>
+    <p class="muted small noprint">اطبع البطاقة على ورقة A4 وعلّقها في موقع العمل، أو احفظها PDF من نافذة الطباعة (اختر «حفظ بصيغة PDF»). الترجمات تُراجع مع متحدث باللغة قبل التعميم.</p>
+    <article class="wcard">
+      <header><img src="assets/logo.png" alt="" onerror="this.remove()"><div><small>${esc(tpl.code)} · تعليمات عمل</small><h1>${esc(tpl.title)}</h1></div></header>
+      ${(c.ppe || []).length ? `<section class="wppe"><h3>${esc(LBL.ar[0])}${two ? ` <span lang="${lang}" dir="${dir}">· ${esc(L[0])}</span>` : ''}</h3><div>${c.ppe.map(k => `<figure>${pic(k)}<figcaption><span class="ar">${esc(PPE[k]?.[0] || '')}</span>${two ? `<span class="tr" lang="${lang}" dir="${dir}">${esc(PPE[k]?.[LI[lang]] || '')}</span>` : ''}</figcaption></figure>`).join('')}</div></section>` : ''}
+      <section class="wsteps"><h3>${esc(LBL.ar[1])}${two ? ` <span lang="${lang}" dir="${dir}">· ${esc(L[1])}</span>` : ''}</h3><ol>${(c.steps || []).map((s, i) => `<li><i>${i + 1}</i>${pic(s.i)}<p>${tx(s, lang)}</p></li>`).join('')}</ol></section>
+      ${(c.donts || []).length ? `<section class="wdonts"><h3>${esc(LBL.ar[2])}${two ? ` <span lang="${lang}" dir="${dir}">· ${esc(L[2])}</span>` : ''}</h3><ul>${c.donts.map(s => `<li>${pic(s.i)}<p>${tx(s, lang)}</p></li>`).join('')}</ul></section>` : ''}
+      <footer><span>تجمع الأحساء الصحي · إدارة الخدمات الفنية</span><span>${esc(tpl.code)}${tpl.ver ? ' · إصدار ' + tpl.ver : ' · مسودة'}</span></footer>
+    </article>`;
 }
