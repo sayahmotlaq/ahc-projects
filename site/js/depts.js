@@ -31,7 +31,7 @@ function flows() {
 let FMS = null;
 async function fmState() {
   if (FMS) return FMS;
-  try { const [sys, latest] = await Promise.all([q(sb.from('fm_systems').select('code,name,owner,critical').eq('active', true)), q(sb.from('v_fm_latest').select('facility_id,system_code,status'))]);
+  try { const [sys, latest] = await Promise.all([q(sb.from('fm_systems').select('code,name,owner,critical').eq('active', true).eq('track', 'SYS')), q(sb.from('v_fm_latest').select('facility_id,system_code,status'))]);
     FMS = { sys, latest }; } catch (e) { FMS = { sys: [], latest: [] }; }
   return FMS;
 }
@@ -124,7 +124,7 @@ export async function mountDept(root, code, tab = 'overview', params = new URLSe
     ${prj}
     ${['FAC', 'MNT', 'SAF'].includes(code) ? (() => { const c = activeCritical(); return `<div class="pcard"><h2>نافذ الآن في المنشآت (${c.length})</h2>${criticalHtml(c)}</div>`; })() : ''}
     ${sys.length ? `<div class="pcard"><h2>الأنظمة التي يملكها القسم <a class="small" href="#/fm">متابعة الأنظمة ‹</a></h2><div class="dsys">${sys.map(x => { const L = fm.latest.filter(l => l.system_code === x.code); const b = L.filter(l => ['down', 'partial'].includes(l.status)).length, a = L.filter(l => l.status === 'attention').length, g = L.filter(l => l.status === 'good').length;
-        return `<a href="#/fm/dash" class="${b ? 'r' : a ? 'a' : 'g'}"><b>${esc(x.name)}${x.critical ? ' <i title="نظام حرج">●</i>' : ''}</b><span>${g} سليم${a ? ` · ${a} متابعة` : ''}${b ? ` · <em>${b} معطل</em>` : ''}</span></a>`; }).join('')}</div></div>` : ''}
+        return `<a href="#/fm/dash?t=SYS" class="${b ? 'r' : a ? 'a' : 'g'}"><b>${esc(x.name)}${x.critical ? ' <i title="نظام حرج">●</i>' : ''}</b><span>${g} سليم${a ? ` · ${a} متابعة` : ''}${b ? ` · <em>${b} معطل</em>` : ''}</span></a>`; }).join('')}</div></div>` : ''}
     ${hand.length ? `<div class="pcard"><h2>نقاط التسليم في الدليل</h2><div class="dhand">${hand.map(h => `<div>${uchip(h.from_unit)}<span class="arr">←</span>${uchip(h.to_unit)}<span><b>${esc(h.trigger)}</b><small>${esc(h.deliverable || '')}${h.sla ? ' · ' + esc(h.sla) : ''}</small></span>${h.process_code ? `<a class="gref" data-peek="${esc(h.process_code)}" href="#/gov/sop/${esc(h.process_code)}">${esc(h.process_code)}</a>` : ''}</div>`).join('')}</div></div>` : ''}`;
   bindRows(t, re);
   $$('[data-nk]', t).forEach(b => b.onclick = e => { e.preventDefault(); newItem({ kind: b.dataset.nk }, r => openItem(r.id, re)); });

@@ -1,4 +1,5 @@
-// ===== متابعة أنظمة المنشآت: اللوحة، الجولة الشهرية، الملاحظات المرتبطة بدليل الإجراءات، سجل الأنظمة، التقرير الشهري =====
+// ===== المتابعة: مسارات متابعة لكل منشأة بنفس الترتيب (الأنظمة الحرجة، سباهي، الزائر السري، الأجهزة الطبية، الأثاث، اللوحات، التجديد…)
+// لكل مسار: اللوحة، الجولة (تحديث الحالة)، الملاحظات المرتبطة بدليل الإجراءات، سجل البنود؛ والتقرير الشهري لمسار الأنظمة
 import { sb, q, session, isAdmin, role, canEdit } from './api.js';
 import { $, $$, esc, toast, err, modal, confirm, field, inp, sel, formData, dateAr, ico } from './ui.js';
 import { govBar, govChip } from './govlink.js';
@@ -13,6 +14,19 @@ export const ST = {
   na: { ar: 'لا ينطبق', cmp: 'لا ينطبق', i: '–', c: '#B5C0CB' },
 };
 const ORDER = ['good', 'attention', 'partial', 'down', 'na'];
+// سلالم الحالة لكل نوع مسار (المفاتيح ثابتة، والتسميات تختلف)
+export const SCALE = {
+  sys: { good: 'يعمل جيداً', attention: 'يحتاج متابعة', partial: 'معطل جزئياً', down: 'معطل', na: 'لا ينطبق' },
+  cmp: { good: 'مستوفٍ', attention: 'ملاحظات بسيطة', partial: 'ملاحظات جوهرية', down: 'غير مستوفٍ', na: 'لا ينطبق' },
+  cond: { good: 'حالة جيدة', attention: 'يحتاج صيانة', partial: 'يحتاج تجديداً', down: 'يحتاج استبدالاً', na: 'لا ينطبق' },
+  renew: { good: 'مُجدَّد ومطابق', attention: 'مخطط له', partial: 'قيد التنفيذ', down: 'لم يُجدَّد', na: 'لا ينطبق' },
+};
+const READY = { sys: 'الجاهزية', cmp: 'الاستيفاء', cond: 'الحالة الجيدة', renew: 'نسبة التجديد' };
+let TR = 'SYS';
+const trk = (c = TR) => D?.T?.[c] || { code: 'SYS', name: 'الأنظمة الحرجة', scale: 'sys', groups: [] };
+const scaleOf = sys => sys?.grp === 'compliance' ? 'cmp' : trk(sys?.track || TR).scale || 'sys';
+const grpMap = (c = TR) => Object.fromEntries((trk(c).groups || []).map(g => [g.k, g.l]));
+const tq = (h, t = TR) => h + (h.includes('?') ? '&' : '?') + 't=' + t;
 const RANK = { down: 4, partial: 3, attention: 2, good: 1, na: 0 };
 export const GRP = { system: 'الأنظمة الهندسية', low: 'التيار الخفيف', fire: 'السلامة من الحريق', area: 'المناطق الحرجة', compliance: 'الامتثال' };
 export const OST = { open: 'مفتوحة', in_progress: 'قيد المعالجة', verify: 'بانتظار التحقق', closed: 'مغلقة' };
@@ -22,7 +36,7 @@ const monthAr = d => d ? `${MONTHS[+d.slice(5, 7) - 1]} ${d.slice(0, 4)}` : '—
 const thisMonth = () => new Date().toISOString().slice(0, 7) + '-01';
 const todayIso = () => new Date().toISOString().slice(0, 10);
 const canW = () => ['admin', 'facility'].includes(role());
-const stLabel = (s, sys) => (sys?.grp === 'compliance' ? ST[s]?.cmp : ST[s]?.ar) || '—';
+const stLabel = (s, sys) => SCALE[scaleOf(sys)]?.[s] || ST[s]?.ar || '—';
 const pill = (s, sys) => s ? `<span class="fmpill" style="--c:${ST[s].c}"><i>${ST[s].i}</i>${esc(stLabel(s, sys))}</span>` : '<span class="fmpill none">لم يُفحص</span>';
 const opill = s => { s = OST[s] ? s : 'open'; return `<span class="fmopill" style="--c:${OSTC[s]}">${OST[s]}</span>`; };
 const late = o => o.status !== 'closed' && o.due_date && o.due_date < todayIso();
@@ -41,20 +55,30 @@ const uname = c => G?.U?.[c]?.short || c || '—';
 const uchip = c => c ? `<span class="uchip" style="--c:#${G?.U?.[c]?.color || '6B7A88'}">${esc(uname(c))}</span>` : '';
 
 async function load() {
-  const [fac, sys, latest, obs, rounds, people] = await Promise.all([
+  const [fac, sys, latest, obs, rounds, people, tracks] = await Promise.all([
     q(sb.from('facilities').select('id,name,kind,sort,active').eq('active', true).order('sort').order('name')),
     q(sb.from('fm_systems').select('*').order('sort')),
     q(sb.from('v_fm_latest').select('*')),
     q(sb.from('fm_obs').select('*').order('id', { ascending: false })),
-    q(sb.from('fm_rounds').select('id,facility_id,period,status,submitted_at,updated_at').order('period', { ascending: false })),
+    q(sb.from('fm_rounds').select('id,facility_id,period,status,submitted_at,updated_at,track').order('period', { ascending: false })),
     q(sb.from('profiles').select('id,full_name,role').in('role', ['admin', 'facility', 'engineer'])),
+    q(sb.from('fm_tracks').select('*').eq('active', true).order('sort')).catch(() => []),
   ]);
   await govG();
   const F = Object.fromEntries(fac.map(f => [f.id, f])), S = Object.fromEntries(sys.map(s => [s.code, s]));
   const L = {}; latest.forEach(l => { (L[l.facility_id] ||= {})[l.system_code] = l; });
   const P = Object.fromEntries(people.map(p => [p.id, p]));
-  D = { fac, sys: sys.filter(s => s.active !== false), allSys: sys, F, S, L, obs, rounds, people, P };
+  const T = Object.fromEntries(tracks.map(t => [t.code, t]));
+  sys.forEach(s => { s.track ||= 'SYS'; }); obs.forEach(o => { o.track ||= 'SYS'; }); rounds.forEach(r => { r.track ||= 'SYS'; });
+  D = { fac, everySys: sys, everyObs: obs, everyRounds: rounds, F, S, L, people, P, tracks, T };
+  scope(TR);
   return D;
+}
+// حصر البيانات على المسار المختار (الدوال القائمة تعمل على D.sys وD.obs وD.rounds كما هي)
+function scope(t) {
+  TR = D.T[t] || t === 'SYS' ? t : 'SYS';
+  D.allSys = D.everySys.filter(s => s.track === TR); D.sys = D.allSys.filter(s => s.active !== false);
+  D.obs = D.everyObs.filter(o => o.track === TR); D.rounds = D.everyRounds.filter(r => r.track === TR);
 }
 const pname = id => D?.P?.[id]?.full_name || '';
 const openObsOf = (f, s) => D.obs.filter(o => o.facility_id === f && o.system_code === s && o.status !== 'closed');
@@ -68,19 +92,60 @@ function facStats(f) {
 const suggestProc = (sys, sev) => sev === 'down' && sys?.critical ? 'G-11' : (sys?.proc || 'G-05');
 
 // ---------- الهيكل العام
-export async function mountFM(root, tab = 'dash', params = new URLSearchParams()) {
+export async function mountFM(root, tab = 'home', params = new URLSearchParams()) {
+  if (tab === 'dash' && !params.get('t') && !params.get('g')) tab = 'home';
+  TR = params.get('t') || 'SYS';
   await load();
+  const oid = +(params.get('id') || 0); if (oid && !params.get('t')) { const o = D.everyObs.find(x => x.id === oid); if (o && o.track !== TR) scope(o.track); }
+  const tr = trk(), general = tab === 'home' || tab === 'fac';
   const nOpen = D.obs.filter(o => o.status !== 'closed').length, nLate = D.obs.filter(late).length;
-  const tabs = [['dash', 'اللوحة'], ['round', 'الجولة الشهرية'], ['obs', `الملاحظات <b class="fmcnt ${nLate ? 'bad' : ''}">${nOpen}</b>`], ...(isAdmin() ? [['systems', 'سجل الأنظمة']] : []), ['report', 'التقرير الشهري']];
-  root.innerHTML = `<div class="fmhead"><div><h1 class="pagetitle">متابعة أنظمة المنشآت</h1><p class="muted m0">حالة الأنظمة الحرجة في كل منشأة شهراً بشهر، وكل ملاحظة مربوطة بإجرائها في دليل الحوكمة وخطوتها الحالية.</p></div><span class="sp"></span>${canW() ? `<a class="btn primary" href="#/fm/round">＋ جولة شهرية</a><button class="btn" id="fmNewObs">＋ ملاحظة</button>` : ''}</div>
-    <nav class="fmtabs">${tabs.map(([k, v]) => `<a href="#/fm/${k}" class="${tab === k ? 'on' : ''}">${v}</a>`).join('')}</nav><div id="fmBody"></div>`;
+  const tabs = [['dash', 'اللوحة'], ['round', TR === 'SYS' ? 'الجولة الشهرية' : 'تحديث الحالة'], ['obs', `الملاحظات <b class="fmcnt ${nLate ? 'bad' : ''}">${nOpen}</b>`], ...(isAdmin() ? [['systems', 'سجل البنود']] : []), ...(TR === 'SYS' ? [['report', 'التقرير الشهري']] : [])];
+  const trCard = t => { const st = trackStats(t.code); return `<a class="fmtr ${!general && t.code === TR ? 'on' : ''}" href="#/fm/dash?t=${t.code}" style="--c:#${t.color}">${ico(t.icon || 'pulse')}<b>${esc(t.short || t.name)}</b><small>${st.ready === null ? 'لا بيانات بعد' : `${READY[t.scale] || 'الجاهزية'} ${st.ready}٪`}${st.open ? ` · <em>${st.open}</em> مفتوحة` : ''}</small></a>`; };
+  root.innerHTML = `<div class="fmhead"><div><h1 class="pagetitle">المتابعة</h1><p class="muted m0">${general ? 'مسارات متابعة لكل منشأة بنفس الترتيب، وكل ملاحظة مربوطة بإجرائها في دليل الحوكمة وخطوتها الحالية.' : esc(tr.intro || '')}</p></div><span class="sp"></span>${canW() && !general ? `<a class="btn primary" href="${tq('#/fm/round')}">＋ ${TR === 'SYS' ? 'جولة شهرية' : 'تحديث الحالة'}</a><button class="btn" id="fmNewObs">＋ ملاحظة</button>${['CBAHI', 'MYST'].includes(TR) || TR !== 'SYS' ? '<button class="btn" id="fmBulk">لصق ملاحظات تقرير</button>' : ''}` : ''}</div>
+    <nav class="fmtrs"><a class="fmtr all ${general ? 'on' : ''}" href="#/fm/home">${ico('dash')}<b>نظرة عامة</b><small>كل المسارات لكل منشأة</small></a>${D.tracks.map(trCard).join('')}</nav>
+    ${general ? '' : `<nav class="fmtabs">${tabs.map(([k, v]) => `<a href="${tq('#/fm/' + k)}" class="${tab === k ? 'on' : ''}">${v}</a>`).join('')}</nav>`}<div id="fmBody"></div>`;
   $('#fmNewObs', root) && ($('#fmNewObs', root).onclick = () => obsForm(null, {}, () => mountFM(root, tab, params)));
+  $('#fmBulk', root) && ($('#fmBulk', root).onclick = () => bulkObs(() => mountFM(root, 'obs', new URLSearchParams('t=' + TR))));
   const t = $('#fmBody', root); const re = () => mountFM(root, tab, params);
+  if (tab === 'home') return viewHome(t);
+  if (tab === 'fac') return viewFac(t, params);
   if (tab === 'round') return viewRound(t, params, re);
   if (tab === 'obs') return viewObs(t, params, re);
   if (tab === 'systems' && isAdmin()) return viewSystems(t, re);
-  if (tab === 'report') return viewReport(t, params);
+  if (tab === 'report' && TR === 'SYS') return viewReport(t, params);
   return viewDash(t, params, re);
+}
+// إحصاء مسار: نسبة الحالة الجيدة من آخر حالة لكل بند في كل منشأة + الملاحظات المفتوحة
+function trackStats(code, fid = null) {
+  const items = D.everySys.filter(s => s.track === code && s.active !== false);
+  let good = 0, base = 0, bad = 0;
+  D.fac.forEach(f => { if (fid && f.id !== fid) return; items.forEach(s => { const l = D.L[f.id]?.[s.code]; if (!l || l.status === 'na') return; base++; if (l.status === 'good') good++; else if (l.status !== 'attention') bad++; }); });
+  const obs = D.everyObs.filter(o => o.track === code && o.status !== 'closed' && (!fid || o.facility_id === fid));
+  return { ready: base ? Math.round(good / base * 100) : null, base, good, bad, open: obs.length, late: obs.filter(late).length, items: items.length };
+}
+
+// ---------- نظرة عامة: كل منشأة × كل المسارات
+function viewHome(t) {
+  const cell = (f, tr) => { const st = trackStats(tr.code, f.id); const c = st.ready === null ? '' : st.ready >= 85 ? 'g' : st.ready >= 60 ? 'a' : 'r';
+    return `<td><a class="fmhc ${c}" href="#/fm/dash?t=${tr.code}&f=${f.id}" title="${esc(f.name)} — ${esc(tr.name)}">${st.ready === null ? '<span class="muted">—</span>' : `<b>${st.ready}٪</b>`}${st.open ? `<small class="${st.late ? 'bad' : ''}">${st.open} مفتوحة</small>` : ''}</a></td>`; };
+  const tot = D.tracks.map(tr => ({ tr, st: trackStats(tr.code) }));
+  t.innerHTML = `<div class="fmhk">${tot.map(({ tr, st }) => `<a class="fmk" href="#/fm/dash?t=${tr.code}" style="--c:#${tr.color}"><span class="fmhk-i">${ico(tr.icon || 'pulse')}</span><b>${st.ready === null ? '—' : st.ready + '٪'}</b><span>${esc(tr.name)}</span><small>${st.items} بنداً · ${st.open} ملاحظة مفتوحة${st.late ? ` · <em class="bad">${st.late} متأخرة</em>` : ''}</small></a>`).join('')}</div>
+    <div class="pcard fmmatrix"><div class="toolbar m0"><h2 class="m0">المنشآت × مسارات المتابعة</h2><span class="muted small">النسبة: البنود بحالة جيدة من آخر تحديث، والرقم: الملاحظات المفتوحة. اضغط المنشأة لصفحتها الكاملة.</span></div>
+      <div class="fmscroll"><table class="fmtab fmhome"><thead><tr><th class="fh">المنشأة</th>${D.tracks.map(tr => `<th style="--c:#${tr.color}"><span class="fmth">${ico(tr.icon || 'pulse')} ${esc(tr.short || tr.name)}</span></th>`).join('')}</tr></thead>
+      <tbody>${D.fac.map(f => `<tr><th class="fh"><a href="#/fm/fac?f=${f.id}">${esc(f.name)}</a></th>${D.tracks.map(tr => cell(f, tr)).join('')}</tr>`).join('')}</tbody></table></div></div>`;
+}
+
+// ---------- صفحة المنشأة: كل المسارات بنفس الترتيب
+function viewFac(t, params) {
+  const fid = +(params.get('f') || 0) || D.fac[0]?.id, f = D.F[fid];
+  if (!f) { t.innerHTML = '<div class="empty-boq">اختر منشأة.</div>'; return; }
+  t.innerHTML = `<div class="pcard fmpick"><label class="fld"><span>المنشأة</span>${sel('ff', D.fac.map(x => [x.id, x.name]), fid)}</label></div>
+    <div class="fmfac">${D.tracks.map(tr => { const items = D.everySys.filter(s => s.track === tr.code && s.active !== false); const st = trackStats(tr.code, fid); const gm = Object.fromEntries((tr.groups || []).map(g => [g.k, g.l]));
+      return `<section class="pcard fmfs" style="--c:#${tr.color}"><div class="fmfs-h">${ico(tr.icon || 'pulse')}<h2>${esc(tr.name)}</h2><span class="sp"></span><b>${st.ready === null ? 'لا بيانات' : (READY[tr.scale] || 'الجاهزية') + ' ' + st.ready + '٪'}</b>${st.open ? `<a class="fmcnt ${st.late ? 'bad' : ''}" href="#/fm/obs?t=${tr.code}&f=${fid}">${st.open} مفتوحة</a>` : ''}<a class="btn sm ghost" href="#/fm/round?t=${tr.code}&f=${fid}">${tr.code === 'SYS' ? 'الجولة' : 'تحديث'}</a></div>
+        <div class="fmfs-l">${[...new Set(items.map(s => s.grp))].map(g => `<div class="fmfs-g"><small>${esc(gm[g] || GRP[g] || g)}</small>${items.filter(s => s.grp === g).map(s => { const l = D.L[fid]?.[s.code]; const oo = D.everyObs.filter(o => o.facility_id === fid && o.system_code === s.code && o.status !== 'closed');
+          return `<button class="fmfs-i" data-f="${fid}" data-s="${s.code}" data-t="${tr.code}"><span>${esc(s.name)}</span>${pill(l?.status, s)}${oo.length ? `<em>${oo.length}</em>` : ''}</button>`; }).join('')}</div>`).join('')}</div></section>`; }).join('')}</div>`;
+  $('[name=ff]', t).onchange = e => location.hash = '#/fm/fac?f=' + e.target.value;
+  $$('.fmfs-i', t).forEach(b => b.onclick = () => { scope(b.dataset.t); cellDetail(+b.dataset.f, b.dataset.s, () => viewFac(t, params)); });
 }
 
 // ---------- اللوحة
@@ -95,29 +160,30 @@ function viewDash(t, params, re) {
     const staleFac = D.fac.filter(f => { const r = lastRound(f.id); return !r || r.period < cm; });
     const latestP = D.rounds[0]?.period;
     const ready = base ? Math.round(good / base * 100) : 0;
+    const G0 = grpMap(), SC = SCALE[trk().scale] || SCALE.sys;
     const kpi = (cls, big, lbl, sub = '', href = '') => `<${href ? `a href="${href}"` : 'div'} class="fmk ${cls}"><b>${big}</b><span>${lbl}</span>${sub ? `<small>${sub}</small>` : ''}</${href ? 'a' : 'div'}>`;
     const groups = [...new Set(sys.map(s => s.grp))];
     const worstSys = D.sys.map(s => ({ s, n: D.fac.filter(f => { const l = D.L[f.id]?.[s.code]; return l && !['good', 'na'].includes(l.status); }).length })).filter(x => x.n).sort((a, b) => b.n - a.n).slice(0, 8);
     const crit = [...open].sort((a, b) => (late(b) - late(a)) || (RANK[b.severity] - RANK[a.severity])).slice(0, 6);
     t.innerHTML = `<div class="fmkpis">
-        <div class="fmk ring" style="--p:${ready}"><div class="rg"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" class="bgc"/><circle cx="18" cy="18" r="15.9" class="fgc" stroke-dasharray="${ready} 100"/></svg><b>${ready}<small>٪</small></b></div><span>جاهزية الأنظمة</span><small>${good} من ${base} نظاماً يعمل جيداً${latestP ? ' · آخر جولة ' + monthAr(latestP) : ''}</small></div>
-        ${kpi(bad.length ? 'red' : '', bad.length, 'معطل كلياً أو جزئياً', bad.slice(0, 2).map(([f, s]) => esc(s.name) + ' — ' + esc(f.name)).join('<br>'))}
-        ${kpi(att ? 'amber' : '', att, 'يحتاج متابعة', 'حالات تعمل مع ملاحظات')}
-        ${(() => { const sl = open.filter(stale).length; return kpi(lt.length || sl ? 'red' : 'blue', open.length, 'ملاحظات مفتوحة', [lt.length ? `<b>${lt.length}</b> متأخرة عن موعدها` : '', sl ? `<b>${sl}</b> بلا تحديث منذ ${STALE_DAYS} أيام` : ''].filter(Boolean).join('<br>') || 'كلها محدّثة وفي موعدها', '#/fm/obs?due=1'); })()}
+        <div class="fmk ring" style="--p:${ready}"><div class="rg"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" class="bgc"/><circle cx="18" cy="18" r="15.9" class="fgc" stroke-dasharray="${ready} 100"/></svg><b>${ready}<small>٪</small></b></div><span>${READY[trk().scale] || 'الجاهزية'} — ${esc(trk().short || trk().name)}</span><small>${good} من ${base} بحالة «${SC.good}»${latestP ? ' · آخر تحديث ' + monthAr(latestP) : ''}</small></div>
+        ${kpi(bad.length ? 'red' : '', bad.length, `${SC.down} أو ${SC.partial}`, bad.slice(0, 2).map(([f, s]) => esc(s.name) + ' — ' + esc(f.name)).join('<br>'))}
+        ${kpi(att ? 'amber' : '', att, SC.attention, '')}
+        ${(() => { const sl = open.filter(stale).length; return kpi(lt.length || sl ? 'red' : 'blue', open.length, 'ملاحظات مفتوحة', [lt.length ? `<b>${lt.length}</b> متأخرة عن موعدها` : '', sl ? `<b>${sl}</b> بلا تحديث منذ ${STALE_DAYS} أيام` : ''].filter(Boolean).join('<br>') || 'كلها محدّثة وفي موعدها', tq('#/fm/obs?due=1')); })()}
         ${kpi(undoc ? 'amber' : 'green', undoc, 'حالات بلا ملاحظة', undoc ? 'حالة غير سليمة لم تُفتح لها ملاحظة بعد' : 'كل حالة موثقة')}
         ${kpi(staleFac.length ? 'amber' : 'green', staleFac.length, 'منشآت لم تُحدَّث هذا الشهر', staleFac.length ? staleFac.slice(0, 3).map(f => esc(f.name)).join('، ') + (staleFac.length > 3 ? '…' : '') : 'كل المنشآت محدّثة')}
       </div>
-      <div class="pcard fmmatrix"><div class="toolbar m0"><h2 class="m0">مصفوفة الحالة</h2><span class="muted small">آخر حالة مسجلة لكل نظام في كل منشأة</span><span class="sp"></span>
-        <div class="fmfilt"><button data-g="" class="${!grp ? 'on' : ''}">الكل</button>${Object.entries(GRP).map(([k, v]) => `<button data-g="${k}" class="${grp === k ? 'on' : ''}">${v}</button>`).join('')}</div></div>
-        <div class="fmlegend">${ORDER.map(s => `<span><i style="--c:${ST[s].c}">${ST[s].i}</i>${ST[s].ar}</span>`).join('')}<span><i class="nd">!</i>بلا ملاحظة</span><span><i class="ob">•</i>ملاحظة مفتوحة</span></div>
-        <div class="fmscroll"><table class="fmtab"><thead><tr><th class="fh" rowspan="2">المنشأة</th>${groups.map(g => `<th class="gh" colspan="${sys.filter(s => s.grp === g).length}">${GRP[g]}</th>`).join('')}</tr>
+      <div class="pcard fmmatrix"><div class="toolbar m0"><h2 class="m0">مصفوفة الحالة</h2><span class="muted small">آخر حالة مسجلة لكل بند في كل منشأة</span><span class="sp"></span>
+        <div class="fmfilt"><button data-g="" class="${!grp ? 'on' : ''}">الكل</button>${Object.entries(G0).map(([k, v]) => `<button data-g="${k}" class="${grp === k ? 'on' : ''}">${v}</button>`).join('')}</div></div>
+        <div class="fmlegend">${ORDER.map(s => `<span><i style="--c:${ST[s].c}">${ST[s].i}</i>${SC[s]}</span>`).join('')}<span><i class="nd">!</i>بلا ملاحظة</span><span><i class="ob">•</i>ملاحظة مفتوحة</span></div>
+        <div class="fmscroll"><table class="fmtab"><thead><tr><th class="fh" rowspan="2">المنشأة</th>${groups.map(g => `<th class="gh" colspan="${sys.filter(s => s.grp === g).length}">${esc(G0[g] || GRP[g] || g)}</th>`).join('')}</tr>
           <tr>${groups.map(g => sys.filter(s => s.grp === g).map(s => `<th class="sh" title="${esc(s.name)}"><span>${esc(s.name)}</span></th>`).join('')).join('')}</tr></thead>
-          <tbody>${facs.map(({ f, st, r }) => `<tr><th class="fh"><a href="#/fm/round?f=${f.id}">${esc(f.name)}</a><div class="fhm">${st.ready === null ? '<span class="muted">لا جولة بعد</span>' : `<span class="rb"><i style="width:${st.ready}%"></i></span><b>${st.ready}٪</b><span class="muted">${monthAr(r?.period)}</span>`}</div></th>
+          <tbody>${facs.filter(({ f }) => !+params.get('f') || f.id === +params.get('f')).map(({ f, st, r }) => `<tr><th class="fh"><a href="${tq('#/fm/round?f=' + f.id)}">${esc(f.name)}</a><div class="fhm">${st.ready === null ? '<span class="muted">لا جولة بعد</span>' : `<span class="rb"><i style="width:${st.ready}%"></i></span><b>${st.ready}٪</b><span class="muted">${monthAr(r?.period)}</span>`}</div></th>
             ${groups.map(g => sys.filter(s => s.grp === g).map(s => { const l = D.L[f.id]?.[s.code]; const oo = openObsOf(f.id, s.code); const nd = l && !['good', 'na'].includes(l.status) && !oo.length;
               return `<td><button class="fmc ${l ? 's-' + l.status : 's-none'} ${nd ? 'nd' : ''} ${oo.length ? 'ob' : ''}" data-f="${f.id}" data-s="${s.code}" title="${esc(f.name)} — ${esc(s.name)}: ${esc(l ? stLabel(l.status, s) : 'لم يُفحص')}${oo.length ? ' · ' + oo.length + ' ملاحظة مفتوحة' : ''}">${l ? ST[l.status].i : ''}</button></td>`; }).join('')).join('')}</tr>`).join('')}</tbody></table></div></div>
       <div class="fm2col">
-        <div class="pcard"><h2>أكثر الأنظمة تعثراً</h2>${worstSys.length ? `<div class="fmbars">${worstSys.map(({ s, n }) => `<div class="fmbar"><span>${esc(s.name)}</span><i><em style="width:${Math.round(n / D.fac.length * 100)}%"></em></i><b>${n}</b></div>`).join('')}</div><p class="muted small m0">عدد المنشآت التي فيها النظام بحالة غير سليمة.</p>` : '<p class="muted">لا أنظمة متعثرة.</p>'}</div>
-        <div class="pcard"><div class="toolbar m0"><h2 class="m0">ملاحظات تحتاج انتباهاً</h2><span class="sp"></span><a class="small" href="#/fm/obs">كل الملاحظات ‹</a></div>${crit.length ? `<div class="fmolist">${crit.map(obsRow).join('')}</div>` : '<p class="muted">لا ملاحظات مفتوحة.</p>'}</div>
+        <div class="pcard"><h2>أكثر البنود تعثراً</h2>${worstSys.length ? `<div class="fmbars">${worstSys.map(({ s, n }) => `<div class="fmbar"><span>${esc(s.name)}</span><i><em style="width:${Math.round(n / D.fac.length * 100)}%"></em></i><b>${n}</b></div>`).join('')}</div><p class="muted small m0">عدد المنشآت التي فيها البند بحالة غير سليمة.</p>` : '<p class="muted">لا بنود متعثرة.</p>'}</div>
+        <div class="pcard"><div class="toolbar m0"><h2 class="m0">ملاحظات تحتاج انتباهاً</h2><span class="sp"></span><a class="small" href="${tq('#/fm/obs')}">كل الملاحظات ‹</a></div>${crit.length ? `<div class="fmolist">${crit.map(obsRow).join('')}</div>` : '<p class="muted">لا ملاحظات مفتوحة.</p>'}</div>
       </div>`;
     $$('.fmfilt [data-g]', t).forEach(b => b.onclick = () => { grp = b.dataset.g; render(); });
     $$('.fmc', t).forEach(b => b.onclick = () => cellDetail(+b.dataset.f, b.dataset.s, re));
@@ -161,8 +227,8 @@ async function viewRound(t, params, re) {
   const fid = +(params.get('f') || 0) || (myF.length === 1 ? myF[0] : null);
   const period = (params.get('p') || thisMonth().slice(0, 7)) + '-01';
   const pickers = `<div class="pcard fmpick"><label class="fld"><span>المنشأة</span>${sel('f', [['', '— اختر المنشأة —'], ...D.fac.map(f => [f.id, f.name])], fid || '')}</label><label class="fld"><span>الشهر</span><input type="month" name="p" value="${period.slice(0, 7)}" max="${thisMonth().slice(0, 7)}"></label>
-    <div class="fmpick-st">${[...D.fac].sort((a, b) => myF.includes(b.id) - myF.includes(a.id)).map(f => { const r = D.rounds.find(x => x.facility_id === f.id && x.period === period); return `<a href="#/fm/round?f=${f.id}&p=${period.slice(0, 7)}" class="${f.id === fid ? 'on' : ''} ${r ? (r.status === 'submitted' ? 'ok' : 'dr') : ''}" title="${r ? (r.status === 'submitted' ? 'معتمدة' : 'مسودة') : 'لم تبدأ'}${myF.includes(f.id) ? ' — منشأتك' : ''}">${myF.includes(f.id) ? '★ ' : ''}${esc(f.name)}</a>`; }).join('')}</div></div>`;
-  if (!fid) { t.innerHTML = pickers + '<div class="empty-boq">اختر المنشأة لبدء جولة الشهر أو مراجعتها. الأخضر: معتمدة، الذهبي: مسودة.</div>'; bindPick(t); return; }
+    <div class="fmpick-st">${[...D.fac].sort((a, b) => myF.includes(b.id) - myF.includes(a.id)).map(f => { const r = D.rounds.find(x => x.facility_id === f.id && x.period === period); return `<a href="${tq('#/fm/round?f=' + f.id + '&p=' + period.slice(0, 7))}" class="${f.id === fid ? 'on' : ''} ${r ? (r.status === 'submitted' ? 'ok' : 'dr') : ''}" title="${r ? (r.status === 'submitted' ? 'معتمدة' : 'مسودة') : 'لم تبدأ'}${myF.includes(f.id) ? ' — منشأتك' : ''}">${myF.includes(f.id) ? '★ ' : ''}${esc(f.name)}</a>`; }).join('')}</div></div>`;
+  if (!fid) { t.innerHTML = pickers + `<div class="empty-boq">اختر المنشأة لبدء ${TR === 'SYS' ? 'جولة الشهر' : 'تحديث الحالة'} أو مراجعتها. الأخضر: معتمدة، الذهبي: مسودة.</div>`; bindPick(t); return; }
   const round = D.rounds.find(r => r.facility_id === fid && r.period === period) || null;
   const checks = round ? await q(sb.from('fm_checks').select('*').eq('round_id', round.id)) : [];
   const C = Object.fromEntries(checks.map(c => [c.system_code, c]));
@@ -170,9 +236,9 @@ async function viewRound(t, params, re) {
   const val = {}; D.sys.forEach(s => { val[s.code] = { status: C[s.code]?.status || prevOf(s.code)?.status || '', note: C[s.code]?.note || '' }; });
   const ro = !canW() || (round?.status === 'submitted' && !isAdmin());
   const f = D.F[fid];
-  t.innerHTML = pickers + `<div class="fmround-h"><div><h2 class="m0">${esc(f.name)} — جولة ${monthAr(period)}</h2><p class="muted m0">${round ? (round.status === 'submitted' ? `معتمدة · ${dateAr(round.submitted_at)}` : 'مسودة لم تُعتمد بعد') : 'جولة جديدة: الحالات معبأة من آخر جولة، غيّر ما تغيّر فقط.'}</p></div><span class="sp"></span>${ro ? '' : `<button class="btn" id="rSave">حفظ مسودة</button><button class="btn primary" id="rSubmit">${round?.status === 'submitted' ? 'حفظ التعديلات' : 'اعتماد الجولة'}</button>`}</div>
+  t.innerHTML = pickers + `<div class="fmround-h"><div><h2 class="m0">${esc(f.name)} — ${esc(trk().name)} · ${monthAr(period)}</h2><p class="muted m0">${round ? (round.status === 'submitted' ? `معتمدة · ${dateAr(round.submitted_at)}` : 'مسودة لم تُعتمد بعد') : 'جولة جديدة: الحالات معبأة من آخر جولة، غيّر ما تغيّر فقط.'}</p></div><span class="sp"></span>${ro ? '' : `<button class="btn" id="rSave">حفظ مسودة</button><button class="btn primary" id="rSubmit">${round?.status === 'submitted' ? 'حفظ التعديلات' : 'اعتماد الجولة'}</button>`}</div>
     <div class="fmprog" id="rProg"></div>
-    ${Object.entries(GRP).map(([g, gl]) => { const ss = D.sys.filter(s => s.grp === g); if (!ss.length) return ''; return `<section class="fmgsec"><h3>${gl}</h3>${ss.map(s => { const p = prevOf(s.code); const oo = openObsOf(fid, s.code);
+    ${Object.entries({ ...grpMap(), ...Object.fromEntries([...new Set(D.sys.map(s => s.grp))].filter(g => !grpMap()[g]).map(g => [g, GRP[g] || g])) }).map(([g, gl]) => { const ss = D.sys.filter(s => s.grp === g); if (!ss.length) return ''; return `<section class="fmgsec"><h3>${gl}</h3>${ss.map(s => { const p = prevOf(s.code); const oo = openObsOf(fid, s.code);
       return `<div class="fmrow" data-s="${s.code}"><div class="fmrow-n"><b>${esc(s.name)}${s.critical ? ' <span class="crit" title="نظام حرج">●</span>' : ''}</b><small>${esc(s.hint || '')}</small><span class="fmrow-m">${uchip(s.owner)}${p ? `<span class="muted small">السابق (${monthAr(p.period)}): ${esc(stLabel(p.status, s))}</span>` : ''}</span></div>
         <div class="fmseg" role="radiogroup">${ORDER.map(k => `<button type="button" data-v="${k}" style="--c:${ST[k].c}" ${ro ? 'disabled' : ''} title="${esc(stLabel(k, s))}"><i>${ST[k].i}</i><span>${esc(stLabel(k, s))}</span></button>`).join('')}</div>
         <div class="fmrow-x"><input class="fmnote" placeholder="ملاحظة قصيرة (اختياري)" value="${esc(val[s.code].note)}" ${ro ? 'disabled' : ''}><span class="fmrow-o">${oo.map(o => `<button type="button" class="fmochip" data-o="${o.id}">#${o.id} ${OST[o.status]}</button>`).join('')}<span class="fmneed">يلزم ملاحظة${canW() ? ' <button type="button" class="btn sm" data-new>＋ ملاحظة</button>' : ''}</span></span></div></div>`; }).join('')}</section>`; }).join('')}`;
@@ -181,7 +247,7 @@ async function viewRound(t, params, re) {
     let done = 0, bad = 0, need = 0;
     $$('.fmrow', t).forEach(r => { const c = r.dataset.s, v = val[c].status; $$('.fmseg button', r).forEach(b => b.classList.toggle('on', b.dataset.v === v));
       const nd = v && !['good', 'na'].includes(v) && !openObsOf(fid, c).length; r.classList.toggle('need', nd); r.dataset.st = v || ''; if (v) done++; if (v && !['good', 'na'].includes(v)) bad++; if (nd) need++; });
-    $('#rProg', t).innerHTML = `<span><b>${done}</b> / ${D.sys.length} نظاماً</span><span class="pb"><i style="width:${Math.round(done / D.sys.length * 100)}%"></i></span><span>${bad} غير سليم</span>${need ? `<span class="bad">${need} بلا ملاحظة</span>` : ''}`;
+    $('#rProg', t).innerHTML = `<span><b>${done}</b> / ${D.sys.length} بنداً</span><span class="pb"><i style="width:${Math.round(done / D.sys.length * 100)}%"></i></span><span>${bad} غير سليم</span>${need ? `<span class="bad">${need} بلا ملاحظة</span>` : ''}`;
   };
   paint();
   if (!ro) $$('.fmrow', t).forEach(r => { const c = r.dataset.s;
@@ -192,10 +258,10 @@ async function viewRound(t, params, re) {
   $$('.fmochip', t).forEach(b => b.onclick = () => obsDetail(+b.dataset.o, async () => { await load(); viewRound(t, params, re); }));
   async function save(status, silent) {
     const missing = D.sys.filter(s => !val[s.code].status);
-    if (status === 'submitted' && missing.length) { toast(`حدّد حالة ${missing.length} نظام قبل الاعتماد: ${missing.slice(0, 3).map(s => s.name).join('، ')}`, 'bad'); return null; }
+    if (status === 'submitted' && missing.length) { toast(`حدّد حالة ${missing.length} بنداً قبل الاعتماد: ${missing.slice(0, 3).map(s => s.name).join('، ')}`, 'bad'); return null; }
     try {
-      const row = { facility_id: fid, period, note: round?.note || '', by_user: session.user.id, ...(status === 'submitted' ? { status: 'submitted', submitted_at: round?.submitted_at || new Date().toISOString() } : round ? {} : { status: 'draft' }) };
-      const r = await q(sb.from('fm_rounds').upsert(row, { onConflict: 'facility_id,period' }).select('id').single());
+      const row = { facility_id: fid, period, track: TR, note: round?.note || '', by_user: session.user.id, ...(status === 'submitted' ? { status: 'submitted', submitted_at: round?.submitted_at || new Date().toISOString() } : round ? {} : { status: 'draft' }) };
+      const r = await q(sb.from('fm_rounds').upsert(row, { onConflict: 'facility_id,period,track' }).select('id').single());
       const rows = D.sys.filter(s => val[s.code].status).map(s => ({ round_id: r.id, system_code: s.code, status: val[s.code].status, note: val[s.code].note.trim(), checked_on: C[s.code]?.status === val[s.code].status && C[s.code]?.checked_on ? C[s.code].checked_on : todayIso() }));
       if (rows.length) await q(sb.from('fm_checks').upsert(rows, { onConflict: 'round_id,system_code' }));
       if (!silent) toast(status === 'submitted' ? 'اعتُمدت الجولة' : 'حُفظت المسودة');
@@ -211,7 +277,7 @@ async function viewRound(t, params, re) {
       if (!a) return; auto = a === 'auto'; }
     const fixed = D.obs.filter(o => o.facility_id === fid && o.status !== 'closed' && o.system_code && val[o.system_code]?.status === 'good');
     const rid = await save('submitted'); if (!rid) return;
-    if (auto) { try { await q(sb.from('fm_obs').insert(need.map(s => { const v = val[s.code].status; return { facility_id: fid, system_code: s.code, title: `${s.name}: ${stLabel(v, s)}`, details: val[s.code].note.trim(), severity: v, proc: suggestProc(s, v), step: 1, owner: s.owner, source: 'round', round_id: rid, created_by: session.user.id }; }))); toast(`أُنشئت ${need.length} ملاحظة`); } catch (e) { err(e); } }
+    if (auto) { try { await q(sb.from('fm_obs').insert(need.map(s => { const v = val[s.code].status; return { facility_id: fid, system_code: s.code, track: TR, title: `${s.name}: ${stLabel(v, s)}`, details: val[s.code].note.trim(), severity: v, proc: suggestProc(s, v), step: 1, owner: s.owner, source: 'round', round_id: rid, created_by: session.user.id }; }))); toast(`أُنشئت ${need.length} ملاحظة`); } catch (e) { err(e); } }
     if (fixed.length) await closeFixed(fixed);
     await load(); viewRound(t, params, re);
   });
@@ -224,14 +290,14 @@ async function closeFixed(list) {
       try { for (const o of go) { const a = x['a_' + o.id].trim(); await q(sb.from('fm_obs').update({ status: 'closed', last_action: a, close_note: a, step: G.P[o.proc]?.steps?.length || o.step }).eq('id', o.id)); } if (go.length) toast(`أُغلقت ${go.length} ملاحظة`); close(); } catch (e2) { err(e2); } }; } });
 }
 function bindPick(t) {
-  const go = () => { const f = $('[name=f]', t).value, p = $('[name=p]', t).value; location.hash = `#/fm/round?${f ? 'f=' + f + '&' : ''}p=${p}`; };
+  const go = () => { const f = $('[name=f]', t).value, p = $('[name=p]', t).value; location.hash = tq(`#/fm/round?${f ? 'f=' + f + '&' : ''}p=${p}`); };
   $('[name=f]', t).onchange = go; $('[name=p]', t).onchange = go;
 }
 
 // ---------- الملاحظات
 function viewObs(t, params, re) {
   const st = { q: params.get('q') || '', f: params.get('f') || '', g: '', u: '', s: params.get('s') || 'active', late: params.get('late') === '1' || params.get('due') === '1' };
-  t.innerHTML = `<div class="filters fmofilt"><input id="oq" placeholder="بحث في الملاحظات…" value="${esc(st.q)}">${sel('of', [['', 'كل المنشآت'], ...D.fac.map(f => [f.id, f.name])], st.f)}${sel('og', [['', 'كل المجموعات'], ...Object.entries(GRP)], '')}${sel('ou', [['', 'كل الأقسام'], ...G.units.filter(u => u.kind === 'unit').map(u => [u.code, u.short])], '')}${sel('os', [['active', 'المفتوحة (غير المغلقة)'], ['', 'الكل'], ...Object.entries(OST)], st.s)}<label class="chk"><input type="checkbox" id="ol" ${st.late ? 'checked' : ''}> المتأخرة أو بلا تحديث فقط</label></div>
+  t.innerHTML = `<div class="filters fmofilt"><input id="oq" placeholder="بحث في الملاحظات…" value="${esc(st.q)}">${sel('of', [['', 'كل المنشآت'], ...D.fac.map(f => [f.id, f.name])], st.f)}${sel('og', [['', 'كل المجموعات'], ...Object.entries(grpMap())], '')}${sel('ou', [['', 'كل الأقسام'], ...G.units.filter(u => u.kind === 'unit').map(u => [u.code, u.short])], '')}${sel('os', [['active', 'المفتوحة (غير المغلقة)'], ['', 'الكل'], ...Object.entries(OST)], st.s)}<label class="chk"><input type="checkbox" id="ol" ${st.late ? 'checked' : ''}> المتأخرة أو بلا تحديث فقط</label></div>
     <div class="fmostats" id="oStats"></div><div id="oList"></div>`;
   const render = () => {
     const list = D.obs.filter(o => (!st.f || o.facility_id === +st.f) && (!st.g || D.S[o.system_code]?.grp === st.g) && (!st.u || o.owner === st.u) && (st.s === 'active' ? o.status !== 'closed' : !st.s || o.status === st.s) && (!st.late || late(o) || stale(o))
@@ -265,7 +331,7 @@ async function obsDetail(id, re) {
     <div class="fmod-h" style="--c:${ST[o.severity].c}"><div><b>#${o.id} — ${esc(o.title)}</b><span class="muted">${esc(f?.name || '')}${s ? ' · ' + esc(s.name) : ''}</span></div>${opill(o.status)}</div>
     ${o.details ? `<p class="pre">${esc(o.details)}</p>` : ''}
     <div class="fmlast ${stale(o) ? 'stale' : ''}"><span>آخر إجراء متخذ</span>${o.last_action ? `<p>${esc(o.last_action)}</p><small>${pname(o.last_action_by) ? esc(pname(o.last_action_by)) + ' · ' : ''}${dateAr(o.last_action_at)} (${ago(o.last_action_at)})</small>` : '<p class="muted">لم يُسجَّل أي إجراء بعد.</p>'}${stale(o) ? `<b>بلا تحديث منذ ${daysSince(o.last_action_at || o.created_at)} يوماً — المطلوب تحديث الحالة بالمعالجة أو الإجراء المتخذ</b>` : ''}</div>
-    <div class="kvs">${[['الخطورة', pill(o.severity, s)], ['القسم المسؤول', uchip(o.owner) || '—'], ['المكلّف', esc(pname(o.assignee_id) || o.assignee_name || '—')], ['الموعد', o.due_date ? `<span class="${late(o) ? 'bad' : ''}">${dateAr(o.due_date)}${late(o) ? ' (متأخرة)' : ''}</span>` : '—'], ['المصدر', { round: 'الجولة الشهرية', manual: 'إدخال مباشر', import: 'مستوردة من ملف Excel' }[o.source] || '—'], ['أُنشئت', dateAr(o.created_at)], ...(o.project_id ? [['المشروع', `<a href="#/project/${o.project_id}">فتح المشروع</a>`]] : []), ...(closed ? [['أُغلقت', dateAr(o.closed_at) + (o.close_note ? ' — ' + esc(o.close_note) : '')]] : [])].map(([k, v]) => `<div class="kv"><span>${k}</span><b>${v}</b></div>`).join('')}</div>
+    <div class="kvs">${[['الخطورة', pill(o.severity, s)], ['القسم المسؤول', uchip(o.owner) || '—'], ['المكلّف', esc(pname(o.assignee_id) || o.assignee_name || '—')], ['الموعد', o.due_date ? `<span class="${late(o) ? 'bad' : ''}">${dateAr(o.due_date)}${late(o) ? ' (متأخرة)' : ''}</span>` : '—'], ['المصدر', { round: 'الجولة', manual: 'إدخال مباشر', import: 'مستوردة من ملف Excel', visit: 'زيارة أو تقييم', bulk: 'من تقرير (لصق)' }[o.source] || '—'], ...(o.ref_no ? [['رقم الملاحظة في التقرير', esc(o.ref_no)]] : []), ...(o.visit_date ? [['تاريخ الزيارة', dateAr(o.visit_date)]] : []), ['المسار', esc(trk(o.track).name)], ['أُنشئت', dateAr(o.created_at)], ...(o.project_id ? [['المشروع', `<a href="#/project/${o.project_id}">فتح المشروع</a>`]] : []), ...(closed ? [['أُغلقت', dateAr(o.closed_at) + (o.close_note ? ' — ' + esc(o.close_note) : '')]] : [])].map(([k, v]) => `<div class="kv"><span>${k}</span><b>${v}</b></div>`).join('')}</div>
     ${w0 && p && !closed ? `<div class="fmstep"><label class="fld"><span>الخطوة الحالية في ${esc(o.proc)}</span><select id="oStep">${p.steps.map((x, i) => `<option value="${i + 1}" ${o.step === i + 1 ? 'selected' : ''}>${i + 1}. ${esc(uname(x.unit))}: ${esc(x.action.slice(0, 90))}</option>`).join('')}</select></label>${(o.step || 1) < n ? '<button class="btn sm" id="oAdv">✓ أُنجزت الخطوة ← التالية</button>' : ''}</div>` : ''}
     <div class="btnrow wrap mt8">${w0 ? `<button class="btn" id="oEdit">تعديل</button>${next ? `<button class="btn ${next[0] === 'closed' ? 'primary' : ''}" id="oNext">${next[1]}</button>` : ''}` : ''}${isAdmin() ? '<button class="btn ghost" id="oDel" style="color:#A6503B">حذف</button>' : ''}</div>
     <div class="toolbar m0 mt12"><h3 class="sub-h m0">أوامر العمل والإحالات للأقسام (${wos.length})</h3><span class="sp"></span>${!closed && (w0 || role() === 'tech') ? '<button class="btn sm primary" id="oWo">＋ أمر عمل للقسم المسؤول</button>' : ''}</div>
@@ -299,16 +365,18 @@ async function obsForm(o, preset = {}, done) {
   const procs = Object.values(G.P).filter(p => p.active !== false).sort((a, b) => a.code.localeCompare(b.code));
   const people = [['', '—'], ...D.people.filter(p => ['admin', 'facility'].includes(p.role) || p.id === v.assignee_id).map(p => [p.id, p.full_name])];
   let projects = []; if (canEdit()) { try { projects = await q(sb.from('projects').select('id,name').neq('stage', 'cancelled').order('name')); } catch { } }
-  const sysOpts = sid => [['', '— (عام للمنشأة)'], ...D.allSys.filter(s => s.active !== false || s.code === sid).map(s => [s.code, `${GRP[s.grp]} — ${s.name}`])];
+  const G0 = grpMap(), SC = SCALE[trk().scale] || SCALE.sys;
+  const sysOpts = sid => [['', '— (عام للمنشأة)'], ...D.allSys.filter(s => s.active !== false || s.code === sid).map(s => [s.code, `${G0[s.grp] || GRP[s.grp] || ''} — ${s.name}`])];
   const stepOpts = (pc, cur) => { const p = G.P[pc]; return p ? p.steps.map((x, i) => `<option value="${i + 1}" ${+cur === i + 1 ? 'selected' : ''}>${i + 1}. ${esc(uname(x.unit))}: ${esc(x.action.slice(0, 80))}</option>`).join('') : '<option value="">—</option>'; };
   const procSel = cur => `<select name="proc">${procs.map(p => `<option value="${p.code}" ${p.code === cur ? 'selected' : ''}>${p.code} — ${esc(p.title)}</option>`).join('')}</select>`;
-  if (!v.proc) { const s = D.S[v.system_code]; v.proc = suggestProc(s, v.severity); v.owner ||= s?.owner || 'MNT'; }
+  if (!v.proc) { const s = D.S[v.system_code]; v.proc = s ? suggestProc(s, v.severity) : (trk().proc || 'G-05'); v.owner ||= s?.owner || trk().owner || 'MNT'; }
   await modal(`<form id="f" class="pgrid">
     ${field('المنشأة *', sel('facility_id', [['', '—'], ...D.fac.map(f => [f.id, f.name])], v.facility_id || '', 'required'))}
-    ${field('النظام', sel('system_code', sysOpts(v.system_code), v.system_code || ''))}
+    ${field(TR === 'SYS' ? 'النظام' : 'البند', sel('system_code', sysOpts(v.system_code), v.system_code || ''))}
     ${field('عنوان الملاحظة *', inp('title', v.title || '', 'required placeholder="مثال: تعطل مضخة الإطفاء الرئيسية"'), 'wide')}
     ${field('الوصف والتفاصيل', `<textarea name="details" rows="3">${esc(v.details || '')}</textarea>`, 'wide')}
-    ${field('الخطورة', sel('severity', [['attention', 'يحتاج متابعة'], ['partial', 'معطل جزئياً'], ['down', 'معطل']], v.severity))}
+    ${field('الخطورة', sel('severity', [['attention', SC.attention], ['partial', SC.partial], ['down', SC.down]], v.severity))}
+    ${field('رقم الملاحظة في التقرير (اختياري)', inp('ref_no', v.ref_no || ''))}${field('تاريخ الزيارة أو التقييم', inp('visit_date', v.visit_date || '', 'type="date"'))}
     ${field('القسم المسؤول', sel('owner', units, v.owner || 'MNT'))}
     <div class="fld wide fmprocf"><span>الإجراء الحاكم في الدليل <small class="muted" id="pHint"></small></span>${procSel(v.proc)}</div>
     ${field('الخطوة الحالية', `<select name="step">${stepOpts(v.proc, v.step || 1)}</select>`, 'wide')}
@@ -324,10 +392,10 @@ async function obsForm(o, preset = {}, done) {
       form.system_code.onchange = () => { const s = D.S[form.system_code.value]; if (s && !o) { form.owner.value = s.owner || form.owner.value; form.proc.value = suggestProc(s, form.severity.value); form.step.innerHTML = stepOpts(form.proc.value, 1); } hint(); };
       form.severity.onchange = hint; hint();
       form.onsubmit = async e => { e.preventDefault(); const x = formData(e.target);
-        const row = { facility_id: +x.facility_id, system_code: x.system_code || null, title: x.title.trim(), details: x.details.trim(), severity: x.severity, owner: x.owner, proc: x.proc, step: +x.step || null, assignee_id: x.assignee_id || null, assignee_name: x.assignee_name.trim(), due_date: x.due_date || null, ...(projects.length ? { project_id: x.project_id || null } : {}) };
+        const row = { facility_id: +x.facility_id, system_code: x.system_code || null, track: TR, ref_no: x.ref_no.trim(), visit_date: x.visit_date || null, title: x.title.trim(), details: x.details.trim(), severity: x.severity, owner: x.owner, proc: x.proc, step: +x.step || null, assignee_id: x.assignee_id || null, assignee_name: x.assignee_name.trim(), due_date: x.due_date || null, ...(projects.length ? { project_id: x.project_id || null } : {}) };
         try {
           if (o) await q(sb.from('fm_obs').update(row).eq('id', o.id));
-          else await q(sb.from('fm_obs').insert({ ...row, status: 'open', source: v.source || 'manual', round_id: v.round_id || null, created_by: session.user.id }));
+          else await q(sb.from('fm_obs').insert({ ...row, status: 'open', source: v.source || (['CBAHI', 'MYST'].includes(TR) ? 'visit' : 'manual'), round_id: v.round_id || null, created_by: session.user.id }));
           toast(o ? 'حُفظت' : 'أُنشئت الملاحظة'); close(); await load(); done && done();
         } catch (e2) { err(e2); } };
     } });
@@ -335,17 +403,17 @@ async function obsForm(o, preset = {}, done) {
 
 // ---------- سجل الأنظمة (للإدارة)
 function viewSystems(t, re) {
-  t.innerHTML = `<div class="pcard"><div class="toolbar"><h2 class="m0">سجل الأنظمة <span class="muted">(${D.allSys.length})</span></h2><span class="muted small">لكل نظام قسمه المالك وإجراؤه الحاكم؛ منها تُقترح الإجراءات للملاحظات تلقائياً.</span><span class="sp"></span><button class="btn primary" id="sNew">＋ نظام</button></div>
-    <div class="tblwrap"><table class="lst"><thead><tr><th>الكود</th><th>النظام</th><th>المجموعة</th><th>القسم المالك</th><th>الإجراء الحاكم</th><th class="c">حرج</th><th class="c">الترتيب</th><th></th></tr></thead><tbody>
-    ${D.allSys.map(s => `<tr class="${s.active === false ? 'off' : ''}"><td><b class="ltr">${esc(s.code)}</b></td><td>${esc(s.name)}<div class="muted small">${esc(s.name_en || '')}</div></td><td>${GRP[s.grp]}</td><td>${uchip(s.owner)}${(s.partners || []).map(uchip).join('')}</td><td>${s.proc ? govChip(s.proc) : '—'}</td><td class="c">${s.critical ? '●' : ''}</td><td class="c">${s.sort}</td><td><button class="btn sm" data-e="${esc(s.code)}">تعديل</button></td></tr>`).join('')}</tbody></table></div></div>`;
-  const form = s => { const v = s || { grp: 'system', owner: 'MNT', partners: [], proc: 'G-05', sort: (D.allSys.slice(-1)[0]?.sort || 0) + 10, active: true };
+  t.innerHTML = `<div class="pcard"><div class="toolbar"><h2 class="m0">بنود ${esc(trk().name)} <span class="muted">(${D.allSys.length})</span></h2><span class="muted small">لكل بند قسمه المالك وإجراؤه الحاكم؛ منها تُقترح الإجراءات للملاحظات تلقائياً.</span><span class="sp"></span><button class="btn primary" id="sNew">＋ بند</button></div>
+    <div class="tblwrap"><table class="lst"><thead><tr><th>الكود</th><th>البند</th><th>المجموعة</th><th>القسم المالك</th><th>الإجراء الحاكم</th><th class="c">حرج</th><th class="c">الترتيب</th><th></th></tr></thead><tbody>
+    ${D.allSys.map(s => `<tr class="${s.active === false ? 'off' : ''}"><td><b class="ltr">${esc(s.code)}</b></td><td>${esc(s.name)}<div class="muted small">${esc(s.name_en || '')}</div></td><td>${esc(grpMap()[s.grp] || GRP[s.grp] || s.grp)}</td><td>${uchip(s.owner)}${(s.partners || []).map(uchip).join('')}</td><td>${s.proc ? govChip(s.proc) : '—'}</td><td class="c">${s.critical ? '●' : ''}</td><td class="c">${s.sort}</td><td><button class="btn sm" data-e="${esc(s.code)}">تعديل</button></td></tr>`).join('')}</tbody></table></div></div>`;
+  const form = s => { const v = s || { grp: (trk().groups || [])[0]?.k || 'system', owner: trk().owner || 'MNT', partners: [], proc: trk().proc || 'G-05', sort: (D.allSys.slice(-1)[0]?.sort || 0) + 10, active: true };
     const units = G.units.filter(u => u.kind === 'unit');
-    modal(`<form id="f" class="pgrid">${field('الكود *', inp('code', v.code || '', s ? 'readonly' : 'required placeholder="مثال: STER" dir="ltr"'))}${field('الترتيب', inp('sort', v.sort, 'type="number"'))}${field('الاسم *', inp('name', v.name || '', 'required'), 'wide')}${field('الاسم بالإنجليزية', inp('name_en', v.name_en || '', 'dir="ltr"'))}${field('المجموعة', sel('grp', Object.entries(GRP), v.grp))}${field('القسم المالك', sel('owner', units.map(u => [u.code, u.short]), v.owner))}${field('الإجراء الحاكم', sel('proc', Object.values(G.P).map(p => [p.code, p.code + ' — ' + p.title]), v.proc))}
+    modal(`<form id="f" class="pgrid">${field('الكود *', inp('code', v.code || '', s ? 'readonly' : 'required placeholder="مثال: STER" dir="ltr"'))}${field('الترتيب', inp('sort', v.sort, 'type="number"'))}${field('الاسم *', inp('name', v.name || '', 'required'), 'wide')}${field('الاسم بالإنجليزية', inp('name_en', v.name_en || '', 'dir="ltr"'))}${field('المجموعة', sel('grp', Object.entries(grpMap()).length ? Object.entries(grpMap()) : Object.entries(GRP), v.grp))}${field('القسم المالك', sel('owner', units.map(u => [u.code, u.short]), v.owner))}${field('الإجراء الحاكم', sel('proc', Object.values(G.P).map(p => [p.code, p.code + ' — ' + p.title]), v.proc))}
       <div class="fld wide"><span>أقسام مشاركة</span><div class="chips">${units.map(u => `<label class="chip"><input type="checkbox" name="p_${u.code}" ${(v.partners || []).includes(u.code) ? 'checked' : ''}> ${esc(u.short)}</label>`).join('')}</div></div>
       ${field('ما الذي يُفحص', inp('hint', v.hint || ''), 'wide')}<label class="chk wide"><input type="checkbox" name="critical" ${v.critical ? 'checked' : ''}> نظام حرج (تعطله يُقترح له إجراء الطوارئ G-11)</label><label class="chk wide"><input type="checkbox" name="active" ${v.active !== false ? 'checked' : ''}> فعّال (يظهر في الجولة والمصفوفة)</label>
-      <div class="btnrow end wide"><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">حفظ</button></div></form>`, { title: s ? 'تعديل نظام' : 'نظام جديد', wide: true, onOpen: (w, close) => {
+      <div class="btnrow end wide"><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">حفظ</button></div></form>`, { title: s ? 'تعديل بند' : 'بند جديد', wide: true, onOpen: (w, close) => {
       $('#f', w).onsubmit = async e => { e.preventDefault(); const x = formData(e.target);
-        const row = { code: x.code.trim().toUpperCase(), name: x.name.trim(), name_en: x.name_en.trim(), grp: x.grp, owner: x.owner, proc: x.proc, partners: units.map(u => u.code).filter(c => x['p_' + c]), hint: x.hint.trim(), critical: !!x.critical, active: !!x.active, sort: +x.sort || 0 };
+        const row = { code: x.code.trim().toUpperCase(), track: TR, name: x.name.trim(), name_en: x.name_en.trim(), grp: x.grp, owner: x.owner, proc: x.proc, partners: units.map(u => u.code).filter(c => x['p_' + c]), hint: x.hint.trim(), critical: !!x.critical, active: !!x.active, sort: +x.sort || 0 };
         try { if (s) await q(sb.from('fm_systems').update(row).eq('code', s.code)); else await q(sb.from('fm_systems').insert(row)); toast('حُفظ'); close(); re(); } catch (e2) { err(e2); } };
     } }); };
   $('#sNew', t).onclick = () => form(null);
@@ -435,4 +503,20 @@ async function exportXlsx(R) {
   [s1, s2, s3].forEach(ws => { ws.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 }; ws.headerFooter = { oddFooter: '&Lتجمع الأحساء الصحي — إدارة الخدمات الفنية&Rصفحة &P من &N' }; });
   const buf = await wb.xlsx.writeBuffer(); const { download } = await import('./ui.js');
   download(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `تقرير حالة الأنظمة - ${monthAr(R.period)}.xlsx`);
+}
+
+// ---------- لصق ملاحظات من تقرير (سباهي، الزائر السري، جولة…) دفعة واحدة
+async function bulkObs(done) {
+  const items = D.sys, SC = SCALE[trk().scale] || SCALE.sys;
+  await modal(`<form id="bf" class="pgrid"><p class="wide muted small m0">سطر لكل ملاحظة. يمكن أن يبدأ السطر برقم الملاحظة في التقرير ثم « | ». مثال: <span class="ltr">12 | لا توجد بطاقة بيانات سلامة لمادة التنظيف في غرفة الجانيتور</span></p>
+    ${field('المنشأة *', sel('facility_id', [['', '—'], ...D.fac.map(f => [f.id, f.name])], '', 'required'))}${field('البند', sel('system_code', [['', '— (عام للمنشأة)'], ...items.map(s => [s.code, s.name])], ''))}
+    ${field('الخطورة', sel('severity', [['attention', SC.attention], ['partial', SC.partial], ['down', SC.down]], 'attention'))}${field('تاريخ الزيارة أو التقييم', inp('visit_date', new Date().toISOString().slice(0, 10), 'type="date"'))}
+    ${field('الملاحظات *', '<textarea name="lines" rows="10" required></textarea>', 'wide')}
+    <div class="btnrow end wide"><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">إضافة الملاحظات</button></div></form>`, { title: 'لصق ملاحظات — ' + trk().name, wide: true, onOpen: (w, close) => {
+    $('#bf', w).onsubmit = async e => { e.preventDefault(); const x = formData(e.target); const s = D.S[x.system_code];
+      const rows = String(x.lines).split('\n').map(l => l.trim()).filter(Boolean).map(l => { const m = l.match(/^([^|]{1,20})\|\s*(.+)$/); const ref = m ? m[1].trim() : '', title = (m ? m[2] : l).trim();
+        return { facility_id: +x.facility_id, system_code: x.system_code || null, track: TR, title: title.slice(0, 300), details: title.length > 300 ? title : '', severity: x.severity, status: 'open', proc: s ? suggestProc(s, x.severity) : (trk().proc || 'G-05'), step: 1, owner: s?.owner || trk().owner || 'MNT', source: 'bulk', ref_no: ref, visit_date: x.visit_date || null, created_by: session.user.id }; });
+      if (!rows.length) return toast('لا ملاحظات', 'bad');
+      try { await q(sb.from('fm_obs').insert(rows)); toast(`أُضيفت ${rows.length} ملاحظة`); close(); done && done(); } catch (er) { err(er); } };
+  } });
 }
