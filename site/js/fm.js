@@ -100,9 +100,10 @@ export async function mountFM(root, tab = 'home', params = new URLSearchParams()
   const tr = trk(), general = tab === 'home' || tab === 'fac';
   const nOpen = D.obs.filter(o => o.status !== 'closed').length, nLate = D.obs.filter(late).length;
   const tabs = [['dash', 'اللوحة'], ['round', TR === 'SYS' ? 'الجولة الشهرية' : 'تحديث الحالة'], ['obs', `الملاحظات <b class="fmcnt ${nLate ? 'bad' : ''}">${nOpen}</b>`], ...(isAdmin() ? [['systems', 'سجل البنود']] : []), ...(TR === 'SYS' ? [['report', 'التقرير الشهري']] : [])];
-  const trCard = t => { const st = trackStats(t.code); return `<a class="fmtr ${!general && t.code === TR ? 'on' : ''}" href="#/fm/dash?t=${t.code}" style="--c:#${t.color}">${ico(t.icon || 'pulse')}<b>${esc(t.short || t.name)}</b><small>${st.ready === null ? 'لا بيانات بعد' : `${READY[t.scale] || 'الجاهزية'} ${st.ready}٪`}${st.open ? ` · <em>${st.open}</em> مفتوحة` : ''}</small></a>`; };
-  root.innerHTML = `<div class="fmhead"><div><h1 class="pagetitle">المتابعة</h1><p class="muted m0">${general ? 'مسارات متابعة لكل منشأة بنفس الترتيب، وكل ملاحظة مربوطة بإجرائها في دليل الحوكمة وخطوتها الحالية.' : esc(tr.intro || '')}</p></div><span class="sp"></span>${canW() && !general ? `<a class="btn primary" href="${tq('#/fm/round')}">＋ ${TR === 'SYS' ? 'جولة شهرية' : 'تحديث الحالة'}</a><button class="btn" id="fmNewObs">＋ ملاحظة</button>${['CBAHI', 'MYST'].includes(TR) || TR !== 'SYS' ? '<button class="btn" id="fmBulk">لصق ملاحظات تقرير</button>' : ''}` : ''}</div>
-    <nav class="fmtrs"><a class="fmtr all ${general ? 'on' : ''}" href="#/fm/home">${ico('dash')}<b>نظرة عامة</b><small>كل المسارات لكل منشأة</small></a>${D.tracks.map(trCard).join('')}</nav>
+  const trCard = t => { const st = trackStats(t.code); const c = st.ready === null ? '' : st.ready >= 85 ? 'g' : st.ready >= 60 ? 'a' : 'r';
+    return `<a class="fmtr ${!general && t.code === TR ? 'on' : ''}" href="#/fm/dash?t=${t.code}" style="--c:#${t.color}" title="${esc(t.name)}">${ico(t.icon || 'pulse')}<b>${esc(t.short || t.name)}</b><small><span class="${c}">${st.ready === null ? '—' : st.ready + '٪'}</span>${st.open ? `<em class="${st.late ? 'bad' : ''}">${st.open}</em>` : ''}</small></a>`; };
+  root.innerHTML = `<div class="fmhead"><div class="fmhead-t"><h1 class="pagetitle">المتابعة${general ? '' : ` <span class="fmhead-s" style="--c:#${tr.color}">${esc(tr.name)}</span>`}</h1><p class="muted m0" title="${esc(general ? '' : tr.intro || '')}">${general ? 'كل منشأة تُتابع بنفس الأقسام والترتيب، وكل ملاحظة مربوطة بإجرائها في دليل الحوكمة.' : esc(tr.intro || '')}</p></div>${canW() && !general ? `<div class="fmhead-a"><a class="btn primary" href="${tq('#/fm/round')}">${TR === 'SYS' ? 'الجولة الشهرية' : 'تحديث الحالة'}</a><button class="btn ghost" id="fmNewObs">＋ ملاحظة</button>${TR !== 'SYS' ? '<button class="btn ghost" id="fmBulk">لصق من تقرير</button>' : ''}</div>` : ''}</div>
+    <nav class="fmtrs"><a class="fmtr all ${general ? 'on' : ''}" href="#/fm/home">${ico('dash')}<b>نظرة عامة</b><small>كل الأقسام</small></a>${D.tracks.map(trCard).join('')}</nav>
     ${general ? '' : `<nav class="fmtabs">${tabs.map(([k, v]) => `<a href="${tq('#/fm/' + k)}" class="${tab === k ? 'on' : ''}">${v}</a>`).join('')}</nav>`}<div id="fmBody"></div>`;
   $('#fmNewObs', root) && ($('#fmNewObs', root).onclick = () => obsForm(null, {}, () => mountFM(root, tab, params)));
   $('#fmBulk', root) && ($('#fmBulk', root).onclick = () => bulkObs(() => mountFM(root, 'obs', new URLSearchParams('t=' + TR))));
@@ -124,28 +125,52 @@ function trackStats(code, fid = null) {
   return { ready: base ? Math.round(good / base * 100) : null, base, good, bad, open: obs.length, late: obs.filter(late).length, items: items.length };
 }
 
-// ---------- نظرة عامة: كل منشأة × كل المسارات
+// ---------- نظرة عامة: كل منشأة × كل الأقسام
+let HSORT = 'worst';
+function facScore(fid) { const rs = D.tracks.map(tr => trackStats(tr.code, fid)); const vals = rs.map(x => x.ready).filter(x => x !== null);
+  return { avg: vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : null, open: rs.reduce((a, x) => a + x.open, 0), late: rs.reduce((a, x) => a + x.late, 0), n: vals.length }; }
+const band = v => v === null ? '' : v >= 85 ? 'g' : v >= 60 ? 'a' : 'r';
 function viewHome(t) {
-  const cell = (f, tr) => { const st = trackStats(tr.code, f.id); const c = st.ready === null ? '' : st.ready >= 85 ? 'g' : st.ready >= 60 ? 'a' : 'r';
-    return `<td><a class="fmhc ${c}" href="#/fm/dash?t=${tr.code}&f=${f.id}" title="${esc(f.name)} — ${esc(tr.name)}">${st.ready === null ? '<span class="muted">—</span>' : `<b>${st.ready}٪</b>`}${st.open ? `<small class="${st.late ? 'bad' : ''}">${st.open} مفتوحة</small>` : ''}</a></td>`; };
-  const tot = D.tracks.map(tr => ({ tr, st: trackStats(tr.code) }));
-  t.innerHTML = `<div class="fmhk">${tot.map(({ tr, st }) => `<a class="fmk" href="#/fm/dash?t=${tr.code}" style="--c:#${tr.color}"><span class="fmhk-i">${ico(tr.icon || 'pulse')}</span><b>${st.ready === null ? '—' : st.ready + '٪'}</b><span>${esc(tr.name)}</span><small>${st.items} بنداً · ${st.open} ملاحظة مفتوحة${st.late ? ` · <em class="bad">${st.late} متأخرة</em>` : ''}</small></a>`).join('')}</div>
-    <div class="pcard fmmatrix"><div class="toolbar m0"><h2 class="m0">المنشآت × مسارات المتابعة</h2><span class="muted small">النسبة: البنود بحالة جيدة من آخر تحديث، والرقم: الملاحظات المفتوحة. اضغط المنشأة لصفحتها الكاملة.</span></div>
-      <div class="fmscroll"><table class="fmtab fmhome"><thead><tr><th class="fh">المنشأة</th>${D.tracks.map(tr => `<th style="--c:#${tr.color}"><span class="fmth">${ico(tr.icon || 'pulse')} ${esc(tr.short || tr.name)}</span></th>`).join('')}</tr></thead>
-      <tbody>${D.fac.map(f => `<tr><th class="fh"><a href="#/fm/fac?f=${f.id}">${esc(f.name)}</a></th>${D.tracks.map(tr => cell(f, tr)).join('')}</tr>`).join('')}</tbody></table></div></div>`;
+  const cell = (f, tr) => { const st = trackStats(tr.code, f.id);
+    return `<td><a class="fmhc ${band(st.ready)}" href="#/fm/dash?t=${tr.code}&f=${f.id}" title="${esc(f.name)} — ${esc(tr.name)}">${st.ready === null ? '<span class="muted">—</span>' : `<b>${st.ready}٪</b>`}${st.open ? `<small class="${st.late ? 'bad' : ''}">${st.open} مفتوحة</small>` : ''}</a></td>`; };
+  const render = () => {
+    let rows = D.fac.map(f => ({ f, sc: facScore(f.id) }));
+    if (HSORT === 'worst') rows.sort((a, b) => (a.sc.avg === null) - (b.sc.avg === null) || (a.sc.avg ?? 0) - (b.sc.avg ?? 0) || b.sc.open - a.sc.open);
+    t.innerHTML = `<div class="pcard fmmatrix"><div class="toolbar m0"><h2 class="m0">المنشآت × أقسام المتابعة</h2><span class="sp"></span>
+        <div class="fmfilt"><button data-o="worst" class="${HSORT === 'worst' ? 'on' : ''}">الأحوج أولاً</button><button data-o="std" class="${HSORT === 'std' ? 'on' : ''}">الترتيب المعتمد</button></div></div>
+      <p class="muted small fmnote">النسبة: البنود بحالة جيدة في آخر تحديث · الرقم تحتها: الملاحظات المفتوحة · اضغط اسم المنشأة لصفحتها الكاملة.</p>
+      <div class="fmscroll"><table class="fmtab fmhome"><thead><tr><th class="fh">المنشأة</th><th class="fmavg">العام</th>${D.tracks.map(tr => `<th style="--c:#${tr.color}"><span class="fmth">${ico(tr.icon || 'pulse')} ${esc(tr.short || tr.name)}</span></th>`).join('')}</tr></thead>
+      <tbody>${rows.map(({ f, sc }) => `<tr><th class="fh"><a href="#/fm/fac?f=${f.id}">${esc(f.name)}</a></th><td class="fmavg"><span class="fmav ${band(sc.avg)}">${sc.avg === null ? '—' : sc.avg + '٪'}</span>${sc.open ? `<small class="${sc.late ? 'bad' : 'muted'}">${sc.open} مفتوحة</small>` : ''}</td>${D.tracks.map(tr => cell(f, tr)).join('')}</tr>`).join('')}</tbody></table></div></div>`;
+    $$('[data-o]', t).forEach(b => b.onclick = () => { HSORT = b.dataset.o; render(); });
+  };
+  render();
 }
 
-// ---------- صفحة المنشأة: كل المسارات بنفس الترتيب
+// ---------- صفحة المنشأة: ملخص ثم الأقسام بنفس الترتيب (ما يحتاج تدخلاً أولاً داخل كل قسم)
 function viewFac(t, params) {
   const fid = +(params.get('f') || 0) || D.fac[0]?.id, f = D.F[fid];
   if (!f) { t.innerHTML = '<div class="empty-boq">اختر منشأة.</div>'; return; }
-  t.innerHTML = `<div class="pcard fmpick"><label class="fld"><span>المنشأة</span>${sel('ff', D.fac.map(x => [x.id, x.name]), fid)}</label></div>
-    <div class="fmfac">${D.tracks.map(tr => { const items = D.everySys.filter(s => s.track === tr.code && s.active !== false); const st = trackStats(tr.code, fid); const gm = Object.fromEntries((tr.groups || []).map(g => [g.k, g.l]));
-      return `<section class="pcard fmfs" style="--c:#${tr.color}"><div class="fmfs-h">${ico(tr.icon || 'pulse')}<h2>${esc(tr.name)}</h2><span class="sp"></span><b>${st.ready === null ? 'لا بيانات' : (READY[tr.scale] || 'الجاهزية') + ' ' + st.ready + '٪'}</b>${st.open ? `<a class="fmcnt ${st.late ? 'bad' : ''}" href="#/fm/obs?t=${tr.code}&f=${fid}">${st.open} مفتوحة</a>` : ''}<a class="btn sm ghost" href="#/fm/round?t=${tr.code}&f=${fid}">${tr.code === 'SYS' ? 'الجولة' : 'تحديث'}</a></div>
-        <div class="fmfs-l">${[...new Set(items.map(s => s.grp))].map(g => `<div class="fmfs-g"><small>${esc(gm[g] || GRP[g] || g)}</small>${items.filter(s => s.grp === g).map(s => { const l = D.L[fid]?.[s.code]; const oo = D.everyObs.filter(o => o.facility_id === fid && o.system_code === s.code && o.status !== 'closed');
-          return `<button class="fmfs-i" data-f="${fid}" data-s="${s.code}" data-t="${tr.code}"><span>${esc(s.name)}</span>${pill(l?.status, s)}${oo.length ? `<em>${oo.length}</em>` : ''}</button>`; }).join('')}</div>`).join('')}</div></section>`; }).join('')}</div>`;
+  const sc = facScore(fid);
+  const secs = D.tracks.map(tr => { const items = D.everySys.filter(s => s.track === tr.code && s.active !== false); const st = trackStats(tr.code, fid);
+    const rows = items.map(s => ({ s, l: D.L[fid]?.[s.code], oo: D.everyObs.filter(o => o.facility_id === fid && o.system_code === s.code && o.status !== 'closed') }));
+    const need = rows.filter(r => (r.l && !['good', 'na'].includes(r.l.status)) || r.oo.length).sort((a, b) => (RANK[b.l?.status] || 0) - (RANK[a.l?.status] || 0));
+    const ok = rows.filter(r => r.l?.status === 'good' && !r.oo.length), none = rows.filter(r => !r.l && !r.oo.length), na = rows.filter(r => r.l?.status === 'na' && !r.oo.length);
+    return { tr, st, need, ok, none, na }; });
+  const btn = (r, tr) => `<button class="fmfs-i" data-s="${r.s.code}" data-t="${tr.code}"><span>${esc(r.s.name)}</span>${pill(r.l?.status, { ...r.s, track: tr.code })}${r.oo.length ? `<em title="ملاحظات مفتوحة">${r.oo.length}</em>` : ''}</button>`;
+  const chip = (r, tr, cls) => `<button class="fmchip ${cls}" data-s="${r.s.code}" data-t="${tr.code}">${esc(r.s.name)}</button>`;
+  t.innerHTML = `<div class="pcard fmfhead"><label class="fld"><span>المنشأة</span>${sel('ff', D.fac.map(x => [x.id, x.name]), fid)}</label>
+      <div class="fmfsum"><div class="fmav big ${band(sc.avg)}">${sc.avg === null ? '—' : sc.avg + '٪'}<small>المتوسط العام</small></div><div class="fmav big ${sc.open ? (sc.late ? 'r' : 'a') : 'g'}">${sc.open}<small>ملاحظة مفتوحة${sc.late ? ` · ${sc.late} متأخرة` : ''}</small></div></div>
+      <div class="fmfsum-t">${secs.map(({ tr, st, need }) => `<a href="#fs-${tr.code}" class="fmst ${band(st.ready)}" style="--c:#${tr.color}">${ico(tr.icon || 'pulse')}<span>${esc(tr.short || tr.name)}</span><b>${st.ready === null ? '—' : st.ready + '٪'}</b>${need.length ? `<em>${need.length}</em>` : ''}</a>`).join('')}</div></div>
+    <div class="fmfac">${secs.map(({ tr, st, need, ok, none, na }) => `<details class="pcard fmfs" id="fs-${tr.code}" style="--c:#${tr.color}" ${need.length ? 'open' : ''}><summary class="fmfs-h">${ico(tr.icon || 'pulse')}<h2>${esc(tr.name)}</h2>
+        <span class="fmfs-m">${need.length ? `<b class="bad">${need.length} يحتاج تدخلاً</b>` : st.ready === null ? '<span class="muted">لم يُبدأ</span>' : '<b class="okc">كل البنود سليمة</b>'}</span><span class="sp"></span><span class="fmav ${band(st.ready)}">${st.ready === null ? '—' : st.ready + '٪'}</span><span class="fmfs-x">${ico('chev')}</span></summary>
+        <div class="fmfs-b">${need.length ? `<div class="fmfs-l">${need.map(r => btn(r, tr)).join('')}</div>` : ''}
+          ${ok.length ? `<div class="fmfs-c"><small>سليمة (${ok.length})</small>${ok.map(r => chip(r, tr, 'ok')).join('')}</div>` : ''}
+          ${none.length ? `<div class="fmfs-c"><small>لم تُفحص (${none.length})</small>${none.map(r => chip(r, tr, 'none')).join('')}</div>` : ''}
+          ${na.length ? `<div class="fmfs-c"><small>لا تنطبق (${na.length})</small>${na.map(r => chip(r, tr, 'na')).join('')}</div>` : ''}
+          <div class="fmfs-f"><a class="btn sm" href="#/fm/round?t=${tr.code}&f=${fid}">${tr.code === 'SYS' ? 'الجولة الشهرية' : 'تحديث الحالة'}</a>${st.open ? `<a class="btn sm ghost" href="#/fm/obs?t=${tr.code}&f=${fid}">الملاحظات (${st.open})</a>` : ''}</div></div></details>`).join('')}</div>`;
   $('[name=ff]', t).onchange = e => location.hash = '#/fm/fac?f=' + e.target.value;
-  $$('.fmfs-i', t).forEach(b => b.onclick = () => { scope(b.dataset.t); cellDetail(+b.dataset.f, b.dataset.s, () => viewFac(t, params)); });
+  $$('.fmst', t).forEach(a => a.onclick = e => { e.preventDefault(); const d = $(a.getAttribute('href'), t); d.open = true; d.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+  $$('.fmfs-i,.fmchip', t).forEach(b => b.onclick = () => { scope(b.dataset.t); cellDetail(fid, b.dataset.s, () => viewFac(t, params)); });
 }
 
 // ---------- اللوحة
@@ -171,16 +196,16 @@ function viewDash(t, params, re) {
         ${kpi(att ? 'amber' : '', att, SC.attention, '')}
         ${(() => { const sl = open.filter(stale).length; return kpi(lt.length || sl ? 'red' : 'blue', open.length, 'ملاحظات مفتوحة', [lt.length ? `<b>${lt.length}</b> متأخرة عن موعدها` : '', sl ? `<b>${sl}</b> بلا تحديث منذ ${STALE_DAYS} أيام` : ''].filter(Boolean).join('<br>') || 'كلها محدّثة وفي موعدها', tq('#/fm/obs?due=1')); })()}
         ${kpi(undoc ? 'amber' : 'green', undoc, 'حالات بلا ملاحظة', undoc ? 'حالة غير سليمة لم تُفتح لها ملاحظة بعد' : 'كل حالة موثقة')}
-        ${kpi(staleFac.length ? 'amber' : 'green', staleFac.length, 'منشآت لم تُحدَّث هذا الشهر', staleFac.length ? staleFac.slice(0, 3).map(f => esc(f.name)).join('، ') + (staleFac.length > 3 ? '…' : '') : 'كل المنشآت محدّثة')}
+        ${kpi(staleFac.length ? 'amber' : 'green', staleFac.length, 'منشآت لم تُحدَّث هذا الشهر', staleFac.length ? `من ${D.fac.length} منشأة` : 'كل المنشآت محدّثة', tq('#/fm/round'))}
       </div>
       <div class="pcard fmmatrix"><div class="toolbar m0"><h2 class="m0">مصفوفة الحالة</h2><span class="muted small">آخر حالة مسجلة لكل بند في كل منشأة</span><span class="sp"></span>
         <div class="fmfilt"><button data-g="" class="${!grp ? 'on' : ''}">الكل</button>${Object.entries(G0).map(([k, v]) => `<button data-g="${k}" class="${grp === k ? 'on' : ''}">${v}</button>`).join('')}</div></div>
         <div class="fmlegend">${ORDER.map(s => `<span><i style="--c:${ST[s].c}">${ST[s].i}</i>${SC[s]}</span>`).join('')}<span><i class="nd">!</i>بلا ملاحظة</span><span><i class="ob">•</i>ملاحظة مفتوحة</span></div>
         <div class="fmscroll"><table class="fmtab"><thead><tr><th class="fh" rowspan="2">المنشأة</th>${groups.map(g => `<th class="gh" colspan="${sys.filter(s => s.grp === g).length}">${esc(G0[g] || GRP[g] || g)}</th>`).join('')}</tr>
           <tr>${groups.map(g => sys.filter(s => s.grp === g).map(s => `<th class="sh" title="${esc(s.name)}"><span>${esc(s.name)}</span></th>`).join('')).join('')}</tr></thead>
-          <tbody>${facs.filter(({ f }) => !+params.get('f') || f.id === +params.get('f')).map(({ f, st, r }) => `<tr><th class="fh"><a href="${tq('#/fm/round?f=' + f.id)}">${esc(f.name)}</a><div class="fhm">${st.ready === null ? '<span class="muted">لا جولة بعد</span>' : `<span class="rb"><i style="width:${st.ready}%"></i></span><b>${st.ready}٪</b><span class="muted">${monthAr(r?.period)}</span>`}</div></th>
+          <tbody>${facs.filter(({ f }) => (!+params.get('f') || f.id === +params.get('f')) && (+params.get('f') || D.sys.some(x => D.L[f.id]?.[x.code]))).map(({ f, st, r }) => `<tr><th class="fh"><a href="${tq('#/fm/round?f=' + f.id)}">${esc(f.name)}</a><div class="fhm">${st.ready === null ? '<span class="muted">لا جولة بعد</span>' : `<span class="rb"><i style="width:${st.ready}%"></i></span><b>${st.ready}٪</b><span class="muted">${monthAr(r?.period)}</span>`}</div></th>
             ${groups.map(g => sys.filter(s => s.grp === g).map(s => { const l = D.L[f.id]?.[s.code]; const oo = openObsOf(f.id, s.code); const nd = l && !['good', 'na'].includes(l.status) && !oo.length;
-              return `<td><button class="fmc ${l ? 's-' + l.status : 's-none'} ${nd ? 'nd' : ''} ${oo.length ? 'ob' : ''}" data-f="${f.id}" data-s="${s.code}" title="${esc(f.name)} — ${esc(s.name)}: ${esc(l ? stLabel(l.status, s) : 'لم يُفحص')}${oo.length ? ' · ' + oo.length + ' ملاحظة مفتوحة' : ''}">${l ? ST[l.status].i : ''}</button></td>`; }).join('')).join('')}</tr>`).join('')}</tbody></table></div></div>
+              return `<td><button class="fmc ${l ? 's-' + l.status : 's-none'} ${nd ? 'nd' : ''} ${oo.length ? 'ob' : ''}" data-f="${f.id}" data-s="${s.code}" title="${esc(f.name)} — ${esc(s.name)}: ${esc(l ? stLabel(l.status, s) : 'لم يُفحص')}${oo.length ? ' · ' + oo.length + ' ملاحظة مفتوحة' : ''}">${l ? ST[l.status].i : ''}</button></td>`; }).join('')).join('')}</tr>`).join('')}</tbody></table></div>${(() => { const nf = +params.get('f') ? [] : D.fac.filter(f => !D.sys.some(x => D.L[f.id]?.[x.code])); return nf.length ? `<details class="fmnone"><summary>لم يُبدأ في ${nf.length} ${nf.length > 10 ? 'منشأة' : 'منشآت'} — اضغط للعرض</summary><div>${nf.map(f => `<a class="fmchip none" href="${tq('#/fm/round?f=' + f.id)}">${esc(f.name)}</a>`).join('')}</div></details>` : ''; })()}</div>
       <div class="fm2col">
         <div class="pcard"><h2>أكثر البنود تعثراً</h2>${worstSys.length ? `<div class="fmbars">${worstSys.map(({ s, n }) => `<div class="fmbar"><span>${esc(s.name)}</span><i><em style="width:${Math.round(n / D.fac.length * 100)}%"></em></i><b>${n}</b></div>`).join('')}</div><p class="muted small m0">عدد المنشآت التي فيها البند بحالة غير سليمة.</p>` : '<p class="muted">لا بنود متعثرة.</p>'}</div>
         <div class="pcard"><div class="toolbar m0"><h2 class="m0">ملاحظات تحتاج انتباهاً</h2><span class="sp"></span><a class="small" href="${tq('#/fm/obs')}">كل الملاحظات ‹</a></div>${crit.length ? `<div class="fmolist">${crit.map(obsRow).join('')}</div>` : '<p class="muted">لا ملاحظات مفتوحة.</p>'}</div>
