@@ -11,6 +11,12 @@ const KINDS = ['تطوير وتأهيل', 'إنشاء جديد', 'توسعة', '
 // اختيار جاهز: التشطيبات الداخلية والأبواب والمصاعد والإنارة
 const PRESET = s => (s.startsWith('08') && !['08 44', '08 62', '08 63', '08 91', '08 92', '08 95'].some(x => s.startsWith(x)))
   || s.startsWith('09') || ['10 21', '10 26', '10 28', '12 35', '12 36', '14 21', '14 24', '14 26', '14 27', '14 28', '26 51', '26 52'].some(x => s.startsWith(x));
+// قوالب حسب طبيعة المشروع (على مستوى البند لا القسم): البنود اللازمة فقط، مع استبعاد خيارات لا تخص هذا النوع
+export const SPEC_TPL = {
+  entrance: { name: 'تطوير داخلي — مدخل رئيسي وردهات واستقبال', items: ['08 11 16', '08 12 16', '08 14 19', '08 14 23', '08 31 16', '08 41 13', '08 41 26', '08 42 13', '08 42 26', '08 42 29', '08 56 19', '08 71 13', '08 71 16', '08 71 19', '08 71 21', '08 71 23', '08 71 26', '08 71 29', '08 71 33', '08 71 39', '08 74 13', '08 81 13', '08 81 16', '08 87 13', '08 87 26', '09 05 61', '09 21 16', '09 21 33', '09 21 36', '09 22 26', '09 23 16', '09 29 10', '09 29 13', '09 29 16', '09 29 19', '09 29 29', '09 29 33', '09 30 19', '09 30 23', '09 30 33', '09 30 36', '09 30 43', '09 51 13', '09 51 33', '09 53 23', '09 53 26', '09 54 23', '09 54 26', '09 54 33', '09 54 36', '09 54 43', '09 65 13', '09 65 16', '09 65 19', '09 66 16', '09 66 23', '09 75 13', '09 77 33', '09 77 43', '09 77 53', '09 78 13', '09 78 16', '09 78 23', '09 91 23', '09 94 13', '09 96 66', '10 14 16', '10 14 23', '10 14 29', '10 14 33', '10 14 36', '10 14 46', '10 14 56', '10 14 63', '10 14 66', '10 14 73', '10 26 13', '10 26 16', '10 26 19', '10 26 23', '10 26 33', '10 26 46', '10 28 21', '10 28 26', '12 35 71', '12 36 40', '12 36 61', '12 36 63', '12 48 13', '12 48 16', '14 27 13', '14 27 16', '14 27 19', '14 27 23', '14 28 16', '14 28 23', '26 51 16', '26 51 19', '26 51 23', '26 51 33', '26 52 13', '26 52 16'],
+    skipVar: ['غرف المعدات', 'الكهرباء', 'للانفجار', 'المختبر', 'الكيماويات', 'المطابخ', 'المغاسل', 'العمليات', 'رصاص', 'الرنين', 'الغازات'] },
+};
+const tplVars = (it, tpl) => it.variants.filter(v => v.active !== false && !(tpl?.skipVar || []).some(w => (v.ar || '').includes(w))).map(v => v.code);
 const canW = () => canEdit();
 const badge = (t, c = 'skel') => `<span class="badge ${c}">${esc(t)}</span>`;
 
@@ -122,7 +128,8 @@ function secTree(chosen) {
 async function newSpecSet(owner) {
   const chosen = new Set(REF.sections.filter(s => PRESET(s.code)).map(s => s.code));
   await modal(`<form id="f" class="pgrid"><div class="wide">${field('اسم الجدول', inp('name', 'جدول المواد والمواصفات المعتمدة'))}</div>${field('المقاول (اختياري)', inp('contractor', ''))}
-    <div class="wide"><div class="toolbar m0"><b>الأقسام المشمولة</b><span class="sp"></span><button type="button" class="btn sm" id="pre">التشطيبات والأبواب والمصاعد والإنارة</button><button type="button" class="btn sm ghost" id="none">إلغاء الكل</button></div>
+    ${field('طبيعة المشروع', sel('tpl', [...Object.entries(SPEC_TPL).map(([k, t]) => [k, t.name + ` (${t.items.length} بنداً مختاراً)`]), ['', 'اختيار يدوي بالأقسام']], 'entrance'), 'wide')}
+    <div class="wide" id="secBox" style="display:none"><div class="toolbar m0"><b>الأقسام المشمولة</b><span class="sp"></span><button type="button" class="btn sm" id="pre">التشطيبات والأبواب والمصاعد والإنارة</button><button type="button" class="btn sm ghost" id="none">إلغاء الكل</button></div>
       <p class="muted small m0">تُعرض كل بنود الأقسام المختارة بكل خياراتها، ثم تحذف ما لا يلزم من داخل الجدول.</p><div id="tree" class="sptreewrap">${secTree(chosen)}</div><div class="small" id="cnt"></div></div>
     <div class="btnrow end wide"><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">إنشاء الجدول</button></div></form>`, { title: 'جدول مواد ومواصفات جديد', wide: true, onOpen: (w, close) => {
     const upd = () => { const n = REF.items.filter(i => i.active !== false && chosen.has(i.section_code)).length; $('#cnt', w).textContent = `${chosen.size} قسماً · ${n} بنداً`; };
@@ -131,14 +138,15 @@ async function newSpecSet(owner) {
       $$('[data-div]', w).forEach(c => { c.onclick = e => e.stopPropagation(); c.onchange = () => { REF.byDiv[c.dataset.div].sections.forEach(s => c.checked ? chosen.add(s.code) : chosen.delete(s.code)); $('#tree', w).innerHTML = secTree(chosen); bind(); upd(); }; });
     };
     bind(); upd();
+    const tplSel = $('[name=tpl]', w); const tog = () => { $('#secBox', w).style.display = tplSel.value ? 'none' : ''; }; tplSel.onchange = tog; tog();
     $('#pre', w).onclick = () => { chosen.clear(); REF.sections.filter(s => PRESET(s.code)).forEach(s => chosen.add(s.code)); $('#tree', w).innerHTML = secTree(chosen); bind(); upd(); };
     $('#none', w).onclick = () => { chosen.clear(); $('#tree', w).innerHTML = secTree(chosen); bind(); upd(); };
-    $('#f', w).onsubmit = async e => { e.preventDefault(); const x = formData(e.target); if (!chosen.size) return toast('اختر قسماً واحداً على الأقل', 'bad');
+    $('#f', w).onsubmit = async e => { e.preventDefault(); const x = formData(e.target); const tpl = SPEC_TPL[x.tpl]; if (!tpl && !chosen.size) return toast('اختر قسماً واحداً على الأقل', 'bad');
       const btn = e.submitter; btn.disabled = true;
       try {
         const set = await q(sb.from('spec_sets').insert({ ...owner, name: x.name.trim() || 'جدول المواد والمواصفات المعتمدة', contractor: x.contractor.trim(), created_by: session.user.id }).select('id').single());
-        const items = REF.items.filter(i => i.active !== false && chosen.has(i.section_code));
-        const rows = items.map((it, k) => ({ set_id: set.id, item_code: it.code, variants: it.variants.filter(v => v.active !== false).map(v => v.code), submit: ['sample', 'data'], sort: k }));
+        const items = tpl ? tpl.items.map(c => REF.byItem[c]).filter(Boolean) : REF.items.filter(i => i.active !== false && chosen.has(i.section_code));
+        const rows = items.map((it, k) => ({ set_id: set.id, item_code: it.code, variants: tplVars(it, tpl), submit: ['sample', 'data'], sort: k }));
         for (let i = 0; i < rows.length; i += 300) await q(sb.from('spec_lines').insert(rows.slice(i, i + 300)));
         close(); location.hash = '#/spec/' + set.id;
       } catch (er) { btn.disabled = false; err(er); } };
