@@ -20,7 +20,7 @@ function hdr(ws, prj, title, sub, L){
   ws.getCell(3,tc).value = sub; ws.getCell(3,tc).font = {name:FONT, size:10, color:{argb:GREY}};
   [1,2,3].forEach(r => ws.getCell(r,tc).alignment = {horizontal:'right', vertical:'middle'});
   ws.getRow(1).height = 24; ws.getRow(2).height = 28; ws.getRow(3).height = 20; ws.getRow(4).height = 10;
-  const info = [['اسم المشروع', prj.name||'—'], ['رقم المشروع / المرجع', prj.ref||'—'], ['المنشأة / الموقع', prj.facility||'—'], ['نوع المشروع', prj.type||'—'], ['الجهة الطالبة', prj.dept||'—'], ['المهندس المسؤول', prj.engineer||'—'], ['التاريخ', prj.date||'—'], prj.pricing==='lumpsum' ? ['طريقة التسعير', 'مقطوعية (Lump-sum): يُسعّر المتقدم كل بند بمبلغ إجمالي شامل حسب المخططات والمواصفات'] : ['مصدر الأسعار', 'المرجع الفني الموحد لمشاريع تجمع الأحساء الصحي (استرشادي)']];
+  const info = [['اسم المشروع', prj.name||'—'], ['رقم المشروع / المرجع', prj.ref||'—'], ['المنشأة / الموقع', prj.facility||'—'], ['نوع المشروع', prj.type||'—'], ['الجهة الطالبة', prj.dept||'—'], ['المهندس المسؤول', prj.engineer||'—'], ['التاريخ', prj.date||'—'], prj.spec ? ['المقاول / الحالة', (prj.contractor||'—') + (prj.status ? ' · ' + prj.status : '')] : prj.pricing==='lumpsum' ? ['طريقة التسعير', 'مقطوعية (Lump-sum): يُسعّر المتقدم كل بند بمبلغ إجمالي شامل حسب المخططات والمواصفات'] : ['مصدر الأسعار', 'المرجع الفني الموحد لمشاريع تجمع الأحساء الصحي (استرشادي)']];
   const per = L.pairs.length; let r = 5;
   for(let i=0;i<info.length;i+=per){
     for(let k=0;k<per;k++){ const it = info[i+k]; if(!it) continue; const [l1,l2,v1,v2] = L.pairs[k];
@@ -88,7 +88,7 @@ function specSheet(wb, prj, c){
   const ws = wb.addWorksheet('المواصفات الفنية', {properties:{tabColor:{argb:BLUE}}});
   const cols = 3;
   ws.getColumn(1).width = 5; ws.getColumn(2).width = 26; ws.getColumn(3).width = 118;
-  let r = hdr(ws, prj, 'المواصفات الفنية وطريقة التنفيذ للبنود', 'مستخرجة من المرجع الفني الموحد لمشاريع تجمع الأحساء الصحي — جزء لا يتجزأ من جدول الكميات', {cols, titleCol:3, logoW:190, logoH:67, pairs:[[1,2,3,3]]});
+  let r = hdr(ws, prj, 'المواصفات الفنية وطريقة التنفيذ للبنود', (prj.specSub || 'مستخرجة من المرجع الفني الموحد لمشاريع تجمع الأحساء الصحي — جزء لا يتجزأ من جدول الكميات'), {cols, titleCol:3, logoW:190, logoH:67, pairs:[[1,2,3,3]]});
   const specStart = r;
   const seen = new Set(); let n = 0;
   const secs = [['نطاق البند', it => [it.scope||'—']], ['المتطلبات الفنية', it => it.specs], ['متطلبات المنشآت الصحية ومكافحة العدوى', it => it.health], ['معايير القبول والاختبار', it => it.accept], ['طريقة التنفيذ (Method Statement)', it => it.method], ['المراجع والمعايير', it => it.refs]];
@@ -146,5 +146,46 @@ export async function exportExcel(prj, c, LOGO_B64){
   toast('جارٍ إنشاء ملف Excel…');
   let buf; try { buf = await buildExcel(prj, c, LOGO_B64); } catch(e){ toast('تعذّر تحميل مكتبة Excel — تحقق من الاتصال بالإنترنت'); return; }
   download(new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), `جدول الكميات - ${prj.name||'مشروع'} - ${prj.date||today()}.xlsx`);
+  toast('تم تصدير ملف Excel');
+}
+
+// ---------- جدول المواد والمواصفات المعتمدة: ورقة الجدول + ورقة المواصفات الفنية التفصيلية لكل بند
+export async function exportSpecExcel(prj, rows, REF, SUBMIT, LOGO_B64){
+  await loadExcelJS();
+  const wb = new ExcelJS.Workbook(); wb.creator = 'تجمع الأحساء الصحي — المرجع الفني الموحد'; wb.created = new Date();
+  wb._ahcLogo = wb.addImage({base64: LOGO_B64, extension:'png'});
+  const P = {...prj, pricing:null, spec:true, engineer: prj.engineer_name||'', specSub:'مستخرجة من المرجع الفني الموحد لمشاريع تجمع الأحساء الصحي — جزء لا يتجزأ من جدول المواد والمواصفات المعتمدة'};
+  // ترتيب بالشعبة ثم الكود
+  rows = [...rows].sort((a,b) => a.item_code.localeCompare(b.item_code));
+  const divs = [...new Set(rows.map(x => x.item_code.slice(0,2)))];
+  const sub = k => (SUBMIT.find(s => s[0]===k)||[])[1];
+  // الورقة 1
+  const ws = wb.addWorksheet('جدول المواد المعتمدة', {properties:{tabColor:{argb:NAVY}}});
+  const cols = 8;
+  let r = hdr(ws, P, prj.setName || 'جدول المواد والمواصفات المعتمدة', 'البنود والخيارات المعتمدة للتنفيذ من المرجع الفني الموحد لمشاريع تجمع الأحساء الصحي — ملزم للمقاول' + (prj.contractor ? ' · المقاول: ' + prj.contractor : ''), {cols, titleCol:4, pairs:[[1,2,3,4],[5,6,7,8]]});
+  if(prj.notes){ ws.mergeCells(r,1,r,cols); const nc = ws.getCell(r,1); nc.value = 'ملاحظات عامة:\n' + prj.notes; cellStyle(nc, {fill:GOLDBG, align:{vertical:'top'}}); ws.getRow(r).height = Math.min(200, 15*(prj.notes.split('\n').length+1)+8); r += 2; }
+  thead(ws, r, ['م','الكود','البند','الخيارات / المواصفة المعتمدة','أماكن الاستخدام','المصنّعون المعتمدون','يُقدَّم للاعتماد','ملاحظات'], [5,11,28,58,22,30,15,20]);
+  const first = r; let n = 0;
+  divs.forEach(d => { const dv = REF.byDiv[d];
+    r++; ws.mergeCells(r,1,r,cols); const dc = ws.getCell(r,1); dc.value = `الشعبة ${d} — ${dv?.ar||''}${dv?.en ? ' ('+dv.en+')' : ''}`; cellStyle(dc, {font:{bold:true, color:{argb:NAVY}}, fill:LB}); ws.getRow(r).height = 20;
+    rows.filter(x => x.item_code.slice(0,2)===d).forEach(x => { n++; r++;
+      const vtxt = x.vs.map(v => `• ${v.ar}${v.spec ? ' — ' + v.spec : ''}`).join('\n') || (x.it.scope||'').slice(0,300);
+      const vals = [n, x.item_code, `${x.it.ar}\n${x.it.en||''}`, vtxt, x.locs||'', x.makers||'', (x.submit||[]).map(sub).filter(Boolean).join('، '), x.note||''];
+      vals.forEach((v,i) => { const c = ws.getCell(r,i+1); c.value = v; cellStyle(c, {align:{vertical:'top', horizontal: i<2?'center':'right'}, fill: i===5 && !x.makers ? GOLDBG : undefined}); });
+      ws.getCell(r,3).font = {name:FONT, size:10, bold:true};
+      const lines = Math.max(2, x.vs.reduce((a,v) => a + Math.ceil(((v.ar||'').length + (v.spec||'').length + 6)/70), 0), Math.ceil((x.makers||'').length/34), Math.ceil((x.locs||'').length/26));
+      ws.getRow(r).height = Math.min(409, 14*lines + 6);
+    });
+  });
+  r += 2; ws.mergeCells(r,1,r,cols); const note = ws.getCell(r,1);
+  note.value = 'شروط الاعتماد: لا تُورَّد أي مادة قبل اعتمادها كتابياً بعد تقديم ما هو محدد في عمود «يُقدَّم للاعتماد». المواصفات الفنية التفصيلية لكل بند في الورقة التالية وهي جزء لا يتجزأ من هذا الجدول. أي مادة خارج الجدول أو بمصنّع غير مدرج تحتاج موافقة مكتوبة من المالك. الخلايا المظللة في عمود المصنّعين لم تُحدد بعد.';
+  cellStyle(note, {font:{size:9, italic:true, color:{argb:GREY}}}); ws.getRow(r).height = 44;
+  r += 2; ['إعداد: مهندس المشروع', 'مراجعة: رئيس قسم المشاريع', 'اعتماد: مدير إدارة الخدمات الفنية'].forEach((t, i) => { const c1 = 1 + i*3; mc(ws, r, c1, r, Math.min(c1+1, cols)); const cell = ws.getCell(r, c1); cell.value = t + '\n\nالاسم: ................................\nالتوقيع: ..............................'; cellStyle(cell, {font:{size:9}, align:{vertical:'top'}}); }); ws.getRow(r).height = 62;
+  pageSetup(ws, true, P, first);
+  // الورقة 2: المواصفات الفنية التفصيلية (نفس شكل ورقة المواصفات في جدول الكميات)
+  const c = {groups: divs.map(d => ({div: REF.byDiv[d] || {code:d, ar:''}, lines: rows.filter(x => x.item_code.slice(0,2)===d).flatMap(x => (x.vs.length ? x.vs : [{code:x.item_code, ar:'—', unit:'', spec:''}]).map(v => ({free:false, r:{it:x.it, v}})))}))};
+  specSheet(wb, P, c);
+  const buf = await wb.xlsx.writeBuffer();
+  download(new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), `${prj.setName||'جدول المواد والمواصفات'} - ${prj.name||''} - ${prj.date||today()}.xlsx`);
   toast('تم تصدير ملف Excel');
 }
