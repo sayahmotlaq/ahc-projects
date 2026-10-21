@@ -71,6 +71,8 @@ const SEED_TEMPLATES = {
   'تأهيل الواجهات والموقع الخارجي': ['LS-40', 'LS-03', 'LS-12', 'LS-13', 'LS-27', 'LS-28', 'LS-29', 'LS-30', 'LS-32'],
   'تطوير غرف التنويم': ['LS-40', 'LS-02', 'LS-03', 'LS-35', 'LS-36', 'LS-37', 'LS-38', 'LS-39', 'LS-31', 'LS-32', 'LS-33'],
 };
+// الملاحظات العامة الافتراضية: من الإعدادات (يعدّلها المدير) وإلا النص الثابت أدناه
+export async function defaultNotes() { try { const { data } = await sb.from('settings').select('value').eq('key', 'boq_default_notes').maybeSingle(); if (data?.value?.text) return data.value.text; } catch (e) { } return LS_DEFAULT_NOTES; }
 export const LS_DEFAULT_NOTES = `1. الأسعار مقطوعية شاملة جميع أعمال التوريد والتنفيذ والمواد والعمالة والمعدات والنقل والاختبار والتشغيل والتسليم والضمان.
 2. يُرجع إلى المخططات والمواصفات الفنية للتفاصيل، وتُعدّ زيارة الموقع والاطلاع على طبيعة الأعمال القائمة إلزامية قبل التسعير.
 3. تشمل الأسعار حماية المناطق التشغيلية المجاورة والالتزام بمتطلبات مكافحة العدوى والسلامة والعمل خارج أوقات الذروة عند الطلب.
@@ -96,12 +98,16 @@ export function activeLS(LS) { return build(LS.all.filter(i => i.active !== fals
 
 // ---------- إدارة القائمة (الإدارة ← بنود المقطوعية)
 export async function mountLsAdmin(t) {
+  const t0 = t;
   const LS = await loadLS(true); const items = LS.all; const groupsAr = LS.groups.map(g => g.ar);
   const nextCode = () => { const n = Math.max(0, ...items.map(i => Number((i.code.match(/(\d+)$/) || [])[1] || 0))); return 'LS-' + String(n + 1).padStart(2, '0'); };
   t.innerHTML = `<div class="pcard"><h2><span class="ic"></span>بنود المقطوعية <span class="muted">(${items.length})</span><span class="sp"></span><button class="btn primary sm" id="lsNew">＋ بند جديد</button></h2>
     <p class="muted small mb10">هذه القائمة تظهر للمهندسين في جدول الكميات ← «بنود المقطوعية». عدّل العنوان والوصف، أوقف بنداً دون حذفه، أو غيّر ترتيبه ومجموعته. تعديلك لا يمس الجداول المنشأة سابقاً (البند يُنسخ إليها عند الإضافة).</p>
     <input type="search" id="lsAq" placeholder="بحث…" class="mb10" style="width:100%;max-width:420px">
     <div id="lsAList"></div></div>
+    <div class="pcard"><h2><span class="ic"></span>الملاحظات العامة الافتراضية<span class="sp"></span><button class="btn primary sm" id="dnSave">حفظ</button></h2>
+    <p class="muted small mb10">تُدرج تلقائياً في أي جدول كميات جديد عند إضافة بنود المقطوعية (إن كانت ملاحظاته فارغة). تعديلها لا يمس الجداول السابقة.</p>
+    <textarea id="dnText" rows="12" style="width:100%"></textarea></div>
     <div class="pcard"><h2><span class="ic"></span>نطاقات العمل (القوالب) <span class="muted">(${LS.templates.length})</span><span class="sp"></span><button class="btn primary sm" id="tpNew">＋ نطاق جديد</button></h2>
     <p class="muted small mb10">كل نطاق يحدد تلقائياً مجموعة بنود عند اختياره في جدول الكميات، ويبقى للمهندس أن يضيف أو يزيل بعدها.</p>
     <div id="tpList"></div></div>`;
@@ -121,6 +127,8 @@ export async function mountLsAdmin(t) {
   };
   $('#lsAq', t).oninput = renderItems; $('#lsNew', t).onclick = () => itemForm(null); $('#tpNew', t).onclick = () => tplForm(null);
   renderItems(); renderTpls();
+  defaultNotes().then(t => { $('#dnText', t0).value = t; });
+  $('#dnSave', t0).onclick = async () => { try { await q(sb.from('settings').upsert({ key: 'boq_default_notes', value: { text: $('#dnText', t0).value.trim() }, updated_at: new Date().toISOString() }, { onConflict: 'key' })); toast('حُفظت الملاحظات الافتراضية'); } catch (er) { err(er); } };
 
   function itemForm(it) {
     const v = it || { code: nextCode(), grp: groupsAr[0] || 'بنود عامة', title: '', descr: '', sort: (Math.max(0, ...items.map(i => i.sort || 0)) + 10), active: true };

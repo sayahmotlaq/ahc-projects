@@ -2,7 +2,7 @@
 import { sb, REF, canEdit, q, session, itemDetail } from './api.js';
 import { $, $$, esc, norm, fmt, money, toast, err, confirm, modal, field, inp, sel, formData, debounce, ico } from './ui.js';
 import { exportExcel } from './excel.js';
-import { loadLS, activeLS, LS_DEFAULT_NOTES, UNITS } from './lumpsum.js';
+import { loadLS, activeLS, LS_DEFAULT_NOTES, UNITS, defaultNotes } from './lumpsum.js';
 import { govBar, govChip, GOV } from './govlink.js';
 
 const STATUS = { draft: 'مسودة', approved: 'معتمد', tender: 'طرح', awarded: 'ترسية', final: 'ختامي' };
@@ -118,7 +118,7 @@ export async function mountBoq(root, boqId, project, onBack) {
       $('#lsq', w).oninput = () => { const t = norm($('#lsq', w).value); $$('.lsi', w).forEach(el => { const i = LS_BY_CODE[el.getAttribute('data-code')]; el.style.display = !t || norm(i.title + ' ' + i.descr + ' ' + i.code).includes(t) ? '' : 'none'; }); $$('.lsg', w).forEach(g => g.style.display = $$('.lsi', g).some(e => e.style.display !== 'none') ? '' : 'none'); };
       $('#f', w).onsubmit = async e => { e.preventDefault(); const f = formData(e.target); const codes = boxes.filter(b => b.checked).map(b => b.value); if (!codes.length) return;
         const rows = codes.map((c, i) => { const it = LS_BY_CODE[c]; return { boq_id: boq.id, kind: 'free', ls_code: it.code, title: it.title, descr: it.descr, unit: it.unit || 'مقطوعية', qty: 1, unit_price: null, div_code: it.div_code || null, sort: lines.length + i }; });
-        try { const ins = await q(sb.from('boq_lines').insert(rows).select()); lines.push(...ins); const up = {}; if (f.lump) Object.assign(up, { pricing: 'lumpsum', hide_prices: true }); if (f.notes && !boq.notes) up.notes = LS_DEFAULT_NOTES; if (Object.keys(up).length) { await q(sb.from('boqs').update(up).eq('id', boq.id)); Object.assign(boq, up); } close(); toast(`أُضيف ${ins.length} بنداً`); mountBoq(root, boqId, project, onBack); } catch (er) { err(er); } };
+        try { const ins = await q(sb.from('boq_lines').insert(rows).select()); lines.push(...ins); const up = {}; if (f.lump) Object.assign(up, { pricing: 'lumpsum', hide_prices: true }); if (f.notes && !boq.notes) up.notes = await defaultNotes(); if (Object.keys(up).length) { await q(sb.from('boqs').update(up).eq('id', boq.id)); Object.assign(boq, up); } close(); toast(`أُضيف ${ins.length} بنداً`); mountBoq(root, boqId, project, onBack); } catch (er) { err(er); } };
     } });
   }
 
