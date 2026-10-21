@@ -39,7 +39,7 @@ function thead(ws, r, labels, widths){
   ws.getRow(r).height = 24;
   widths.forEach((w, i) => ws.getColumn(i+1).width = w);
 }
-function cellStyle(c, opts={}){ c.font = Object.assign({name:FONT, size:10}, opts.font||{}); c.border = B; c.alignment = Object.assign({vertical:'middle', wrapText:true, horizontal:'right'}, opts.align||{}); if(opts.fill) c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:opts.fill}}; if(opts.fmt) c.numFmt = opts.fmt; }
+function cellStyle(c, opts={}){ c.font = Object.assign({name:FONT, size:10}, opts.font||{}); c.border = B; c.alignment = Object.assign({vertical:'middle', wrapText:true, horizontal:'right', readingOrder:'rtl'}, opts.align||{}); if(opts.fill) c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:opts.fill}}; if(opts.fmt) c.numFmt = opts.fmt; }
 function pageSetup(ws, landscape, prj, titleRow){
   ws.pageSetup = {orientation: landscape?'landscape':'portrait', paperSize:9, fitToPage:true, fitToWidth:1, fitToHeight:0, printTitlesRow:`${titleRow}:${titleRow}`, margins:{left:0.4,right:0.4,top:0.5,bottom:0.5,header:0.25,footer:0.25}, horizontalCentered:true};
   ws.headerFooter = {oddHeader:`&R&"Arial,Bold"&9${(prj.name||'').replace(/&/g,'&&')}`, oddFooter:`&L&8تجمع الأحساء الصحي — المرجع الفني الموحد&C&8صفحة &P / &N&R&8التاريخ: ${prj.date||''}`};
@@ -193,24 +193,48 @@ export async function exportSpecExcel(prj, rows, REF, SUBMIT, LOGO_B64){
   toast('تم تصدير ملف Excel');
 }
 
-// ---------- اشتراطات تسليم المشروع (HO-NN)
+// ---------- اشتراطات تسليم المشروع (HO-NN): A4 عمودي، مجموعات مرقمة، الاشتراط ونصه في عمود، والمطلوب والتوقيت في عمودين
 export function handoverSheet(wb, prj, list){
   const ws = wb.addWorksheet('اشتراطات التسليم', {properties:{tabColor:{argb:'FF2E8B57'}}});
-  const cols = 5;
-  let r = hdr(ws, prj, 'اشتراطات تسليم المشروع', 'التزامات المقاول للتسليم الابتدائي والنهائي — جزء لا يتجزأ من العقد، ولا يُصرف المستخلص الختامي قبل استيفائها', {cols, titleCol:3, logoW:190, logoH:67, pairs:[[1,2,3,3]]});
-  thead(ws, r, ['م','الكود','الاشتراط','المطلوب تسليمه','التوقيت'], [5,9,78,32,17]);
-  const first = r; let n = 0, g0 = null;
-  list.forEach(h => {
-    if(h.grp !== g0){ g0 = h.grp; r++; ws.mergeCells(r,1,r,cols); const gc = ws.getCell(r,1); gc.value = h.grp; cellStyle(gc, {font:{bold:true, color:{argb:NAVY}}, fill:LB}); ws.getRow(r).height = 20; }
-    n++; r++;
-    const vals = [n, h.code, `${h.title}\n${h.descr||''}`, h.deliver||'', h.stage||''];
-    vals.forEach((v,i) => { const c = ws.getCell(r,i+1); c.value = v; cellStyle(c, {align:{vertical:'top', horizontal: i<2?'center':'right'}}); });
-    ws.getCell(r,3).value = {richText:[{text:h.title+'\n', font:{name:FONT, size:10, bold:true, color:{argb:NAVY}}}, {text:h.descr||'', font:{name:FONT, size:10}}]};
-    ws.getRow(r).height = Math.min(409, 15*(1 + Math.ceil((h.descr||'').length/95)) + 6);
+  const cols = 4, W = [7, 66, 30, 17];
+  ws.views = [{rightToLeft:true, showGridLines:false}];
+  W.forEach((w,i) => ws.getColumn(i+1).width = w);
+  ws.addImage(ws.workbook._ahcLogo, {tl:{col:2.15, row:0.2}, ext:{width:150, height:53}});
+  [['تجمع الأحساء الصحي — إدارة الخدمات الفنية / قسم المشاريع', 10.5, true, NAVY, 20], ['اشتراطات تسليم المشروع', 17, true, NAVY, 30], ['التزامات المقاول للاستلام الابتدائي والنهائي — جزء لا يتجزأ من العقد ووثائق الطرح', 9.5, false, GREY, 18]].forEach(([t, sz, b, c, h], i) => {
+    ws.mergeCells(i+1,1,i+1,2); const cell = ws.getCell(i+1,1); cell.value = t; cell.font = {name:FONT, size:sz, bold:b, color:{argb:c}}; cell.alignment = {horizontal:'right', vertical:'middle'}; ws.getRow(i+1).height = h; });
+  ws.getRow(4).height = 8;
+  const info = [['المشروع', prj.name||'—'], ['المنشأة', prj.facility||'—'], ['المقاول', prj.contractor||'—'], ['التاريخ', prj.date||'—']];
+  [[0,1],[2,3]].forEach(([a,b], k) => { const rr = 5+k; [[1,info[a]],[3,info[b]]].forEach(([c0,[l,v]]) => { const lc = ws.getCell(rr,c0); lc.value = l; cellStyle(lc, {font:{bold:true, color:{argb:NAVY}}, fill:CARD}); const vc = ws.getCell(rr,c0+1); vc.value = v; cellStyle(vc); }); ws.getRow(rr).height = 20; });
+  let r = 8;
+  // تمهيد
+  ws.mergeCells(r,1,r,cols); const ic = ws.getCell(r,1);
+  ic.value = 'يلتزم المقاول بتسليم ما يلي كاملاً وبالصيغ المحددة، ورقياً ورقمياً بفهرس موحد. يُعدّ استيفاء كل اشتراط شرطاً للاستلام في التوقيت المحدد له، ولا يُصرف المستخلص الختامي ولا يُفرج عن الضمانات قبل استيفائها جميعاً.';
+  cellStyle(ic, {fill:GOLDBG, align:{vertical:'middle'}}); ws.getRow(r).height = 36; r += 2;
+  thead(ws, r, ['م','الاشتراط ونصه التعاقدي','المطلوب تسليمه','التوقيت'], W);
+  const first = r;
+  const ST = {'قبل الاستلام الابتدائي':'FFEAF3F9', 'عند الاستلام الابتدائي':'FFE7F4EC', 'خلال فترة الضمان':'FFFBF3DE', 'قبل الاستلام النهائي':'FFF5F1EE'};
+  const fit = (t, cpl) => String(t||'').split('\n').reduce((a,x) => a + Math.max(1, Math.ceil(x.length/cpl)), 0);
+  const groups = [...new Set(list.map(h => h.grp))];
+  groups.forEach((g, gi) => {
+    const items = list.filter(h => h.grp === g);
+    r++; ws.mergeCells(r,1,r,cols); const gc = ws.getCell(r,1); gc.value = `${gi+1}. ${g}  (${items.length})`;
+    cellStyle(gc, {font:{bold:true, size:11, color:{argb:WHITE}}, fill:BLUE}); ws.getRow(r).height = 22;
+    items.forEach((h, k) => { r++;
+      const nc = ws.getCell(r,1); nc.value = `${gi+1}.${k+1}`; cellStyle(nc, {align:{horizontal:'center', vertical:'top'}, font:{bold:true, color:{argb:NAVY}}});
+      const tc = ws.getCell(r,2); cellStyle(tc, {align:{vertical:'top'}});
+      tc.value = {richText:[{text:h.title, font:{name:FONT, size:10.5, bold:true, color:{argb:NAVY}}}, {text:`   ${h.code}\n`, font:{name:FONT, size:8, color:{argb:GREY}}}, {text:h.descr||'', font:{name:FONT, size:10}}]};
+      const dc = ws.getCell(r,3); dc.value = h.deliver || '—'; cellStyle(dc, {align:{vertical:'top'}});
+      const sc = ws.getCell(r,4); sc.value = h.stage || '—'; cellStyle(sc, {align:{vertical:'top', horizontal:'center'}, font:{bold:true, size:9.5, color:{argb:NAVY}}, fill: ST[h.stage]});
+      const lines = Math.max(1 + fit(h.descr, 78), fit(h.deliver, 34), 2);
+      ws.getRow(r).height = Math.min(409, 14.5*lines + 8);
+    });
   });
-  r += 2; ws.mergeCells(r,1,r,cols); const nt = ws.getCell(r,1);
-  nt.value = 'يُعدّ استيفاء هذه الاشتراطات شرطاً للاستلام الابتدائي أو النهائي حسب التوقيت المحدد لكل بند، وتُسلَّم جميع الوثائق ورقياً ورقمياً بفهرس موحد، ولا يُصرف المستخلص الختامي ولا يُفرج عن الضمانات قبل استيفائها كاملة.';
-  cellStyle(nt, {font:{size:9, italic:true, color:{argb:GREY}}}); ws.getRow(r).height = 36;
-  pageSetup(ws, true, prj, first);
+  // ملخص التوقيتات (عدد الاشتراطات لكل توقيت)
+  r += 2; ws.mergeCells(r,1,r,cols); const sh = ws.getCell(r,1); sh.value = 'عدد الاشتراطات حسب التوقيت'; cellStyle(sh, {font:{bold:true, color:{argb:NAVY}}, fill:CARD}); ws.getRow(r).height = 20;
+  Object.keys(ST).forEach(st => { const n = list.filter(h => h.stage === st).length; if(!n) return; r++; const a = ws.getCell(r,1); a.value = n; cellStyle(a, {align:{horizontal:'center'}, font:{bold:true, color:{argb:NAVY}}, fill:ST[st]}); ws.mergeCells(r,2,r,4); const b = ws.getCell(r,2); b.value = st; cellStyle(b, {fill:ST[st]}); ws.getRow(r).height = 18; });
+  // التوقيعات وإقرار المقاول
+  r += 2; const sig = [[1,2,'إعداد: مهندس المشروع'], [3,3,'اعتماد: رئيس قسم المشاريع'], [4,4,'إقرار المقاول بالاطلاع والالتزام']];
+  sig.forEach(([c1,c2,t]) => { if(c2>c1) ws.mergeCells(r,c1,r,c2); const cell = ws.getCell(r,c1); cell.value = t + '\n\nالاسم: ....................\nالتوقيع: ..................\nالتاريخ: ....../....../......'; cellStyle(cell, {font:{size:9}, align:{vertical:'top'}}); }); ws.getRow(r).height = 78;
+  pageSetup(ws, false, prj, first);
   return ws;
 }
