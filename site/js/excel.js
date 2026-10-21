@@ -51,20 +51,22 @@ async function boqSheet(wb, prj, c, priced){
   let r = hdr(ws, prj, priced ? 'جدول الكميات التقديري (مُسعّر)' : (prj.pricing==='lumpsum' ? 'جدول الكميات — مقطوعية (نسخة الطرح)' : 'جدول الكميات — نسخة الطرح (بدون أسعار)'), priced ? 'الأسعار استرشادية من المرجع الفني الموحد لأغراض التقدير الأولي' : (prj.pricing==='lumpsum' ? 'يُعبّأ المبلغ المقطوع لكل بند من قبل المقاول المتقدم — بالريال السعودي شاملاً جميع الأعمال حسب المخططات والمواصفات' : 'يُعبّأ سعر الوحدة من قبل المقاول المتقدم — بالريال السعودي شاملاً التوريد والتركيب'), {cols, titleCol:4, pairs:[[1,2,3,4],[5,6,7,8]]});
   if(prj.notes){ ws.mergeCells(r,1,r,cols); const nc = ws.getCell(r,1); nc.value = 'ملاحظات عامة:\n' + prj.notes; cellStyle(nc, {font:{size:10}, fill:GOLDBG, align:{vertical:'top'}}); const nl = prj.notes.split('\n').reduce((a,x)=>a+Math.ceil((x.length+2)/150),1); ws.getRow(r).height = Math.min(300, 15*nl + 8); r += 2; }
   const lump = prj.pricing==='lumpsum';
-  thead(ws, r, ['م','الكود','البند / الوصف','المواصفة المميِّزة','الوحدة','الكمية', lump ? 'المبلغ المقطوع (ر.س)' : 'سعر الوحدة (ر.س)','الإجمالي (ر.س)'], [5,12,lump?70:48,lump?20:36,8,10,15,17]);
+  thead(ws, r, ['م','الكود','البند / الوصف', lump ? 'ملاحظات' : 'المواصفة المميِّزة','الوحدة','الكمية', lump ? 'المبلغ المقطوع (ر.س)' : 'سعر الوحدة (ر.س)','الإجمالي (ر.س)'], [5,12,lump?56:48,lump?34:36,8,10,15,17]);
   const first = r+1; let n = 0; const subRows = [];
   c.groups.forEach(g => {
     r++; ws.mergeCells(r,1,r,cols); const dc = ws.getCell(r,1); dc.value = g.div.code==='00' ? g.div.ar : `الشعبة ${g.div.code} — ${g.div.ar} (${g.div.en})`; cellStyle(dc, {font:{bold:true, color:{argb:NAVY}, size:11}, fill:LB}); ws.getRow(r).height = 20;
     const gStart = r+1;
     g.lines.forEach(L => { r++; n++;
-      const loc = L.ln.loc?'\n[الموقع: '+L.ln.loc+']':'';
-      const vals = L.free ? [n, L.r.v.code, `${L.ln.title}${L.ln.descr?'\n'+L.ln.descr:''}${loc}`, '', L.r.v.unit, L.ln.qty, priced ? (L.price||0) : null, null]
-                        : [n, L.r.v.code, `${L.r.it.ar} — ${L.r.v.ar}\n${L.r.v.en}${loc}`, L.r.v.spec||'', L.r.v.unit, L.ln.qty, priced ? (L.price||0) : null, null];
+      // في المقطوعية: الملاحظة في عمود مستقل؛ في جدول الوحدة: الموقع تحت الوصف
+      const loc = !lump && L.ln.loc ? '\n[الموقع: '+L.ln.loc+']' : '';
+      const note = lump ? (L.free ? (L.ln.loc||'') : [L.r.v.spec, L.ln.loc].filter(Boolean).join('\n')) : (L.free ? '' : L.r.v.spec||'');
+      const vals = L.free ? [n, L.r.v.code, `${L.ln.title}${L.ln.descr?'\n'+L.ln.descr:''}${loc}`, note, L.r.v.unit, L.ln.qty, priced ? (L.price||0) : null, null]
+                        : [n, L.r.v.code, `${L.r.it.ar} — ${L.r.v.ar}\n${L.r.v.en}${loc}`, note, L.r.v.unit, L.ln.qty, priced ? (L.price||0) : null, null];
       vals.forEach((v, i) => { const cell = ws.getCell(r, i+1); if(v!==null) cell.value = v; cellStyle(cell, {align:{horizontal:[0,1,4,5].includes(i)?'center':'right'}, fmt: i===5?'#,##0.###': (i>=6?'#,##0.00':undefined)}); });
       ws.getCell(r,8).value = {formula:`F${r}*G${r}`};
       if(!priced){ ws.getCell(r,7).fill = {type:'pattern', pattern:'solid', fgColor:{argb:GOLDBG}}; ws.getCell(r,7).protection = {locked:false}; }
       else ws.getCell(r,6).protection = {locked:false};
-      const lines = L.free ? 1 + (L.ln.descr||'').split('\n').reduce((n, p) => n + Math.max(1, Math.ceil(p.length/(lump?88:52))), 0) + (L.ln.loc?1:0) : 2 + (L.ln.loc?1:0); ws.getRow(r).height = Math.min(409, Math.max(30, 14*lines, L.free ? 0 : 15*Math.ceil((L.r.v.spec||'').length/40)));
+      const lines = L.free ? 1 + (L.ln.descr||'').split('\n').reduce((n, p) => n + Math.max(1, Math.ceil(p.length/(lump?88:52))), 0) + (!lump && L.ln.loc?1:0) : 2 + (!lump && L.ln.loc?1:0); ws.getRow(r).height = Math.min(409, Math.max(30, 14*lines, lump ? 14*Math.ceil((note||'').length/30) : 0, L.free ? 0 : 15*Math.ceil((L.r.v.spec||'').length/40)));
       if(L.free) ws.getCell(r,3).font = {name:FONT, size:10};
     });
     r++; ws.mergeCells(r,1,r,7); const sc = ws.getCell(r,1); sc.value = g.div.code==='00' ? `مجموع ${g.div.ar}` : `مجموع الشعبة ${g.div.code} — ${g.div.ar}`; cellStyle(sc, {font:{bold:true, color:{argb:NAVY}}, fill:CARD});
@@ -117,7 +119,7 @@ function scopeSheet(wb, prj, c){
   if(prj.notes){ head('أولاً: الملاحظات والاشتراطات العامة'); block('ملاحظات عامة', prj.notes, GOLDBG); }
   head((prj.notes?'ثانياً: ':'') + 'بيان بنود المقطوعية ونطاق كل بند');
   let n = 0;
-  c.groups.forEach(g => g.lines.filter(L => L.free).forEach(L => { n++; block(`${n}. [${L.r.v.code}] ${L.ln.title}${L.ln.loc?'\n(الموقع: '+L.ln.loc+')':''}`, L.ln.descr || '—'); }));
+  c.groups.forEach(g => g.lines.filter(L => L.free).forEach(L => { n++; block(`${n}. [${L.r.v.code}] ${L.ln.title}`, L.ln.descr || '—'); if(L.ln.loc) block('ملاحظة على البند', L.ln.loc, GOLDBG); }));
   head((prj.notes?'ثالثاً: ':'ثانياً: ') + 'الاشتراطات الفنية العامة');
   [['المواصفات والكودات', 'تُنفَّذ جميع الأعمال وفق المخططات والمواصفات الفنية المرفقة، وكود البناء السعودي (SBC) بأجزائه ذات العلاقة، والمواصفات القياسية السعودية، ومتطلبات الدفاع المدني، ومتطلبات وزارة الصحة للمنشآت الصحية؛ وعند التعارض يُعتمد الأشد.'],
    ['مكافحة العدوى والسلامة', 'يلتزم المقاول بمتطلبات مكافحة العدوى (ICRA) وتقييم المخاطر قبل البدء، وبحواجز الغبار والضغط السالب حيث يلزم، وبخطة السلامة والصحة المهنية، وبالعمل خارج أوقات الذروة في المناطق التشغيلية عند طلب الإدارة.'],
