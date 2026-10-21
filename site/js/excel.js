@@ -94,33 +94,33 @@ function specSheet(wb, prj, c){
   const specStart = r;
   const seen = new Set(); let n = 0;
   const secs = [['نطاق البند', it => [it.scope||'—']], ['المتطلبات الفنية', it => it.specs], ['متطلبات المنشآت الصحية ومكافحة العدوى', it => it.health], ['معايير القبول والاختبار', it => it.accept], ['طريقة التنفيذ (Method Statement)', it => it.method], ['المراجع والمعايير', it => it.refs]];
-  c.groups.filter(g => g.lines.some(L => !L.free)).forEach(g => {
-    r++; ws.mergeCells(r,1,r,cols); const dc = ws.getCell(r,1); dc.value = `الشعبة ${g.div.code} — ${g.div.ar}`; cellStyle(dc, {font:{bold:true, size:12, color:{argb:WHITE}}, fill:NAVY}); ws.getRow(r).height = 22;
-    g.lines.filter(L => !L.free).forEach(L => { const it = L.r.it; if(seen.has(it.code)) { return; } seen.add(it.code); n++;
-      r++; ws.mergeCells(r,1,r,cols); const tc = ws.getCell(r,1); tc.value = `${n}. [${it.code}] ${it.ar} — ${it.en}`; cellStyle(tc, {font:{bold:true, size:11, color:{argb:NAVY}}, fill:LB}); ws.getRow(r).height = 20;
-      // الخيارات المستخدمة في هذا المشروع
-      const used = c.groups.flatMap(gg=>gg.lines).filter(x=>!x.free && x.r.it.code===it.code).map(x=>`${x.r.v.code} — ${x.r.v.ar}${x.r.v.spec?': '+x.r.v.spec:''} (${x.r.v.unit})`);
-      const blocks = [['الخيارات المحددة في المشروع', used], ...secs.map(([t,f]) => [t, f(it)])];
+  // قائمة موحدة: بنود المرجع المستخدمة مباشرة في الجدول + بنود المرجع المرتبطة ببنود المقطوعية
+  const entries = [];
+  c.groups.forEach(g => g.lines.filter(L => !L.free).forEach(L => { const it = L.r.it; if(seen.has(it.code)) return; seen.add(it.code);
+    entries.push({div: g.div, it, usedTitle:'الخيارات المحددة في المشروع', used: c.groups.flatMap(gg=>gg.lines).filter(x=>!x.free && x.r.it.code===it.code).map(x=>`${x.r.v.code} — ${x.r.v.ar}${x.r.v.spec?': '+x.r.v.spec:''} (${x.r.v.unit})`)}); }));
+  (c.lsSpecs||[]).forEach(it => { if(seen.has(it.code)) return; seen.add(it.code); entries.push({div: it.div || {code: it.code.slice(0,2), ar:''}, it, usedTitle:'بنود الجدول المرتبطة', used: it._used||[]}); });
+  entries.sort((a,b) => a.it.code.localeCompare(b.it.code));
+  let curDiv = null;
+  entries.forEach(({div, it, usedTitle, used}) => {
+    if(curDiv !== div.code){ curDiv = div.code; r++; ws.mergeCells(r,1,r,cols); const dc = ws.getCell(r,1); dc.value = `الشعبة ${div.code} — ${div.ar||''}`; cellStyle(dc, {font:{bold:true, size:12, color:{argb:WHITE}}, fill:NAVY}); ws.getRow(r).height = 22; }
+    n++; r++; ws.mergeCells(r,1,r,cols); const tc = ws.getCell(r,1); tc.value = `${n}. [${it.code}] ${it.ar} — ${it.en||''}`; cellStyle(tc, {font:{bold:true, size:11, color:{argb:NAVY}}, fill:LB}); ws.getRow(r).height = 20;
+    const blocks = [[usedTitle, used], ...secs.map(([t,f]) => [t, f(it)])];
       blocks.forEach(([title, arr]) => { if(!arr||!arr.length) return; r++; mc(ws,r,1,r,2); const lc = ws.getCell(r,1); lc.value = title; cellStyle(lc, {font:{bold:true, color:{argb:NAVY}}, fill:CARD, align:{vertical:'top'}}); ws.getCell(r,2).border = B; const vc = ws.getCell(r,3); const txt = arr.length===1 ? arr[0] : arr.map((x,i)=>`${i+1}. ${x}`).join('\n'); vc.value = txt; cellStyle(vc, {align:{vertical:'top'}}); const lines = arr.reduce((a,x)=>a+Math.ceil((x.length+4)/125),0); ws.getRow(r).height = Math.min(409, Math.max(18, 14.5*lines + 2)); });
-      if(it.status!=='full'){ r++; ws.mergeCells(r,1,r,cols); const nc = ws.getCell(r,1); nc.value = 'ملاحظة: المواصفة التفصيلية لهذا البند قيد الاستكمال في المرجع؛ يُعتمد النطاق ومواصفة الخيار المحدد والمواصفات العامة للشعبة.'; cellStyle(nc, {font:{size:9, italic:true, color:{argb:GREY}}}); }
-      r++; ws.getRow(r).height = 6;
-    });
+      if(it.status!=='full'){ r++; ws.mergeCells(r,1,r,cols); const nc = ws.getCell(r,1); nc.value = '* مواصفة مختصرة: يُعتمد النطاق أعلاه والاشتراطات العامة للشعبة.'; cellStyle(nc, {font:{size:9, italic:true, color:{argb:GREY}}}); }
+    r++; ws.getRow(r).height = 6;
   });
   pageSetup(ws, false, prj, specStart);
   return ws;
 }
 function scopeSheet(wb, prj, c){
-  const ws = wb.addWorksheet('نطاق الأعمال والمواصفات', {properties:{tabColor:{argb:'FFA98736'}}});
+  const ws = wb.addWorksheet('الاشتراطات العامة', {properties:{tabColor:{argb:'FFA98736'}}});
   const cols = 3; ws.getColumn(1).width = 5; ws.getColumn(2).width = 34; ws.getColumn(3).width = 110;
-  let r = hdr(ws, prj, 'نطاق الأعمال والمواصفات العامة', 'بيان تفصيلي لبنود المقطوعية — جزء لا يتجزأ من جدول الكميات ووثائق الطرح', {cols, titleCol:3, logoW:190, logoH:67, pairs:[[1,2,3,3]]});
+  let r = hdr(ws, prj, 'الملاحظات والاشتراطات العامة', 'جزء لا يتجزأ من جدول الكميات ووثائق الطرح — المواصفات التفصيلية في ورقة «المواصفات الفنية» واشتراطات التسليم في ورقتها', {cols, titleCol:3, logoW:190, logoH:67, pairs:[[1,2,3,3]]});
   const start = r;
   const block = (title, txt, fill) => { r++; mc(ws,r,1,r,2); const lc = ws.getCell(r,1); lc.value = title; cellStyle(lc, {font:{bold:true, color:{argb:NAVY}}, fill: fill||CARD, align:{vertical:'top'}}); ws.getCell(r,2).border = B; const vc = ws.getCell(r,3); vc.value = txt; cellStyle(vc, {align:{vertical:'top'}}); const n = txt.split('\n').reduce((a,x)=>a+Math.ceil((x.length+4)/115),0); ws.getRow(r).height = Math.min(409, Math.max(18, 14.5*n + 4)); };
   const head = (txt) => { r++; ws.mergeCells(r,1,r,cols); const dc = ws.getCell(r,1); dc.value = txt; cellStyle(dc, {font:{bold:true, size:12, color:{argb:WHITE}}, fill:NAVY}); ws.getRow(r).height = 22; };
   if(prj.notes){ head('أولاً: الملاحظات والاشتراطات العامة'); block('ملاحظات عامة', prj.notes, GOLDBG); }
-  head((prj.notes?'ثانياً: ':'') + 'بيان بنود المقطوعية ونطاق كل بند');
-  let n = 0;
-  c.groups.forEach(g => g.lines.filter(L => L.free).forEach(L => { n++; block(`${n}. [${L.r.v.code}] ${L.ln.title}`, L.ln.descr || '—'); if(L.ln.loc) block('ملاحظة على البند', L.ln.loc, GOLDBG); }));
-  head((prj.notes?'ثالثاً: ':'ثانياً: ') + 'الاشتراطات الفنية العامة');
+  head((prj.notes?'ثانياً: ':'أولاً: ') + 'الاشتراطات الفنية العامة');
   [['المواصفات والكودات', 'تُنفَّذ جميع الأعمال وفق المخططات والمواصفات الفنية المرفقة، وكود البناء السعودي (SBC) بأجزائه ذات العلاقة، والمواصفات القياسية السعودية، ومتطلبات الدفاع المدني، ومتطلبات وزارة الصحة للمنشآت الصحية؛ وعند التعارض يُعتمد الأشد.'],
    ['مكافحة العدوى والسلامة', 'يلتزم المقاول بمتطلبات مكافحة العدوى (ICRA) وتقييم المخاطر قبل البدء، وبحواجز الغبار والضغط السالب حيث يلزم، وبخطة السلامة والصحة المهنية، وبالعمل خارج أوقات الذروة في المناطق التشغيلية عند طلب الإدارة.'],
    ['المواد والاعتمادات', 'تُقدَّم عينات وبيانات فنية لجميع المواد والمعدات لاعتمادها من المهندس المشرف قبل التوريد، وتكون المواد جديدة وأصلية من مصادر معتمدة ومطابقة للمواصفات.'],
@@ -140,7 +140,8 @@ export async function buildExcel(prj, c, LOGO_B64){
   if(!prj.hide_prices) await boqSheet(wb, prj, c, true);
   await boqSheet(wb, prj, c, false);
   if(c.groups.some(g => g.lines.some(L => L.free))) scopeSheet(wb, prj, c);
-  if(c.groups.some(g => g.lines.some(L => !L.free))) specSheet(wb, prj, c);
+  if(c.groups.some(g => g.lines.some(L => !L.free)) || (c.lsSpecs||[]).length) specSheet(wb, prj, c);
+  if((c.handover||[]).length) handoverSheet(wb, prj, c.handover);
   return wb.xlsx.writeBuffer();
 }
 export async function exportExcel(prj, c, LOGO_B64){
@@ -190,4 +191,26 @@ export async function exportSpecExcel(prj, rows, REF, SUBMIT, LOGO_B64){
   const buf = await wb.xlsx.writeBuffer();
   download(new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), `${prj.setName||'جدول المواد والمواصفات'} - ${prj.name||''} - ${prj.date||today()}.xlsx`);
   toast('تم تصدير ملف Excel');
+}
+
+// ---------- اشتراطات تسليم المشروع (HO-NN)
+export function handoverSheet(wb, prj, list){
+  const ws = wb.addWorksheet('اشتراطات التسليم', {properties:{tabColor:{argb:'FF2E8B57'}}});
+  const cols = 5;
+  let r = hdr(ws, prj, 'اشتراطات تسليم المشروع', 'التزامات المقاول للتسليم الابتدائي والنهائي — جزء لا يتجزأ من العقد، ولا يُصرف المستخلص الختامي قبل استيفائها', {cols, titleCol:3, logoW:190, logoH:67, pairs:[[1,2,3,3]]});
+  thead(ws, r, ['م','الكود','الاشتراط','المطلوب تسليمه','التوقيت'], [5,9,78,32,17]);
+  const first = r; let n = 0, g0 = null;
+  list.forEach(h => {
+    if(h.grp !== g0){ g0 = h.grp; r++; ws.mergeCells(r,1,r,cols); const gc = ws.getCell(r,1); gc.value = h.grp; cellStyle(gc, {font:{bold:true, color:{argb:NAVY}}, fill:LB}); ws.getRow(r).height = 20; }
+    n++; r++;
+    const vals = [n, h.code, `${h.title}\n${h.descr||''}`, h.deliver||'', h.stage||''];
+    vals.forEach((v,i) => { const c = ws.getCell(r,i+1); c.value = v; cellStyle(c, {align:{vertical:'top', horizontal: i<2?'center':'right'}}); });
+    ws.getCell(r,3).value = {richText:[{text:h.title+'\n', font:{name:FONT, size:10, bold:true, color:{argb:NAVY}}}, {text:h.descr||'', font:{name:FONT, size:10}}]};
+    ws.getRow(r).height = Math.min(409, 15*(1 + Math.ceil((h.descr||'').length/95)) + 6);
+  });
+  r += 2; ws.mergeCells(r,1,r,cols); const nt = ws.getCell(r,1);
+  nt.value = 'يُعدّ استيفاء هذه الاشتراطات شرطاً للاستلام الابتدائي أو النهائي حسب التوقيت المحدد لكل بند، وتُسلَّم جميع الوثائق ورقياً ورقمياً بفهرس موحد، ولا يُصرف المستخلص الختامي ولا يُفرج عن الضمانات قبل استيفائها كاملة.';
+  cellStyle(nt, {font:{size:9, italic:true, color:{argb:GREY}}}); ws.getRow(r).height = 36;
+  pageSetup(ws, true, prj, first);
+  return ws;
 }

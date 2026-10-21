@@ -1575,3 +1575,5 @@ td.kic{color:var(--k)} td.kic svg.i{width:20px;height:20px}
 @media (max-width:700px){.spf{grid-template-columns:1fr} .sptree>div{grid-template-columns:1fr;padding-inline-start:8px} .spdoc{padding:12px;overflow-x:auto} .sptbl{min-width:760px}}
 @media print{.phead .btnrow,.crumb{display:none!important} .spdoc{border:0;padding:0;max-width:none} .sptbl{font-size:9.5px} .sptbl tr{break-inside:avoid} .sptbl thead{display:table-header-group} .sptbl th,.sptbl tr.dv td{-webkit-print-color-adjust:exact;print-color-adjust:exact} @page{size:A4 landscape;margin:12mm}}
 .stq,.sptool input{border:1px solid var(--line);border-radius:10px;padding:8px 12px;font:inherit;font-size:13px;background:var(--surface,#fff);width:260px;max-width:100%}
+.hogrp h2{font-size:15px;color:#123B5C;margin:0 0 6px} .hoq{border-bottom:1px solid var(--line);padding:10px 2px} .hoq:last-child{border-bottom:0} .hoq.off{opacity:.5}
+.hoq-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap} .hoq-h .cd{color:#1B6CA8;font-weight:800;font-size:12px} .hoq p{margin:4px 0;font-size:13px;line-height:1.8;color:var(--text)}
