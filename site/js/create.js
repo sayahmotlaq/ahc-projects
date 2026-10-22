@@ -29,7 +29,7 @@ const ensureRef = async () => { if (!REF.loaded) await loadRef(); };
 
 // كل إجراء: [المفتاح، العنوان، الأيقونة، الوصف، الصلاحية، المجموعة، المنفذ]
 const ACTIONS = [
-  ['task', 'مهمة', 'check', 'تكليف شخص بعمل بموعد', isAdmin, 'prj', async p => (await import('./tasks.js')).taskForm(null, p, done('المهمة'))],
+  ['task', 'مهمة', 'check', 'تكليف بعمل بموعد', canEdit, 'prj', async p => (await import('./tasks.js')).taskForm(null, p, done('المهمة'))],
   ['request', 'طلب', 'inbox', 'طلب على مشروع أو عام', canEdit, 'prj', async p => (await import('./tasks.js')).requestForm(null, p, done('الطلب')), { allowNone: true }],
   ['challenge', 'تحدٍ أو خطر', 'alert', 'معوّق يحتاج تدخلاً', canEdit, 'prj', async p => (await import('./challenges.js')).chForm(null, p, null, done('التحدي'))],
   ['treport', 'تقرير فني أو محضر', 'file', 'زيارة، استلام، اجتماع', canEdit, 'prj', async p => { location.hash = `#/treport/new?p=${p.id}`; }],

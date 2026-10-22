@@ -213,7 +213,12 @@ export async function mountProject(root, id, tab = 'overview', sub) {
   const own = isAdmin() || (edit && p.engineer_id === session.user.id);
   if (tab === 'boq' && sub) { return mountBoq(root, sub, p, () => location.hash = `#/project/${id}/boq`); }
   const st = stageOf(p.stage);
-  const TG = [['overview', 'نظرة عامة', 'dash', [['overview', 'الملخص']]], ['follow', 'المتابعة', 'check', [['schedule', 'الجدول الزمني'], ['treports', 'التقارير والمحاضر'], ['tasks', 'المهام'], ['requests', 'الطلبات'], ['challenges', 'التحديات والمخاطر'], ['updates', 'التحديثات والملاحظات'], ['log', 'سجل المراحل'], ['closeout', 'الإغلاق والضمان']]], ['fin', 'المالية', 'coins', [['boq', 'جداول الكميات'], ['payments', 'المستخلصات'], ['changes', 'أوامر التغيير والتمديدات']]], ['docs', 'المستندات', 'doc', [['tender', 'حزمة الطرح'], ['docs', 'المستندات الرسمية'], ['drawings', 'المخططات'], ['specs', 'المواد والمواصفات'], ['submittals', 'الاعتمادات']]]];
+  const TG = [['overview', 'الملخص', 'dash', [['overview', 'الملخص'], ['updates', 'التحديثات والملاحظات'], ['log', 'سجل المراحل']]],
+    ['work', 'العمل', 'check', [['tasks', 'المهام'], ['requests', 'الطلبات'], ['challenges', 'التحديات والمخاطر']]],
+    ['schedule', 'الجدول الزمني', 'calendar', [['schedule', 'الجدول الزمني']]],
+    ['fin', 'المالية', 'coins', [['boq', 'جداول الكميات'], ['payments', 'المستخلصات'], ['changes', 'أوامر التغيير والتمديدات']]],
+    ['docs', 'المستندات', 'doc', [['treports', 'التقارير والمحاضر'], ['submittals', 'الاعتمادات'], ['docs', 'المستندات الرسمية'], ['drawings', 'المخططات'], ['specs', 'المواد والمواصفات'], ['tender', 'حزمة الطرح']]],
+    ['close', 'الإغلاق والضمان', 'clipok', [['closeout', 'الإغلاق والضمان']]]];
   const grp = TG.find(g => g[3].some(x => x[0] === tab)) || TG[0];
   const act0 = await loadActivity();
   root.innerHTML = `<div class="phead">

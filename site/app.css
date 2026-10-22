@@ -1591,3 +1591,17 @@ td.kic{color:var(--k)} td.kic svg.i{width:20px;height:20px}
 .pkp-i:hover{border-color:#27A8DF;background:#F3FAFE} .pkp-i.none{color:var(--muted);border-style:dashed;margin-bottom:6px;align-items:center}
 @media (max-width:600px){.newbtn span{display:none} .newbtn{padding:7px 11px} .cr-g{grid-template-columns:1fr 1fr}}
 @media (max-width:600px){.topbar .gsearch{flex:1 1 auto;min-width:0;width:auto!important} .topbar .gsearch span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .topbar #logout{display:none} .topbar>.sp{display:none} .newbtn{margin-inline:6px 4px}}
+/* الصفحات المجمّعة والمكتبة */
+.hubh{display:flex;align-items:flex-end;gap:12px;margin:4px 0 6px} .hubh p{font-size:13px}
+.hubtabs{margin-bottom:14px} .hub-body>.toolbar .pagetitle,.hub-body .toolbar>h1.pagetitle{display:none}
+.libh{font-size:15px;color:#123B5C;margin:18px 0 8px}
+.libg{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.libc{display:grid;grid-template-columns:auto 1fr;column-gap:12px;row-gap:4px;align-items:center;padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:var(--surface,#fff);text-decoration:none;color:inherit;box-shadow:var(--shadow)}
+.libc svg{grid-row:span 2;width:26px;height:26px;color:#1B6CA8;align-self:start} .libc b{font-size:14.5px;color:#123B5C} .libc span{font-size:12.5px;color:var(--muted);line-height:1.7}
+.libc:hover{border-color:#27A8DF;box-shadow:0 4px 16px rgba(39,168,223,.15)}
+.libd{display:flex;flex-wrap:wrap;gap:8px} .libd a{display:inline-flex;gap:6px;align-items:center;padding:8px 14px;border:1px solid var(--line);border-radius:20px;background:#fff;text-decoration:none;color:#123B5C;font-weight:700;font-size:13px} .libd a svg{width:15px;height:15px;color:#1B6CA8}
+.tqk{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+.tqk a,.tqk button{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:20px;border:1px solid var(--line);background:var(--surface,#fff);color:#123B5C;font:inherit;font-weight:700;font-size:13px;text-decoration:none;cursor:pointer}
+.tqk a svg{width:15px;height:15px;color:#1B6CA8} .tqk a:hover{border-color:#27A8DF;background:#F3FAFE}
+.tqk .tqk-new{background:#123B5C;color:#fff;border-color:#123B5C}
+@media (max-width:600px){.tqk{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none} .tqk a,.tqk button{flex:0 0 auto}}

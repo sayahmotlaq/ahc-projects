@@ -23,7 +23,7 @@ const pname = (id, fb) => profiles.find(p => p.id === id)?.full_name || fb || '�
 // ---------- نموذج المهمة (أدمن) / تحديث حالة (مكلّف)
 export async function taskForm(t, project, done, preset = null) {
   await loadProfiles(); const v = t || preset || {};
-  const admin = isAdmin(); const me = session.user.id;
+  const me = session.user.id; const admin = isAdmin() || (!t && canEdit()) || (t && t.created_by === me);
   const people = [['', '—'], ...profiles.filter(p => ['admin', 'engineer'].includes(p.role)).map(p => [p.id, p.full_name])];
   const html = admin ? `<form id="f" class="pgrid">
       ${field('عنوان المهمة *', inp('title', v.title || '', 'required'), 'wide')}
@@ -46,7 +46,7 @@ export async function taskForm(t, project, done, preset = null) {
         if (admin) { const row = { project_id: project.id, title: f.title.trim(), details: f.details.trim(), assignee_id: f.assignee_id || null, assignee_name: f.assignee_name.trim(), priority: f.priority, due_date: f.due_date || null }; if (preset?.report_id) row.report_id = preset.report_id; if (preset?.challenge_id) row.challenge_id = preset.challenge_id; if (t) { row.status = f.status; row.progress_note = f.progress_note; await q(sb.from('tasks').update(row).eq('id', t.id)); } else await q(sb.from('tasks').insert({ ...row, status: 'open', created_by: me })); }
         else await q(sb.from('tasks').update({ status: f.status, progress_note: f.progress_note }).eq('id', t.id));
         toast('تم الحفظ'); close(); done();
-      } catch (er) { err(er); } };
+      } catch (er) { /row-level security/i.test(er?.message || '') ? toast('تستطيع إنشاء المهام لنفسك أو على المشاريع التي تديرها', 'bad') : err(er); } };
     const del = $('[data-del]', w); if (del) del.onclick = async () => { if (!await confirm('حذف المهمة؟', 'حذف', true)) return; await q(sb.from('tasks').delete().eq('id', t.id)); close(); done(); };
   } });
 }
@@ -91,8 +91,8 @@ export async function projectTasks(t, p) {
   await loadProfiles();
   const rows = await q(sb.from('tasks').select('*').eq('project_id', p.id).order('status').order('due_date', { ascending: true, nullsFirst: false }).order('id', { ascending: false }));
   const open = rows.filter(r => !['done', 'cancelled'].includes(r.status));
-  t.innerHTML = `<div class="pcard"><div class="toolbar"><h2><span class="ic"></span>المهام <span class="muted">(${open.length} مفتوحة من ${rows.length})</span></h2><span class="sp"></span>${govChip('P-10')}${isAdmin() ? '<button class="btn primary" id="tNew">＋ مهمة جديدة</button>' : ''}</div>${rows.length ? taskRows(rows) : '<p class="muted">لا توجد مهام على هذا المشروع.</p>'}</div>`;
-  if (isAdmin()) $('#tNew').onclick = () => taskForm(null, p, () => projectTasks(t, p));
+  t.innerHTML = `<div class="pcard"><div class="toolbar"><h2><span class="ic"></span>المهام <span class="muted">(${open.length} مفتوحة من ${rows.length})</span></h2><span class="sp"></span>${govChip('P-10')}${canEdit() ? '<button class="btn primary" id="tNew">＋ مهمة جديدة</button>' : ''}</div>${rows.length ? taskRows(rows) : '<p class="muted">لا توجد مهام على هذا المشروع.</p>'}</div>`;
+  if (canEdit() && $('#tNew')) $('#tNew').onclick = () => taskForm(null, p, () => projectTasks(t, p));
   $$('[data-t]', t).forEach(b => b.onclick = () => taskForm(rows.find(x => x.id === +b.getAttribute('data-t')), p, () => projectTasks(t, p)));
 }
 export async function projectRequests(t, p) {

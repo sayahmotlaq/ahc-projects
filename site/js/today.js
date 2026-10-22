@@ -88,9 +88,7 @@ export async function mountToday(root, params) {
   const feedHtml = await teamFeed(D, 12).catch(e => { console.error(e); return ''; });
   root.innerHTML = `<div class="today">
     <div class="hero ${closing ? 'pm' : 'am'}"><div><div class="muted small">${now.toLocaleDateString('ar-SA-u-ca-gregory-nu-latn', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div><h1>${esc(greet)}</h1><p>${esc(lead)}</p></div><div class="btnrow">${canEdit() ? `<a class="btn" href="#/treport/new">${ico('file')} تقرير فني</a>` : ''}<a class="btn primary" href="#/dashboard">${ico('dash')} لوحة المؤشرات</a></div></div>
-    ${msgsCard}
-    ${feedHtml}
-    ${pulseHtml}
+    <nav class="tqk"><button class="tqk-new" id="tqNew">＋ إنشاء جديد</button><a href="#/projects">${ico('folder')} المشاريع</a><a href="#/work">${ico('check')} المهام والطلبات</a><a href="#/records">${ico('doc')} المستندات والاعتمادات</a><a href="#/studies">${ico('ruler')} الدراسات</a><a href="#/library">${ico('book')} المكتبة الفنية</a></nav>
     <div class="two">
       <div class="stack">
         <div class="pcard inbox"><h2>مطلوب منك اليوم ${nTodo ? `<span class="badge ${todayItems.some(i => i.bad) ? 'bad' : 'ovr'}">${nTodo}</span>` : ''}</h2>${todayItems.length ? todayItems.map((i, idx) => inboxItem(i, idx, D.ago)).join('') : '<p class="muted">لا يوجد ما ينتظرك الآن</p>'}</div>
@@ -104,7 +102,11 @@ export async function mountToday(root, params) {
         <div class="pcard"><h2>${closing ? 'ما أنجزته اليوم' : 'أنجزته حتى الآن'} <span class="badge ${nDone ? 'full' : 'skel'}">${nDone}</span></h2>${mineToday.length ? `<div class="tl">${mineToday.map(a => `<div class="e"><i>${ico({ treport: 'file', update: 'edit', payment: 'coins', submittal: 'stamp', submittal_review: 'stamp', submittal_decision: 'stamp', task_done: 'check', task_created: 'check', challenge: 'alert', stage: 'chart', request: 'inbox', request_response: 'inbox', document: 'doc', drawing: 'draw', boq: 'book', comment: 'inbox', project: 'folder' }[a.kind] || 'dash')}</i><div><b><a href="${esc(a.link || '#')}" style="color:inherit">${esc(a.title)}</a></b><small>${esc(D.projects.find(p => p.id === a.project_id)?.name || '')} · ${new Date(a.at).toLocaleTimeString('ar-SA-u-nu-latn', { hour: '2-digit', minute: '2-digit' })}</small></div></div>`).join('')}</div>` : `<p class="muted">${closing ? 'لم يُسجَّل إجراء اليوم.' : 'لم تسجل إجراءً بعد. أول تحديث أو تقرير سيظهر هنا فوراً.'}</p>`}<div class="btnrow end" style="margin-top:6px"><a class="btn sm" href="#/${admin ? 'performance/' + me : 'me'}">سجل إنجازاتي الكامل ‹</a></div></div>
         <div class="pcard"><h2>ما حدث منذ آخر زيارة <span class="badge skel">${notes.length}</span></h2><p class="muted small" style="margin:-6px 0 8px">${lastSeen ? 'منذ ' + dateAr(lastSeen) + ' ' + new Date(lastSeen).toLocaleTimeString('ar-SA-u-nu-latn', { hour: '2-digit', minute: '2-digit' }) : 'آخر 24 ساعة'}</p>${notes.length ? notes.map(n => `<a class="nitem ${n.read_at ? '' : 'new'}" href="${esc(n.link || '#')}" style="padding:8px 4px"><span class="nic">${ico(ICON_K[n.kind] || 'bell')}</span><span class="nt"><b>${esc(n.title)}</b>${n.body ? `<small>${esc(n.body)}</small>` : ''}<em>${ago(n.created_at)}</em></span></a>`).join('') : '<p class="muted">لا جديد يخصك منذ آخر زيارة.</p>'}</div>
       </div>
-    </div></div>`;
+    </div>
+    ${msgsCard}
+    ${feedHtml}
+    ${pulseHtml}</div>`;
+  const tq = root.querySelector('#tqNew'); if (tq) tq.onclick = async () => (await import('./create.js')).openCreate();
   import('./messages.js').then(m => m.bindMessagesCard(root)).catch(() => { });
   bindFeed(root, D, () => mountToday(root, params));
   if (opsCard) import('./ops.js').then(o => o.bindRows(root, () => mountToday(root, params)));
