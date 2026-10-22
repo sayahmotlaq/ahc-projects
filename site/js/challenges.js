@@ -95,7 +95,7 @@ export async function projectChallenges(t, p) {
 // ---------- نموذج الإضافة / التعديل
 export async function chForm(c, p, projects, done) {
   const html = `<form id="f" class="pgrid">
-    ${!c && projects ? field('المشروع *', sel('project_id', projects.map(x => [x.id, x.name]), ''), 'wide') : ''}
+    ${!c && projects ? field('المشروع *', sel('project_id', [['', '— اختر المشروع —'], ...projects.map(x => [x.id, x.name])], p?.id || ''), 'wide') : ''}
     ${field('وصف التحدي *', `<textarea name="title" rows="2" required placeholder="مثال: تأخر توريد المولد الاحتياطي عن الموعد التعاقدي">${esc(c?.title || '')}</textarea>`, 'wide')}
     ${field('التصنيف', sel('category', CH_CATS, c?.category || 'فني'))}${field('الأثر إن وقع', sel('severity', SEV, c?.severity || 'متوسطة'))}${field('الاحتمالية', sel('likelihood', LIK, c?.likelihood || 'متوسطة'))}
     <div class="fld"><span>الدرجة (الأثر × الاحتمالية)</span><div id="scPrev" style="padding-top:4px"></div></div>
@@ -108,7 +108,7 @@ export async function chForm(c, p, projects, done) {
   await modal(govBar(c ? GOV.challenge(c) : ['P-09', 1]) + html, { title: c ? 'تعديل التحدي' : 'تحدٍ جديد', wide: true, onOpen: (w, close) => {
     const f = $('#f', w); const prev = () => { const s = scoreOf({ severity: f.severity.value, likelihood: f.likelihood.value }); $('#scPrev', w).innerHTML = scoreChip({ score: s, severity: f.severity.value, likelihood: f.likelihood.value }); }; f.severity.onchange = f.likelihood.onchange = prev; prev();
     f.onsubmit = async e => { e.preventDefault(); const d = formData(f); const n = v => v === '' || v == null ? null : Number(v);
-      const row = { project_id: c ? c.project_id : (p?.id || d.project_id), title: d.title.trim(), category: d.category, severity: d.severity, likelihood: d.likelihood, impact_days: n(d.impact_days), impact_amount: n(d.impact_amount), detected_on: d.detected_on || null, due_date: d.due_date || null, owner: d.owner.trim(), action: d.action.trim(), notes: d.notes.trim() };
+      const row = { project_id: c ? c.project_id : (d.project_id || p?.id), title: d.title.trim(), category: d.category, severity: d.severity, likelihood: d.likelihood, impact_days: n(d.impact_days), impact_amount: n(d.impact_amount), detected_on: d.detected_on || null, due_date: d.due_date || null, owner: d.owner.trim(), action: d.action.trim(), notes: d.notes.trim() };
       if (c && d.status) row.status = d.status;
       if (!row.project_id) return err('اختر المشروع');
       try { if (c) await q(sb.from('challenges').update(row).eq('id', c.id)); else await q(sb.from('challenges').insert({ ...row, created_by: session.user.id })); toast('تم الحفظ'); close(); done(); } catch (er) { err(er); } };
