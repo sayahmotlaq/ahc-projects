@@ -93,7 +93,7 @@ export async function projectChallenges(t, p) {
 }
 
 // ---------- نموذج الإضافة / التعديل
-async function chForm(c, p, projects, done) {
+export async function chForm(c, p, projects, done) {
   const html = `<form id="f" class="pgrid">
     ${!c && projects ? field('المشروع *', sel('project_id', projects.map(x => [x.id, x.name]), ''), 'wide') : ''}
     ${field('وصف التحدي *', `<textarea name="title" rows="2" required placeholder="مثال: تأخر توريد المولد الاحتياطي عن الموعد التعاقدي">${esc(c?.title || '')}</textarea>`, 'wide')}

@@ -1577,3 +1577,17 @@ td.kic{color:var(--k)} td.kic svg.i{width:20px;height:20px}
 .stq,.sptool input{border:1px solid var(--line);border-radius:10px;padding:8px 12px;font:inherit;font-size:13px;background:var(--surface,#fff);width:260px;max-width:100%}
 .hogrp h2{font-size:15px;color:#123B5C;margin:0 0 6px} .hoq{border-bottom:1px solid var(--line);padding:10px 2px} .hoq:last-child{border-bottom:0} .hoq.off{opacity:.5}
 .hoq-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap} .hoq-h .cd{color:#1B6CA8;font-weight:800;font-size:12px} .hoq p{margin:4px 0;font-size:13px;line-height:1.8;color:var(--text)}
+/* إنشاء جديد من أي مكان */
+.newbtn{padding:7px 14px;border-radius:10px;font-weight:800;margin-inline-end:8px;white-space:nowrap}
+.cr-h{font-size:12.5px;color:var(--muted);font-weight:700;margin:4px 0 8px} .cr-h b{color:#123B5C}
+.cr-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;margin-bottom:14px}
+.cr-i{display:grid;grid-template-columns:auto 1fr;column-gap:10px;align-items:center;text-align:start;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:#fff;cursor:pointer;font:inherit;color:inherit}
+.cr-i svg{grid-row:span 2;width:22px;height:22px;color:#1B6CA8} .cr-i b{font-size:13.5px;color:#123B5C} .cr-i small{font-size:11.5px;color:var(--muted)}
+.cr-i:hover{border-color:#27A8DF;background:#F3FAFE;box-shadow:0 2px 10px rgba(39,168,223,.15)}
+.pkp input{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit;margin-bottom:8px}
+.pkp-l{max-height:55vh;overflow:auto;display:flex;flex-direction:column;gap:4px}
+.pkp-i{display:flex;flex-direction:column;gap:2px;text-align:start;border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 12px;cursor:pointer;font:inherit;color:inherit;width:100%}
+.pkp-i b{font-size:13.5px} .pkp-i span{font-size:11.5px;color:var(--muted)} .pkp-i em{font-style:normal;color:#2E8B57;font-weight:700}
+.pkp-i:hover{border-color:#27A8DF;background:#F3FAFE} .pkp-i.none{color:var(--muted);border-style:dashed;margin-bottom:6px;align-items:center}
+@media (max-width:600px){.newbtn span{display:none} .newbtn{padding:7px 11px} .cr-g{grid-template-columns:1fr 1fr}}
+@media (max-width:600px){.topbar .gsearch{flex:1 1 auto;min-width:0;width:auto!important} .topbar .gsearch span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .topbar #logout{display:none} .topbar>.sp{display:none} .newbtn{margin-inline:6px 4px}}

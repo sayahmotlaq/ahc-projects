@@ -1,5 +1,6 @@
 // ===== المستخلصات المالية =====
 import { sb, canEdit, isAdmin, role, q, session, today } from './api.js';
+import { listNew, bindListNew } from './create.js';
 import { $, $$, esc, money, fmt, dateAr, toast, err, modal, confirm, field, inp, sel, formData, money_inp, ico } from './ui.js';
 import { exportTable, xbtn } from './xlsx.js';
 import { threadBox, mountThread } from './thread.js';
@@ -66,7 +67,7 @@ async function transition(pm, to, done) {
 }
 
 // ---------- نموذج إنشاء / تعديل
-async function payForm(pm, project, existing, done) {
+export async function payForm(pm, project, existing, done) {
   const editable = canEditPay(pm);
   const nextNo = existing.length ? Math.max(...existing.map(x => x.no)) + 1 : 1;
   const prevCum = existing.filter(x => x.status !== 'rejected' && x.kind !== 'advance' && x.kind !== 'retention_release').reduce((a, x) => a + Number(x.work_amount || 0), 0);
@@ -154,7 +155,7 @@ export async function projectPayments(t, p) {
 
 // ---------- الصفحة العامة
 export async function mountPayments(root, params) {
-  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">المستخلصات المالية</h1><span class="sp"></span>${govChip('P-07')}${xbtn()}</div>
+  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">المستخلصات المالية</h1><span class="sp"></span>${govChip('P-07')}${xbtn()}${listNew('payment')}</div>
     <div class="filters"><input id="fq" placeholder="بحث باسم المشروع أو رقم الفاتورة…"><select id="fSt"><option value="">قيد الإجراء (مقدَّم ← لدى المالية)</option><option value="all">الكل</option>${Object.entries(P_STATUS).map(([k, v]) => `<option value="${k}" ${params.get('st') === k ? 'selected' : ''}>${v}</option>`).join('')}</select><select id="fK"><option value="">كل الأنواع</option>${Object.entries(P_KIND).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div><div id="kp"></div><div id="pl"><p class="muted">…</p></div>`;
   const all = await q(sb.from('payments').select('*, projects(name,contract_value)').order('id', { ascending: false }));
   const sum = arr => arr.reduce((a, r) => a + Number(r.net_amount || 0), 0);

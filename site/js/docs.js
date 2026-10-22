@@ -1,5 +1,6 @@
 // ===== المستندات الرسمية + المخططات + الاعتمادات =====
 import { sb, REF, loadRef, canEdit, canDocs, isAdmin, q, session, today, SETTINGS } from './api.js';
+import { listNew, bindListNew } from './create.js';
 import { $, $$, esc, norm, money, dateAr, toast, err, modal, confirm, field, inp, sel, formData, ico, money_inp } from './ui.js';
 import { exportTable, xbtn } from './xlsx.js';
 import { compress } from './treports.js';
@@ -141,7 +142,7 @@ export async function projectSubmittals(t, p) {
   if (canEdit()) $('#sNew').onclick = () => subForm(null, p, rows, () => projectSubmittals(t, p));
   $$('[data-s]', t).forEach(b => b.onclick = () => subDetail(rows.find(x => x.id === +b.getAttribute('data-s')), p, rows, () => projectSubmittals(t, p)));
 }
-async function subForm(s, p, existing, done, resubmitOf = null) {
+export async function subForm(s, p, existing, done, resubmitOf = null) {
   const v = s || resubmitOf || { kind: 'material', submitted_on: today() };
   const nextNo = resubmitOf ? resubmitOf.no : (existing.length ? Math.max(...existing.map(x => x.no)) + 1 : 1);
   await modal(`${govBar(['P-06', s ? 1 : 1])}<form id="f" class="pgrid">
@@ -232,7 +233,7 @@ async function decideForm(s, p, done) {
 // الصفحة العامة للاعتمادات
 export async function mountSubmittals(root, params) {
   await loadProfiles(); await loadSla();
-  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">الاعتمادات</h1><span class="sp"></span>${govChip('P-06')}${xbtn('xl')}</div><div class="filters"><input id="fq" placeholder="بحث…"><select id="fSt"><option value="">قيد الإجراء</option><option value="all">الكل</option><option value="submitted">بانتظار المهندس</option><option value="reviewed">بانتظار القرار</option><option value="late">متأخرة</option><option value="decided">صدر القرار</option></select><select id="fK"><option value="">كل الأنواع</option>${Object.entries(SUB_KIND).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div><div id="kp"></div><div id="sl"><p class="muted">…</p></div>`;
+  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">الاعتمادات</h1><span class="sp"></span>${govChip('P-06')}${xbtn('xl')}${listNew('submittal')}</div><div class="filters"><input id="fq" placeholder="بحث…"><select id="fSt"><option value="">قيد الإجراء</option><option value="all">الكل</option><option value="submitted">بانتظار المهندس</option><option value="reviewed">بانتظار القرار</option><option value="late">متأخرة</option><option value="decided">صدر القرار</option></select><select id="fK"><option value="">كل الأنواع</option>${Object.entries(SUB_KIND).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div><div id="kp"></div><div id="sl"><p class="muted">…</p></div>`;
   const all = await q(sb.from('submittals').select('*, projects(name,contractor)').order('id', { ascending: false }));
   const open = all.filter(s => s.status !== 'decided'), late = open.filter(isOverdue);
   const avg = (() => { const d = all.filter(s => s.decided_at); return d.length ? Math.round(d.reduce((a, s) => a + (new Date(s.decided_at) - new Date(s.submitted_on)) / 864e5, 0) / d.length) : null; })();
@@ -254,7 +255,7 @@ export async function mountDocsAll(root, params) {
   const missing = projects.filter(p => ['execution', 'handover', 'warranty'].includes(p.stage)).map(p => ({ p, m: REQUIRED_EXEC.filter(c => !rows.some(r => r.project_id === p.id && r.category === c)) })).filter(x => x.m.length);
   const expiring = rows.filter(r => r.expiry_date && r.expiry_date <= soonD);
   const openLetters = rows.filter(r => r.category.startsWith('letter') && r.reply_due && !r.replied_on);
-  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">سجل المستندات الرسمية</h1><span class="sp"></span>${govChip('P-11')}${xbtn('xl')}</div>
+  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">سجل المستندات الرسمية</h1><span class="sp"></span>${listNew('doc')}${govChip('P-11')}${xbtn('xl')}</div>
     <div class="kpis"><a class="kpi ${expiring.length ? 'bad' : ''}" href="#/documents?f=expiring"><b>${expiring.length}</b><span>ضمانات / تأمينات تنتهي خلال 30 يوماً</span></a><a class="kpi ${missing.length ? 'bad' : ''}" href="#/documents?f=missing"><b>${missing.length}</b><span>مشاريع تحت التنفيذ ناقصة مستندات أساسية</span></a><a class="kpi ${openLetters.filter(r => r.reply_due < today()).length ? 'bad' : ''}" href="#/documents?f=letters"><b>${openLetters.length}</b><span>خطابات بانتظار رد${openLetters.filter(r => r.reply_due < today()).length ? ' · ' + openLetters.filter(r => r.reply_due < today()).length + ' متأخرة' : ''}</span></a><div class="kpi"><b>${rows.length}</b><span>إجمالي المستندات</span></div></div>
     <div class="filters"><input id="fq" placeholder="بحث…"><select id="fF"><option value="">كل المستندات</option><option value="expiring">تنتهي خلال 30 يوماً</option><option value="missing">نواقص المشاريع</option><option value="letters">خطابات بانتظار رد</option></select><select id="fC"><option value="">كل الأنواع</option>${Object.entries(DOC_CAT).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select><select id="fP"><option value="">كل المشاريع</option>${projects.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></div><div id="dl"></div>`;
   if (params.get('f')) $('#fF').value = params.get('f');
@@ -271,7 +272,7 @@ export async function mountDrawingsAll(root, params) {
   const [dwgs, revs, projects] = await Promise.all([q(sb.from('drawings').select('*, projects(name)').order('project_id').order('discipline').order('dwg_no')), q(sb.from('drawing_revisions').select('*').order('id', { ascending: false })), q(sb.from('projects').select('id,name').eq('archived', false).order('name'))]);
   const cur = d => revs.find(r => r.drawing_id === d.id);
   const st = k => dwgs.filter(d => cur(d)?.status === k).length;
-  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">سجل المخططات</h1></div>
+  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">سجل المخططات</h1><span class="sp"></span>${listNew('drawing')}</div>
     <div class="kpis"><div class="kpi"><b>${dwgs.length}</b><span>إجمالي المخططات</span></div><a class="kpi ${st('for_approval') ? 'bad' : ''}" href="#/drawings?st=for_approval"><b>${st('for_approval')}</b><span>بانتظار الاعتماد</span></a><div class="kpi"><b>${st('approved') + st('approved_notes')}</b><span>معتمدة</span></div><div class="kpi"><b>${st('as_built')}</b><span>كما نُفذ</span></div></div>
     <div class="filters"><input id="fq" placeholder="بحث برقم المخطط أو العنوان…"><select id="fSt"><option value="">كل الحالات</option>${Object.entries(DWG_ST).filter(([k]) => k !== 'superseded').map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select><select id="fD"><option value="">كل التخصصات</option>${Object.entries(DISC).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select><select id="fP"><option value="">كل المشاريع</option>${projects.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></div><div id="gl"></div>`;
   if (params.get('st')) $('#fSt').value = params.get('st');

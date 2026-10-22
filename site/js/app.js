@@ -42,13 +42,14 @@ function shell(inner) {
       <nav class="snav">${links()}</nav>
       <button class="fold" id="fold" title="طيّ القائمة">${ico('fold')}</button></aside>
     <div class="mainwrap">
-      <div class="topbar"><div class="gsearch" id="gsearch">${ico('search')}<span>ابحث عن صفحة أو مشروع أو قسم…</span><kbd>⌘K</kbd></div><span class="sp"></span><span id="bellhost"></span>
+      <div class="topbar"><div class="gsearch" id="gsearch">${ico('search')}<span>ابحث عن صفحة أو مشروع أو قسم…</span><kbd>⌘K</kbd></div><span class="sp"></span><button class="btn primary newbtn" id="newBtn" title="إنشاء جديد من أي مكان (N)">＋ <span>جديد</span></button><span id="bellhost"></span>
         <div class="user"><div><b>${esc(p?.full_name || '')}</b><small>${esc(ROLES[role()] || '')}</small></div><div class="av">${esc((p?.full_name || '?').trim().charAt(0))}</div></div>
         <button class="ib" id="logout" title="خروج">${ico('logout')}</button></div>
       <main id="main">${inner || ''}</main></div></div>
     <nav class="bottom">${bottomFor().map(b => `<a href="${b[0] === 'more' ? '#' : '#/' + b[0]}" data-nav="${b[0]}" ${b[0] === 'more' ? 'id="moreBtn"' : ''}>${ico(b[2])}${b[1]}<span class="cnt" data-cnt="${b[0]}"></span></a>`).join('')}</nav>
     <div class="sheet" id="sheet"><div class="sh">${links()}<a href="#" id="logout2">${ico('logout')}<span>خروج</span></a></div></div>`;
   const out = async () => { await sb.auth.signOut(); location.hash = ''; boot(); };
+  $('#newBtn').onclick = async () => (await import('./create.js')).openCreate();
   $('#logout').onclick = out; $('#logout2').onclick = e => { e.preventDefault(); out(); };
   $('#fold').onclick = () => { const a = $('#app2'); a.classList.toggle('mini'); try { localStorage.setItem('ahc_mini', a.classList.contains('mini') ? '1' : '0'); } catch (e) { } };
   $('#moreBtn').onclick = e => { e.preventDefault(); $('#sheet').classList.toggle('show'); };
@@ -58,7 +59,7 @@ function shell(inner) {
     $$(`.ngrp[data-grp="${c}"]`).forEach(g => g.classList.toggle('open')); const isOpen = $(`.snav .ngrp[data-grp="${c}"]`)?.classList.contains('open');
     try { let o = JSON.parse(localStorage.getItem('ahc_open') || '[]'); o = isOpen ? [...new Set([...o, c])] : o.filter(x => x !== c); localStorage.setItem('ahc_open', JSON.stringify(o)); } catch (er) { } }));
   $('#gsearch').onclick = openPalette;
-  document.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openPalette(); } });
+  document.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openPalette(); } if (e.key.toLowerCase() === 'n' && !e.metaKey && !e.ctrlKey && !e.altKey && !/input|textarea|select/i.test(document.activeElement?.tagName || '') && !document.querySelector('.mwrap')) { e.preventDefault(); import('./create.js').then(m => m.openCreate()); } });
   opsCounts();
   if (canRead() || ['facility', 'tech', 'requester'].includes(role())) import('./notif.js').then(n => { n.mountBell($('#bellhost')); n.registerSW(); });
 }
@@ -176,6 +177,7 @@ async function route() {
     else if (parts[0] === 'ref') { await ensureRef(); const { mountRef } = await import('./ref.js'); const code = parts[1] ? parts[1].replace(/-/g, ' ') : null; if (!m.querySelector('.refwrap')) mountRef(m, code); else if (code) { const { go } = await import('./ref.js'); go(code); } }
     else if (parts[0] === 'admin') { if (!isAdmin()) return location.hash = '#/dashboard'; const { mountAdmin } = await import('./admin.js'); await mountAdmin(m, parts[1] || 'users'); }
     else location.hash = '#/' + home();
+    if (m.querySelector('[data-lnew]')) import('./create.js').then(c => c.bindListNew(m));
   } catch (e) { err(e); m.innerHTML = `<div class="empty-boq">تعذّر التحميل: ${esc(e.message || e)}</div>`; }
 }
 window.addEventListener('hashchange', route);

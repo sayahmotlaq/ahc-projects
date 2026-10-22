@@ -127,7 +127,7 @@ function secTree(chosen) {
   return REF.divisions.filter(d => d.sections.some(cnt)).map(d => `<details class="sptree" ${d.sections.some(s => chosen.has(s.code)) ? 'open' : ''}><summary><label><input type="checkbox" data-div="${d.code}" ${d.sections.filter(cnt).every(s => chosen.has(s.code)) ? 'checked' : ''}> <b>${d.code}</b> ${esc(d.ar)}</label><span class="muted small">${d.sections.reduce((a, s) => a + cnt(s), 0)} بنداً</span></summary>
     <div>${d.sections.filter(cnt).map(s => `<label class="chk"><input type="checkbox" data-sec="${s.code}" ${chosen.has(s.code) ? 'checked' : ''}> <span class="ltr small">${s.code}</span> ${esc(s.ar)} <span class="muted small">(${cnt(s)})</span></label>`).join('')}</div></details>`).join('');
 }
-async function newSpecSet(owner) {
+export async function newSpecSet(owner) {
   const chosen = new Set(REF.sections.filter(s => PRESET(s.code)).map(s => s.code));
   await modal(`<form id="f" class="pgrid"><div class="wide">${field('اسم الجدول', inp('name', 'جدول المواد والمواصفات المعتمدة'))}</div>${field('المقاول (اختياري)', inp('contractor', ''))}
     ${field('طبيعة المشروع', sel('tpl', [...Object.entries(SPEC_TPL).map(([k, t]) => [k, t.name + ` (${t.items.length} بنداً مختاراً)`]), ['', 'اختيار يدوي بالأقسام']], 'entrance'), 'wide')}

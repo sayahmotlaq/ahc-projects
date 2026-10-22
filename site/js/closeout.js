@@ -26,7 +26,7 @@ export async function projectChanges(t, p) {
   if (canEdit()) $('#coNew').onclick = () => coForm(null, p, rows, () => projectChanges(t, p));
   $$('[data-co]', t).forEach(b => b.onclick = () => coDetail(rows.find(x => x.id === +b.getAttribute('data-co')), p, rows, () => projectChanges(t, p)));
 }
-async function coForm(c, p, rows, done) {
+export async function coForm(c, p, rows, done) {
   const v = c || { kind: 'cost', requested_on: today(), requested_by: p.contractor || '' };
   const nextNo = rows.length ? Math.max(...rows.map(x => x.no)) + 1 : 1;
   const editable = isAdmin() || !c || ['draft', 'submitted', 'rejected'].includes(c.status);

@@ -157,7 +157,7 @@ export async function mountProjects(root, params) {
   if (edit && params.get('new')) { history.replaceState(null, '', '#/projects'); editProject(null, id => location.hash = '#/project/' + id); }
 }
 
-async function editProject(p, done) {
+export async function editProject(p, done) {
   const isNew = !p; await loadProfiles(); const facs = await q(sb.from('facilities').select('id,name,kind').eq('active', true).order('sort').order('name')).catch(() => []);
   const engs = [['', '—'], ...profiles.filter(x => ['admin', 'engineer'].includes(x.role)).map(x => [x.id, x.full_name])];
   const html = `<form id="f" class="pgrid">

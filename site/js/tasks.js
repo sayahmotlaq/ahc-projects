@@ -1,5 +1,6 @@
 // ===== المهام (من الإدارة) والطلبات (من المهندسين) =====
 import { sb, canEdit, isAdmin, q, session, today } from './api.js';
+import { listNew, bindListNew } from './create.js';
 import { $, $$, esc, dateAr, toast, err, modal, confirm, field, inp, sel, formData, calBtn, bindCal } from './ui.js';
 import { exportTable, xbtn } from './xlsx.js';
 import { threadBox, mountThread } from './thread.js';
@@ -107,7 +108,7 @@ export async function projectRequests(t, p) {
 export async function mountTasks(root, params) {
   await loadProfiles();
   const me = session.user.id;
-  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">المهام</h1><span class="sp"></span>${govChip('P-10')}${xbtn()}</div>
+  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">المهام</h1><span class="sp"></span>${govChip('P-10')}${xbtn()}${listNew('task')}</div>
     <div class="filters"><input id="fq" placeholder="بحث…"><select id="fSt"><option value="">المفتوحة وقيد التنفيذ</option><option value="all">الكل</option>${Object.entries(T_STATUS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select><select id="fAs"><option value="">كل المكلفين</option>${!isAdmin() ? '' : ''}${profiles.filter(p => ['admin', 'engineer'].includes(p.role)).map(p => `<option value="${p.id}" ${params.get('me') && p.id === me ? 'selected' : ''}>${esc(p.full_name)}</option>`).join('')}</select><label class="chk"><input type="checkbox" id="fLate"> المتأخرة فقط</label></div><div id="tl"><p class="muted">…</p></div>`;
   const all = await q(sb.from('tasks').select('*, projects(name)').order('due_date', { ascending: true, nullsFirst: false }).order('id', { ascending: false }));
   const render = () => { const qs = $('#fq').value.toLowerCase(), st = $('#fSt').value, as = $('#fAs').value, late = $('#fLate').checked;
@@ -119,7 +120,7 @@ export async function mountTasks(root, params) {
 }
 export async function mountRequests(root, params) {
   await loadProfiles();
-  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">الطلبات</h1><span class="sp"></span>${govChip('P-10')}${canEdit() ? '<button class="btn primary" id="rNew">＋ طلب عام (بلا مشروع)</button>' : ''}</div>
+  root.innerHTML = `<div class="toolbar"><h1 class="pagetitle">الطلبات</h1><span class="sp"></span>${govChip('P-10')}${listNew('request')}</div>
     <div class="filters"><input id="fq" placeholder="بحث…"><select id="fSt"><option value="">بانتظار الرد</option><option value="all">الكل</option>${Object.entries(R_STATUS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select><select id="fK"><option value="">كل الأنواع</option>${Object.entries(R_KIND).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div><div id="rl"><p class="muted">…</p></div>`;
   const all = await q(sb.from('requests').select('*, projects(name)').order('id', { ascending: false }));
   const render = () => { const qs = $('#fq').value.toLowerCase(), st = $('#fSt').value, k = $('#fK').value;
