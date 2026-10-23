@@ -7,7 +7,7 @@ import './govlink.js';
 const app = $('#app');
 const DEPTS = [['PRJ', 'المشاريع', '27A8DF'], ['FAC', 'المرافق', '2E8B57'], ['MNT', 'الصيانة', 'B8860B'], ['SAF', 'الأمن والسلامة', 'B03A48'], ['BME', 'الصيانة الطبية', 'A0522D'], ['MED', 'التجهيزات الطبية', '6B4C9A'], ['GEN', 'الخدمات العامة', '5F7A5B'], ['IT', 'تقنية المعلومات', '1B6CA8'], ['TRN', 'الحركة', '0E7C86']];
 // القائمة: الإدارة ← الأقسام (كل قسم يتفتح على صفحاته مثل المشاريع) ← النظام
-const TOP = [['today', 'يومي', 'sun', 'read'], ['tsd', 'لوحة الإدارة', 'dash', 'ops'], ['ops', 'البلاغات والطلبات', 'inbox', 'any'], ['fm', 'المتابعة', 'pulse', 'ops'], ['map', 'الخريطة', 'map', 'read'], ['library', 'المكتبة الفنية', 'book', 'any'], ['fleet', 'سيارات المقر', 'car', 'any']];
+const TOP = [['today', 'يومي', 'sun', 'read'], ['tsd', 'لوحة الإدارة', 'dash', 'ops'], ['ops', 'البلاغات والطلبات', 'inbox', 'any'], ['services', 'دليل الخدمات', 'book', 'any'], ['fm', 'المتابعة', 'pulse', 'ops'], ['map', 'الخريطة', 'map', 'read'], ['library', 'المكتبة الفنية', 'book', 'any'], ['fleet', 'سيارات المقر', 'car', 'any']];
 const SYS = [['leaves', 'الإجازات والتغطية', 'clock', 'read'], ['report', 'التقارير', 'chart', 'read'], ['briefs', 'العروض التنفيذية', 'print', 'read'], ['performance', 'الأداء والإنجازات', 'users', 'admin'], ['me', 'إنجازاتي', 'users', ['engineer', 'clerk']], ['settings', 'الإعدادات والإشعارات', 'bell', 'any'], ['admin', 'الإدارة', 'cog', 'admin']];
 const ASSET_U = ['MNT', 'BME', 'IT', 'MED', 'SAF', 'GEN'], PLAN_U = ['MNT', 'BME', 'SAF', 'IT', 'GEN', 'FAC', 'TRN'];
 const SUBS = c => c === 'PRJ' ? [['dashboard', 'لوحة المشاريع', 'chart', 'read'], ['projects', 'المشاريع', 'folder', 'read'], ['studies', 'الدراسات', 'ruler', 'read'], ['work', 'المهام والطلبات', 'check', 'read'], ['records', 'المستندات والاعتمادات', 'doc', 'read'], ['payments', 'المستخلصات', 'coins', 'read'], ['dept/PRJ/work', 'طلبات القسم', 'inbox', 'ops'], ['dept/PRJ/team', 'الفريق', 'users', 'ops']]
@@ -20,7 +20,7 @@ const HUBR = { work: 'work', tasks: 'work', requests: 'work', challenges: 'work'
 // الوصول: read = من يقرأ المنصة كاملة، ops = هم + موظفو الأقسام الفنية، any = الجميع (ومنهم المبلّغ)، أو دور/أدوار محددة
 const OPS_ROLES = ['facility', 'tech'];
 const allow = a => { const r = role(); if (!a || a === 'any') return true; if (a === 'read') return canRead(); if (a === 'ops') return canRead() || OPS_ROLES.includes(r); return Array.isArray(a) ? a.includes(r) : r === a; };
-const ROUTE_ACCESS = { library: 'any', manuals: 'any', tsd: 'ops', dept: 'ops', ops: 'any', fleet: 'any', fm: 'ops', gov: 'ops', settings: 'any', open: 'read' };
+const ROUTE_ACCESS = { services: 'any', standards: 'any', library: 'any', manuals: 'any', tsd: 'ops', dept: 'ops', ops: 'any', fleet: 'any', fm: 'ops', gov: 'ops', settings: 'any', open: 'read' };
 const home = () => { const r = role(); if (r === 'requester') return 'ops'; if (r === 'head' && session.profile?.unit) return 'dept/' + session.profile.unit; if (OPS_ROLES.includes(r)) return session.profile?.unit ? 'dept/' + session.profile.unit : 'fm'; return 'today'; };
 const bottomFor = () => { const r = role(), u = session.profile?.unit;
   if (r === 'requester') return [['ops/mine', 'طلباتي', 'inbox'], ['ops/new', 'طلب جديد', 'plus'], ['settings', 'الإعدادات', 'cog'], ['more', 'المزيد', 'menu']];
@@ -89,7 +89,9 @@ async function buildContentIdx() {
   const [stds, mats, rules, procs, mans, ls, ho] = await Promise.all([Q(sb.from('standards').select('code,title,en,tokens,kind').eq('active', true)), Q(sb.from('materials').select('code,name,makers,category,spec').eq('active', true)),
     Q(sb.from('gov_rules').select('code,title,statement').eq('active', true)), Q(sb.from('gov_processes').select('code,title,goal')), Q(sb.from('manual_templates').select('code,title,scope,cat')),
     Q(sb.from('ls_items').select('code,title,descr').eq('active', true)), Q(sb.from('handover_reqs').select('code,title,descr').eq('active', true))]);
+  const svcs = await Q(sb.from('services').select('code,title,summary,keywords,status').eq('active', true));
   const out = [
+    ...svcs.map(s => ({ r: 0, code: s.code, name: s.title, kind: s.status === 'planned' ? 'دليل الخدمات (قيد الإعداد)' : 'دليل الخدمات', icon: 'book', link: '#/services/' + s.code, s: [s.code, s.title, s.summary, ...(s.keywords || [])].join(' ') })),
     ...stds.map(s => ({ r: 1, code: s.code, name: s.title, kind: s.kind === 'internal' ? 'معيار التجمع' : 'كود / مواصفة', icon: s.kind === 'internal' ? 'shield' : 'book', link: 'std:' + s.code, s: [s.code, s.title, s.en, ...(s.tokens || [])].join(' ') })),
     ...mats.map(m => ({ r: 2, code: m.code, name: `${m.name} — ${(m.makers || []).join('، ')}`, kind: 'مادة معتمدة', icon: 'stamp', link: 'mat:' + m.code, s: [m.code, m.name, m.category, m.spec, ...(m.makers || [])].join(' ') })),
     ...rules.map(r => ({ r: 3, code: r.code, name: r.title, kind: 'قاعدة حوكمة', icon: 'shieldok', link: 'rule:' + r.code, s: [r.code, r.title, r.statement].join(' ') })),
@@ -173,6 +175,7 @@ async function route() {
   try {
     if (HUBR[parts[0]]) { const H = await import('./hub.js'); const hub = HUBR[parts[0]]; await H.mountHub(m, hub, parts[0] === hub ? (params.get('t') || '') : parts[0], params); }
     else if (parts[0] === 'library') { const { mountLibrary } = await import('./library.js'); mountLibrary(m); }
+    else if (parts[0] === 'services') { const { mountServices } = await import('./services.js'); await mountServices(m, parts[1] || null, params); }
     else if (parts[0] === 'standards') { const { mountStandards } = await import('./standards.js'); await mountStandards(m, params); }
     else if (parts[0] === 'today') { const { mountToday } = await import('./today.js'); await mountToday(m, params); }
     else if (parts[0] === 'dashboard') { const { mountDashboard } = await import('./projects.js'); await mountDashboard(m); }

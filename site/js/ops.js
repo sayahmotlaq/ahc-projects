@@ -102,8 +102,13 @@ export const catalogHtml = (only, staffKinds = false) => {
   return `<div class="ocat">${ks.map(k => `<button class="ocard" data-kind="${k.code}" style="--c:${ucolor(k.unit)}"><span class="ocard-i">${kic(k)}</span><b>${esc(k.name)}</b><small>${esc(k.descr)}</small><span class="ocard-f">${uchip(k.unit)}${k.proc ? `<span class="muted small">${ico('book')} ${esc(k.proc)}</span>` : ''}</span></button>`).join('')}</div>`;
 };
 export async function pickKind(title = 'ماذا تحتاج؟', exclude) {
-  return modal(`<p class="muted small m0">اختر نوع الطلب؛ يصل مباشرة إلى القسم المختص ويُعالج وفق إجرائه في الدليل.</p>${catalogHtml(exclude ? Object.keys(O.G.U).filter(u => u !== exclude) : null, true)}`,
-    { title, wide: true, onOpen: (w, c) => $$('[data-kind]', w).forEach(b => b.onclick = () => c(b.dataset.kind)) });
+  const SV = exclude ? null : await import('./services.js').then(async m => { await m.loadSvc(); return m; }).catch(() => null);
+  return modal(`${SV ? `<div class="svc-search sm"><span>${ico('search')}</span><input id="pkq" placeholder="اكتب ما تحتاجه: مكيف، مقبس، تسريب، شاشة…" autocomplete="off"></div><div id="pkr"></div>` : ''}<p class="muted small m0">أو اختر نوع الطلب؛ يصل مباشرة إلى القسم المختص ويُعالج وفق إجرائه في الدليل.</p>${catalogHtml(exclude ? Object.keys(O.G.U).filter(u => u !== exclude) : null, true)}`,
+    { title, wide: true, onOpen: (w, c) => { $$('[data-kind]', w).forEach(b => b.onclick = () => c(b.dataset.kind));
+      const i = $('#pkq', w); if (!i) return; i.focus();
+      i.oninput = () => { const m = SV.matchSvc(i.value, undefined, 4); $('#pkr', w).innerHTML = m.map(s => `<div class="pk-svc"><div class="pk-h"><b>${esc(s.title)}</b><a class="small" href="#/services/${s.code}" target="_blank" rel="noopener">${ico('book')} المرجع الكامل</a></div>${(s.routes || []).map((r, j) => r.kind ? `<button class="pk-r" data-svc="${s.code}:${j}">${esc(r.t)} <span>← ${esc(uname(r.unit))}</span></button>` : r.link ? `<a class="pk-r" href="${esc(r.link)}">${esc(r.t)}</a>` : '').join('')}</div>`).join('');
+        $$('[data-svc]', w).forEach(b => b.onclick = () => c('svc:' + b.dataset.svc)); };
+    } });
 }
 
 // ---------- نموذج بلاغ أو طلب أو عمل
@@ -123,6 +128,8 @@ export async function newItem(preset = {}, done) {
   if (!O) await loadOps();
   let kind = preset.kind;
   if (!kind) { kind = await pickKind(preset.parent_id ? 'إحالة إلى قسم آخر — اختر نوع العمل' : 'ماذا تحتاج؟', preset.parent_id ? O.I[preset.parent_id]?.unit : null); if (!kind) return; }
+  if (String(kind).startsWith('svc:')) { const [, sc, ri] = kind.split(':'); const { loadSvc } = await import('./services.js'); const s = (await loadSvc()).svc.find(x => x.code === sc), r = s?.routes?.[+ri]; if (!r) return;
+    kind = r.kind; preset = { title: s.title, details: `وفق دليل الخدمات ${s.code} — ${s.title}\nالمسار: ${r.t}`, svc: s.code, ...preset }; }
   const k = O.K[kind]; if (!k) return toast('نوع غير معروف', 'bad');
   const v = { priority: k.prio || 'p3', facility_id: me().facility_id || '', ...preset };
   const staff = isStaff();
@@ -133,7 +140,7 @@ export async function newItem(preset = {}, done) {
     ${par ? `<div class="notice wide">إحالة من <b>${esc(par.ref)}</b> — ${esc(par.title)} (${esc(uname(par.unit))}). يُربط العملان وتصل حالة هذا العمل إلى فريق ${esc(uname(par.unit))}.</div>` : ''}
     ${field('المنشأة *', sel('facility_id', [['', '— اختر —'], ...O.fac.map(f => [f.id, f.name])], v.facility_id || '', 'required'))}
     ${field('الموقع: الغرفة أو المنطقة' + (k.effect === 'closure' ? ' *' : ''), inp('location', v.location || (v.location_id ? locLabel(O.Loc[v.location_id]) : ''), `list="locList" autocomplete="off" placeholder="اكتب رقم الغرفة أو اسمها، أو وصف الموقع" ${k.effect === 'closure' ? 'required' : ''}`) + '<datalist id="locList"></datalist><small class="muted" id="locHint"></small>')}
-    ${field('العنوان *', inp('title', v.title || '', 'required placeholder="وصف مختصر للمشكلة أو الطلب"'), 'wide')}
+    ${field('العنوان *', inp('title', v.title || '', 'required placeholder="وصف مختصر للمشكلة أو الطلب"') + '<div id="svHint"></div>', 'wide')}
     ${fields.map(f => fieldHtml(f, v.data?.[f.k])).join('')}
     ${field('التفاصيل', `<textarea name="details" rows="3" placeholder="ماذا حدث؟ متى؟ ما الأثر؟">${esc(v.details || '')}</textarea>`, 'wide')}
     ${field('الأصل أو الجهاز (إن وجد)', inp('asset', v.asset || '', 'list="assetList" autocomplete="off" placeholder="رمز الأصل أو اسمه"') + '<datalist id="assetList"></datalist><small class="muted" id="assetHint"></small>')}
@@ -143,6 +150,9 @@ export async function newItem(preset = {}, done) {
     <div class="btnrow end wide"><button type="button" class="btn" data-x>إلغاء</button><button class="btn primary">${par ? 'إرسال الإحالة' : 'إرسال'}</button></div></form>`,
     { title: par ? 'إحالة إلى قسم آخر' : 'بلاغ أو طلب جديد', wide: true, onOpen: (w, close) => {
       const form = $('#f', w);
+      import('./services.js').then(async SV => { await SV.loadSvc(); const hint = () => { const s = (v.svc && SV.loadSvc && SV.matchSvc(form.title.value + ' ' + form.details.value, undefined, 5).find(x => x.code === v.svc)) || SV.matchSvc(form.title.value + ' ' + form.details.value, undefined, 1)[0];
+          const el = $('#svHint', w); if (!el) return; el.innerHTML = s ? `<a class="svc-hint" href="#/services/${s.code}" target="_blank" rel="noopener">${ico('book')}<span><b>مرجع هذا الطلب: ${esc(s.title)}</b><small>${s.status === 'planned' ? 'المسار والإجراء الحاكم' : 'المسار، من يعتمد وينفّذ، الاشتراطات والمواصفات المعتمدة، طريقة التنفيذ'} — يفتح في نافذة جديدة</small></span></a>` : ''; };
+        let t; form.title.addEventListener('input', () => { clearTimeout(t); t = setTimeout(hint, 250); }); hint(); }).catch(() => { });
       const sug = () => { const d = {}; fields.forEach(f => d[f.k] = form['d_' + f.k]?.value || ''); const p = suggestPrio(kind, d); $('#psug', w).innerHTML = p ? `المقترح من الأثر: <a href="#" data-p="${p}">${PR[p].ar}</a>` : ''; const a = $('[data-p]', w); if (a) a.onclick = e => { e.preventDefault(); form.querySelector(`[name=priority][value=${p}]`).checked = true; }; };
       fields.forEach(f => form['d_' + f.k] && (form['d_' + f.k].onchange = sug)); sug();
       const locsOf = () => O.locs.filter(l => l.facility_id === +form.facility_id.value);
@@ -198,10 +208,12 @@ export async function openItem(id, re) {
   const chain = [parent ? chainRow(parent, '↰ محال من') : '', ...kids.map(c => chainRow(c, '⇠ أُحيل إلى')), obs ? `<a class="ochain-i" href="#/fm/obs?id=${obs.id}" style="--c:#2E8B57"><span class="ochain-r">${ico('hospital')} من متابعة الأنظمة</span><b>#${obs.id} ${esc(obs.title)}</b></a>` : '', i.project_id ? `<a class="ochain-i" href="#/project/${i.project_id}" style="--c:#27A8DF"><span class="ochain-r">${ico('ruler')} مشروع مرتبط</span><b>فتح المشروع</b></a>` : ''].filter(Boolean);
   const people = O.people.filter(p => p.unit === i.unit || (p.role === 'facility' && !p.unit && ['FAC', 'MNT', 'SAF'].includes(i.unit)) || p.id === i.assignee_id);
   const changed = { v: false };
+  const svm = await import('./services.js').then(async m => { await m.loadSvc(); return m.matchSvc(i.title + ' ' + (i.details || ''), undefined, 1)[0]; }).catch(() => null);
   await modal(`${i.proc ? govBar([i.proc, i.status === 'done' ? 'done' : (i.step || 1)], ST[i.status]?.ar) : ''}
     <div class="ohead" style="--c:${PR[i.priority]?.c}"><span class="oi-k big" style="--k:${ucolor(k.unit)}">${kic(k)}</span><div><b>${esc(i.title)}</b><span class="muted">${esc(i.ref || '')} · ${esc(k.name)} · ${esc(f?.name || '—')}${i.location ? ' · ' + esc(i.location) : ''}</span></div><span class="sp"></span>${stPill(i.status)}${prPill(i.priority)}</div>
     <div class="oi-f mb8">${uchip(i.unit)}${ast ? `<a class="olink" href="#/dept/${ast.unit}/assets?a=${ast.id}">${ico('tag')} ${esc(ast.code)} — ${esc(ast.name)}${ast.status === 'down' ? ' (متعطل)' : ''}</a>` : ''}${i.plan_id ? '<span class="olink">' + ico('calendar') + ' عمل مخطط دوري</span>' : ''}${plan?.wi ? `<a class="olink" href="#/manuals/g/${esc(plan.wi)}" target="_blank">${ico('clipok')} تعليمات العمل ${esc(plan.wi)}</a><a class="olink" href="#/manuals/card/${esc(plan.wi)}" target="_blank">${ico('users')} بطاقة العامل</a>` : ''}${loc ? `<span class="small">${ico('pin')} ${esc(locLabel(loc))}</span>${locPill(loc)}` : ''}${slaChip(i)}${i.due_at && open ? `<span class="muted small">المهلة: ${new Date(i.due_at).toLocaleString('ar-SA-u-ca-gregory-nu-latn', { dateStyle: 'medium', timeStyle: 'short' })}</span>` : ''}</div>
     ${i.details ? `<p class="pre">${esc(i.details)}</p>` : ''}
+    ${svm ? `<a class="svc-hint" href="#/services/${svm.code}">${ico('book')}<span><b>المرجع: ${esc(svm.title)}</b><small>المسار والأدوار والاشتراطات والمواصفات وطريقة التنفيذ من دليل الخدمات</small></span></a>` : ''}
     <div class="fmlast ${open && i.last_action_at && Date.now() - new Date(i.last_action_at) > 3 * 864e5 ? 'stale' : ''}"><span>آخر إجراء متخذ</span>${i.last_action ? `<p>${esc(i.last_action)}</p><small>${pname(i.last_action_by) ? esc(pname(i.last_action_by)) + ' · ' : ''}${ago(i.last_action_at)}</small>` : '<p class="muted">لم يُسجَّل أي إجراء بعد.</p>'}</div>
     <div class="kvs">${[...dataKv, ['رقم الأصل', esc(i.asset || '—')], ['المكلّف', esc(pname(i.assignee_id) || i.assignee_name || '—')], ['مقدّم الطلب', esc(pname(i.requester_id) || i.requester_name || pname(i.created_by) || '—') + (i.requester_phone ? ` <span class="ltr">${esc(i.requester_phone)}</span>` : '')], ['المصدر', SRC[i.source] || '—'], ['أُنشئ', dateAr(i.created_at)], ...(i.closed_at ? [[i.status === 'cancelled' ? 'أُلغي' : 'أُغلق', dateAr(i.closed_at)]] : []), ...(i.rating ? [['تقييم صاحب الطلب', '★'.repeat(i.rating) + '☆'.repeat(5 - i.rating) + (i.feedback ? ' — ' + esc(i.feedback) : '')]] : [])].map(([a, b]) => `<div class="kv"><span>${a}</span><b>${b}</b></div>`).join('')}</div>
     ${gHtml}${cHtml}
