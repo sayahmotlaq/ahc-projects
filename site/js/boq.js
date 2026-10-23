@@ -1,7 +1,7 @@
 // ===== جداول الكميات (مرتبطة بقاعدة البيانات) =====
 import { sb, REF, canEdit, q, session, itemDetail } from './api.js';
 import { $, $$, esc, norm, fmt, money, toast, err, confirm, modal, field, inp, sel, formData, debounce, ico } from './ui.js';
-import { exportExcel } from './excel.js';
+import { exportExcel, exportExcelLang } from './excel.js';
 import { loadLS, activeLS, LS_DEFAULT_NOTES, UNITS, defaultNotes } from './lumpsum.js';
 import { govBar, govChip, GOV } from './govlink.js';
 
@@ -63,6 +63,7 @@ export async function mountBoq(root, boqId, project, onBack) {
       <div class="titleblock"><b>${esc(project.name)}</b><span class="muted">جدول الكميات: ${esc(boq.name)} · <span class="badge skel">${STATUS[boq.status] || boq.status}</span></span></div>
 
       <span class="sp"></span>
+      <select id="bLang" class="langsel" title="لغة الملفات المصدَّرة (Excel وPDF)"><option value="ar">العربية</option><option value="en">English</option></select>
       <button class="btn primary" id="bExcel">⬇ تصدير Excel</button>
       ${lines.some(l => l.ls_code) ? '<button class="btn" id="bGuide" title="دليل للمتبرع والمقاول يشرح المواصفات المعتمدة لبنود هذا الجدول — باسم المشروع">دليل المواصفات PDF</button>' : ''}<button class="btn" id="bHO" title="اشتراطات تسليم المشروع باسم المشروع مع إقرار المقاول">اشتراطات التسليم PDF</button>
       ${edit ? `<button class="btn" id="bSettings">إعدادات الجدول</button><button class="btn" id="bRefresh" title="تحديث أسعار البنود من المرجع الحالي">تحديث الأسعار</button>` : ''}
@@ -84,9 +85,12 @@ export async function mountBoq(root, boqId, project, onBack) {
     <div class="pcard" id="bqNotes" ${boq.notes ? '' : 'hidden'}><h2><span class="ic"></span>ملاحظات عامة</h2><div class="pre" id="bqNotesTxt" style="white-space:pre-wrap;line-height:1.8">${esc(boq.notes || '')}</div></div>
     <div class="pcard"><h2><span class="ic"></span>البنود <span class="muted" id="lineCount"></span>${boq.hide_prices ? ' <span class="badge ovr">نسخة طرح — بلا أسعار</span>' : ''}</h2><div class="tblwrap-bq" id="bqTable"></div><div class="totals" id="bqTotals"></div></div>`;
   $('#bBack').onclick = onBack;
-  $('#bGuide') && ($('#bGuide').onclick = async () => (await import('./guide.js')).openGuide(boq.id));
-  $('#bHO').onclick = async () => (await import('./handover.js')).openHandoverDoc({ projectId: project.id, boqName: boq.name });
-  $('#bExcel').onclick = async () => { const { prj, c } = await boqExportData(boq, lines, project); exportExcel(prj, c, await logo()); };
+  const lang = () => $('#bLang').value;
+  try { $('#bLang').value = localStorage.getItem('ahc_xlang') || 'ar'; } catch (e) { }
+  $('#bLang').onchange = () => { try { localStorage.setItem('ahc_xlang', lang()); } catch (e) { } };
+  $('#bGuide') && ($('#bGuide').onclick = async () => (await import('./guide.js')).openGuide(boq.id, lang()));
+  $('#bHO').onclick = async () => (await import('./handover.js')).openHandoverDoc({ projectId: project.id, boqName: boq.name, lang: lang() });
+  $('#bExcel').onclick = async () => { const { prj, c } = await boqExportData(boq, lines, project); exportExcelLang(prj, c, await logo(), lang()); };
   if (edit) {
     $('#bSettings').onclick = () => settings();
     $('#bRefresh').onclick = async () => { if (!await confirm('تحديث أسعار جميع البنود من المرجع الحالي؟ ستُستبدل الأسعار المحفوظة في هذا الجدول.')) return; try { for (const ln of lines) { const v = REF.byVar[ln.variant_code]; if (v && Number(v.price) !== Number(ln.unit_price)) { await q(sb.from('boq_lines').update({ unit_price: v.price }).eq('id', ln.id)); ln.unit_price = v.price; } } renderTable(); toast('تم تحديث الأسعار'); } catch (e) { err(e); } };

@@ -2,6 +2,7 @@
 import { esc, toast } from './ui.js';
 
 export const COPYRIGHT = '© 2026 حقوق النشر محفوظة لتجمع الأحساء الصحي — إدارة الخدمات الفنية';
+export const COPYRIGHT_EN = '© 2026 All rights reserved — Al Ahsa Health Cluster, Technical Services Department';
 export const DOC_CSS = `:root{--n:#153E5C;--n2:#123B5C;--s:#27A8DF;--s2:#E8F6FC;--g:#5B6B7A;--l:#E3EAF0;--ok:#0F7B5F;--okb:#E7F5F0;--w:#B5562B;--wb:#FBEFE8}
 
 *{box-sizing:border-box}body{font-family:'Tajawal',sans-serif;color:#1d2b36;font-size:10.6pt;line-height:1.75;margin:0}
@@ -75,6 +76,9 @@ const COVER_CSS = `.cv{width:210mm;height:297mm;position:relative;overflow:hidde
 .cv-ft{position:absolute;bottom:20mm;right:18mm;left:18mm;display:flex;justify-content:space-between;align-items:flex-end;color:#153E5C}
 .cv-ft b{font-size:12.5pt;display:block}.cv-ft span{color:#5B6B7A;font-size:10.5pt}`;
 
+// قلب التنسيق لليسار في النسخة الإنجليزية
+const LTR_CSS = `body{line-height:1.6}.cmp tbody th,.tbl th,.tbl td{text-align:left}.en{text-align:left;direction:ltr}.sig{border-right:0;border-left:4px solid var(--s)}
+.steps li{padding:6px 0 6px 44px}.steps li:before{right:auto;left:0}.dr .v{text-align:right}.brands b{text-align:left}.intro p{text-align:justify}.b i{display:none}.cv h1{font-size:26pt;line-height:1.25}`;
 // cover: { kicker, title, sub, project, facility, pills[], tag, date, edition }
 let LOGO = null;
 async function logoData() { if (LOGO) return LOGO; try { const b = await (await fetch(new URL('assets/logo.png', location.href).href)).blob(); LOGO = await new Promise(r => { const f = new FileReader(); f.onload = () => r(f.result); f.readAsDataURL(b); }); } catch (e) { LOGO = new URL('assets/logo.png', location.href).href; } return LOGO; }
@@ -82,32 +86,34 @@ async function logoData() { if (LOGO) return LOGO; try { const b = await (await 
 export function prepDoc() { const w = window.open('', '_blank'); if (!w) { toast('اسمح بفتح النوافذ المنبثقة لهذا الموقع ثم أعد المحاولة', 'bad'); return null; } w.document.write('<p style="font-family:sans-serif;text-align:center;margin-top:40vh;direction:rtl">جارٍ تجهيز المستند…</p>'); w.document.close(); logoData(); return w; }
 export function coverHtml(c) {
   const logo = '%%LOGO%%';
-  return `<div class="cv"><div class="cv-top"><img src="${logo}" alt=""><span class="cv-tag">${esc(c.tag || 'للاطلاع والاسترشاد')}</span></div><div class="cv-band"></div>
+  return `<div class="cv"><div class="cv-top"><img src="${logo}" alt=""><span class="cv-tag">${esc(c.tag || (c.en ? 'For information and guidance' : 'للاطلاع والاسترشاد'))}</span></div><div class="cv-band"></div>
   <div class="cv-tx"><div class="cv-k">${esc(c.kicker || '')}</div><h1>${c.title}</h1>${c.sub ? `<div class="cv-sub">${esc(c.sub)}</div>` : ''}
   ${c.project ? `<div class="cv-prj"><b>${esc(c.project)}</b>${esc(c.facility || '')}</div>` : ''}
   ${(c.pills || []).length ? `<div class="cv-pills">${c.pills.map(p => `<span>${esc(p)}</span>`).join('')}</div>` : ''}</div>
-  <div class="cv-ft"><div><b>إدارة الخدمات الفنية — قسم المشاريع</b><span>تجمع الأحساء الصحي</span></div><div style="text-align:left"><b>${esc(c.edition || '')}</b><span>${esc(c.date || '')}</span></div></div></div>`;
+  <div class="cv-ft"><div><b>${c.en ? 'Technical Services Department — Projects Section' : 'إدارة الخدمات الفنية — قسم المشاريع'}</b><span>${c.en ? 'Al Ahsa Health Cluster' : 'تجمع الأحساء الصحي'}</span></div><div style="text-align:${c.en ? 'right' : 'left'}"><b>${esc(c.edition || '')}</b><span>${esc(c.date || '')}</span></div></div></div>`;
 }
 
 // يفتح المستند في نافذة جديدة ويطلق الطباعة بعد تحميل الخط
-export async function openDoc({ title, cover = '', body, css = '', win = null }) {
+export async function openDoc({ title, cover = '', body, css = '', win = null, lang = 'ar' }) {
+  const en = lang === 'en', A = en ? 'left' : 'right', B = en ? 'right' : 'left';
   const w = win || prepDoc(); if (!w || w.closed) return;
   cover = cover.replace('%%LOGO%%', await logoData());
-  const foot = COPYRIGHT.replace(/"/g, '\"');
+  const foot = (en ? COPYRIGHT_EN : COPYRIGHT).replace(/"/g, '\"');
   w.document.open();
-  w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title>
+  w.document.write(`<!doctype html><html lang="${en ? 'en' : 'ar'}" dir="${en ? 'ltr' : 'rtl'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
-@page{size:A4;margin:20mm 16mm 18mm;@bottom-right{content:"${foot}";font-family:Tajawal,sans-serif;font-size:7.5pt;color:#5B6B7A}@bottom-left{content:counter(page) " / " counter(pages);font-family:Tajawal,sans-serif;font-size:8pt;color:#5B6B7A}@top-center{content:"";border-bottom:3px solid #27A8DF;width:100%;vertical-align:bottom;margin-bottom:6mm}}
-${cover ? '@page :first{margin:0;@bottom-right{content:none}@bottom-left{content:none}@top-center{content:none;border:0}}' : ''}
+@page{size:A4;margin:20mm 16mm 18mm;@bottom-${A}{content:"${foot}";font-family:Tajawal,sans-serif;font-size:7.5pt;color:#5B6B7A}@bottom-${B}{content:counter(page) " / " counter(pages);font-family:Tajawal,sans-serif;font-size:8pt;color:#5B6B7A}@top-center{content:"";border-bottom:3px solid #27A8DF;width:100%;vertical-align:bottom;margin-bottom:6mm}}
+${cover ? '@page :first{margin:0;@bottom-left{content:none}@bottom-right{content:none}@top-center{content:none;border:0}}' : ''}
 ${DOC_CSS}
 ${COVER_CSS}
 .docbar{position:sticky;top:0;z-index:5;display:flex;gap:10px;align-items:center;justify-content:center;background:#153E5C;color:#fff;padding:10px;font-size:13px}
 .docbar button{font:inherit;font-weight:700;border:0;border-radius:8px;padding:8px 16px;cursor:pointer;background:#27A8DF;color:#fff}.docbar button.g{background:transparent;border:1px solid rgba(255,255,255,.5)}
 @media screen{html{background:#E9EEF2}body{max-width:210mm;margin:0 auto 30px;background:#fff;box-shadow:0 2px 18px rgba(0,0,0,.12)}.doc{padding:20mm 16mm}.cv{margin-bottom:0;border-bottom:1px dashed #cdd6de}}
 @media print{.docbar{display:none}body{max-width:none}.doc{padding:0}}
+${en ? LTR_CSS : ''}
 ${css}
-</style></head><body><div class="docbar"><span>لحفظ الملف PDF: اضغط «طباعة» ثم اختر «حفظ بتنسيق PDF»</span><button onclick="print()">طباعة / حفظ PDF</button><button class="g" onclick="close()">إغلاق</button></div>${cover}<div class="doc">${body}</div></body></html>`);
+</style></head><body><div class="docbar" dir="rtl"><span>لحفظ الملف PDF: اضغط «طباعة» ثم اختر «حفظ بتنسيق PDF»</span><button onclick="print()">طباعة / حفظ PDF</button><button class="g" onclick="close()">إغلاق</button></div>${cover}<div class="doc">${body}</div></body></html>`);
   w.document.close();
   const go = () => (w.document.fonts?.ready || Promise.resolve()).then(() => setTimeout(() => w.print(), 350));
   if (w.document.readyState === 'complete') go(); else w.addEventListener('load', go);

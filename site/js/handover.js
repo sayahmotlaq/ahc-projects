@@ -12,11 +12,12 @@ export async function mountHandover(root) {
   const render = () => {
     const list = rows.filter(r => (isAdmin() || r.active) && (!fq || (r.code + r.title + r.descr + r.deliver).includes(fq)));
     root.innerHTML = `<div class="fmhead"><div class="fmhead-t"><h1 class="pagetitle">اشتراطات تسليم المشروع</h1><p class="muted m0">ما يلتزم المقاول بتسليمه: المخططات كما نُفِّذ، الضمانات والشهادات، الترميز والتوسيم، التشغيل والصيانة والتدريب. تُرفق تلقائياً بملف Excel لجدول الكميات، وتُولَّد منها بنود «الإغلاق والضمان» في المشروع.</p></div>
-      <div class="fmhead-a"><button class="btn" id="hoPrint">${ico('print')} PDF للطباعة</button><button class="btn primary" id="hoXl">${ico('download')} Excel</button>${isAdmin() ? '<button class="btn" id="hoNew">＋ اشتراط</button>' : ''}</div></div>
+      <div class="fmhead-a"><select id="hoLang" class="langsel" title="لغة الملف"><option value="ar">العربية</option><option value="en">English</option></select><button class="btn" id="hoPrint">${ico('print')} PDF للطباعة</button><button class="btn primary" id="hoXl">${ico('download')} Excel</button>${isAdmin() ? '<button class="btn" id="hoNew">＋ اشتراط</button>' : ''}</div></div>
       ${print ? printView(list) : `<div class="toolbar"><input id="hoQ" class="stq" placeholder="بحث في الاشتراطات…" value="${esc(fq)}"><span class="muted small">${list.filter(r => r.active).length} اشتراطاً فعالاً</span></div>
       ${grps().map(g => { const ls = list.filter(r => r.grp === g); return ls.length ? `<section class="pcard hogrp"><h2>${esc(g)}</h2>${ls.map(r => `<div class="hoq ${r.active ? '' : 'off'}"><div class="hoq-h"><span class="ltr cd">${r.code}</span><b>${esc(r.title)}</b><span class="badge skel">${esc(r.stage || '')}</span><span class="sp"></span>${isAdmin() ? `<button class="btn sm ghost" data-e="${r.code}">تعديل</button>` : ''}</div><p>${esc(r.descr)}</p>${r.deliver ? `<div class="small"><b>المطلوب تسليمه:</b> ${esc(r.deliver)}</div>` : ''}</div>`).join('')}</section>` : ''; }).join('')}`}`;
-    $('#hoPrint', root).onclick = () => openHandoverDoc();
-    $('#hoXl', root).onclick = () => exportHO(rows.filter(r => r.active));
+    const hl = $('#hoLang', root); try { hl.value = localStorage.getItem('ahc_xlang') || 'ar'; } catch (e) { } hl.onchange = () => { try { localStorage.setItem('ahc_xlang', hl.value); } catch (e) { } };
+    $('#hoPrint', root).onclick = () => openHandoverDoc({ lang: hl.value });
+    $('#hoXl', root).onclick = () => exportHO(rows.filter(r => r.active), hl.value);
     $('#hoNew', root) && ($('#hoNew', root).onclick = () => form(null));
     if (print) return;
     $('#hoQ', root).oninput = e => { fq = e.target.value.trim(); const p = e.target.selectionStart; render(); const i = $('#hoQ', root); i.focus(); i.setSelectionRange(p, p); };
@@ -40,14 +41,17 @@ export async function mountHandover(root) {
   render();
 }
 
-async function exportHO(list) {
+async function exportHO(list, lang = 'ar') {
   if (!list.length) return toast('لا اشتراطات');
+  const X = await import('./excel.js');
   try {
-    const X = await import('./excel.js'); const { logo } = await import('./boq.js'); await X.loadExcelJS();
+    const { logo } = await import('./boq.js'); await X.loadExcelJS();
+    const EN = lang === 'en';
+    if (EN) { const I = await import('./i18n.js'); X.setLang(true, await I.translator([...Object.keys(STC), ...list.flatMap(r => [r.grp, r.title, r.descr, r.deliver])]), I.unitEN); }
     const wb = new ExcelJS.Workbook(); wb._ahcLogo = wb.addImage({ base64: await logo(), extension: 'png' });
-    X.handoverSheet(wb, { name: 'اشتراطات تسليم المشروع — قالب عام', date: new Date().toISOString().slice(0, 10) }, list);
-    download(new Blob([await wb.xlsx.writeBuffer()], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `اشتراطات تسليم المشروع - ${new Date().toISOString().slice(0, 10)}.xlsx`);
-  } catch (e) { err(e); }
+    X.handoverSheet(wb, { name: EN ? 'Project Handover Requirements — general template' : 'اشتراطات تسليم المشروع — قالب عام', date: new Date().toISOString().slice(0, 10) }, list);
+    download(new Blob([await wb.xlsx.writeBuffer()], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), EN ? `Project Handover Requirements - ${new Date().toISOString().slice(0, 10)} (EN).xlsx` : `اشتراطات تسليم المشروع - ${new Date().toISOString().slice(0, 10)}.xlsx`);
+  } catch (e) { err(e); } finally { X.setLang(false); }
 }
 
 // توليد بنود الإغلاق في المشروع من الاشتراطات (ما لم يكن موجوداً)
@@ -60,29 +64,33 @@ export async function closeoutFromHO(projectId, items) {
 
 // ===== مستند PDF بهوية التجمع (عام أو باسم المشروع) =====
 const STC = { 'قبل الاستلام الابتدائي': '#27A8DF', 'عند الاستلام الابتدائي': '#153E5C', 'خلال فترة الضمان': '#0F7B5F', 'قبل الاستلام النهائي': '#6B5BA8' };
-export async function openHandoverDoc({ projectId = null, boqName = '' } = {}) {
+export async function openHandoverDoc({ projectId = null, boqName = '', lang = 'ar' } = {}) {
   let win; try {
     const { prepDoc } = await import('./pdfdoc.js'); win = prepDoc(); if (!win) return;
+    const EN = lang === 'en';
     const list = await loadHO(); if (!list.length) { win.close(); return toast('لا اشتراطات فعالة'); }
     const prj = projectId ? await q(sb.from('projects').select('name,facility,contractor').eq('id', projectId).single()) : null;
-    const grps = [...new Set(list.map(r => r.grp))]; let k = 0;
-    const st = s => `<span class="hst" style="background:${STC[s] || '#5B6B7A'}">${esc(s || '')}</span>`;
-    const body = `<div class="intro"><h2>عن هذه الاشتراطات</h2><div class="rib"></div>
-      <p>تحدد هذه الوثيقة ما يلتزم المقاول بتسليمه حتى تُستلم المنشأة جاهزة للتشغيل والصيانة: المخططات كما نُفِّذ، والضمانات والشهادات، وترميز الأصول وتوسيمها، وكتيبات التشغيل والتدريب، ومتطلبات فترة الضمان والاستلام النهائي. وهي <b>جزء لا يتجزأ من العقد ووثائق الطرح</b>${boqName ? ` المرفقة بجدول الكميات «${esc(boqName)}»` : ''}.</p>
+    let t = x => x;
+    if (EN) { const I = await import('./i18n.js'); t = await I.translator([prj?.name, prj?.facility, prj?.contractor, boqName, ...Object.keys(STC), ...list.flatMap(r => [r.grp, r.title, r.descr, r.deliver])].filter(Boolean)); }
+    const X = (ar, en) => EN ? en : ar;
+    const grps = [...new Set(list.map(r => r.grp))];
+    const st = s => `<span class="hst" style="background:${STC[s] || '#5B6B7A'}">${esc(t(s || ''))}</span>`;
+    const body = `<div class="intro"><h2>${X('عن هذه الاشتراطات', 'About these requirements')}</h2><div class="rib"></div>
+      <p>${EN ? `This document sets out what the Contractor shall deliver so that the facility is received ready for operation and maintenance: as‑built drawings, warranties and certificates, asset coding and labelling, operation manuals and training, and the requirements of the warranty period and final acceptance. It is <b>an integral part of the contract and tender documents</b>${boqName ? ` attached to the Bill of Quantities “${esc(t(boqName))}”` : ''}. This English edition is a translation for reference; the Arabic text governs.` : `تحدد هذه الوثيقة ما يلتزم المقاول بتسليمه حتى تُستلم المنشأة جاهزة للتشغيل والصيانة: المخططات كما نُفِّذ، والضمانات والشهادات، وترميز الأصول وتوسيمها، وكتيبات التشغيل والتدريب، ومتطلبات فترة الضمان والاستلام النهائي. وهي <b>جزء لا يتجزأ من العقد ووثائق الطرح</b>${boqName ? ` المرفقة بجدول الكميات «${esc(boqName)}»` : ''}.`}</p>
       <div class="hlg">${Object.keys(STC).map(s => `<div>${st(s)}</div>`).join('')}</div>
-      <table class="tbl" style="margin-top:10px"><thead><tr><th style="width:8%">م</th><th>المجموعة</th><th style="width:18%">عدد الاشتراطات</th></tr></thead><tbody>${grps.map((g, i) => `<tr><td class="c">${i + 1}</td><td>${esc(g)}</td><td class="c">${list.filter(r => r.grp === g).length}</td></tr>`).join('')}</tbody></table></div>
-      ${grps.map((g, i) => `<div class="sec ${i ? '' : 'brk'}" style="margin-top:14px"><div class="sh"><span class="sn">${i + 1}</span><h2>${esc(g)}</h2></div>
-        ${list.filter(r => r.grp === g).map(r => `<div class="hitem"><div class="hh"><span class="ic">${esc(r.code)}</span><b>${esc(r.title)}</b>${st(r.stage)}</div><p>${esc(r.descr)}</p>${r.deliver ? `<div class="hdl"><span>المطلوب تسليمه</span>${esc(r.deliver)}</div>` : ''}<div class="hck">☐ استُلم &nbsp;&nbsp; التاريخ: ............ &nbsp;&nbsp; ملاحظات: ..............................</div></div>`).join('')}</div>`).join('')}
-      <div class="note" style="margin-top:14px">يُعدّ استيفاء هذه الاشتراطات شرطاً للاستلام الابتدائي أو النهائي حسب التوقيت المحدد لكل بند، ولا يُصرف المستخلص الختامي ولا يُفرج عن الضمانات قبل استيفائها كاملة.</div>
-      <div class="hsig"><h3>إقرار المقاول</h3><p>نقرّ نحن الموقعين أدناه بأننا اطلعنا على اشتراطات تسليم المشروع الواردة في هذه الوثيقة (${list.length} اشتراطاً)، ونلتزم بتنفيذها وتسليمها كاملة في مواعيدها المحددة.</p>
-        <div class="hsg"><div><b>المقاول</b><span>الاسم: ${esc(prj?.contractor || '')}</span><span>المفوض بالتوقيع:</span><span>التوقيع:</span><span>الختم:</span><span>التاريخ:</span></div><div><b>عن تجمع الأحساء الصحي — قسم المشاريع</b><span>الاسم:</span><span>الصفة:</span><span>التوقيع:</span><span>التاريخ:</span></div></div></div>`;
+      <table class="tbl" style="margin-top:10px"><thead><tr><th style="width:8%">${X('م', 'No.')}</th><th>${X('المجموعة', 'Group')}</th><th style="width:18%">${X('عدد الاشتراطات', 'Requirements')}</th></tr></thead><tbody>${grps.map((g, i) => `<tr><td class="c">${i + 1}</td><td>${esc(t(g))}</td><td class="c">${list.filter(r => r.grp === g).length}</td></tr>`).join('')}</tbody></table></div>
+      ${grps.map((g, i) => `<div class="sec ${i ? '' : 'brk'}" style="margin-top:14px"><div class="sh"><span class="sn">${i + 1}</span><h2>${esc(t(g))}</h2></div>
+        ${list.filter(r => r.grp === g).map(r => `<div class="hitem"><div class="hh"><span class="ic">${esc(r.code)}</span><b>${esc(t(r.title))}</b>${st(r.stage)}</div><p>${esc(t(r.descr))}</p>${r.deliver ? `<div class="hdl"><span>${X('المطلوب تسليمه', 'To be delivered')}</span>${esc(t(r.deliver))}</div>` : ''}<div class="hck">${X('☐ استُلم &nbsp;&nbsp; التاريخ: ............ &nbsp;&nbsp; ملاحظات: ..............................', '☐ Received &nbsp;&nbsp; Date: ............ &nbsp;&nbsp; Notes: ..............................')}</div></div>`).join('')}</div>`).join('')}
+      <div class="note" style="margin-top:14px">${X('يُعدّ استيفاء هذه الاشتراطات شرطاً للاستلام الابتدائي أو النهائي حسب التوقيت المحدد لكل بند، ولا يُصرف المستخلص الختامي ولا يُفرج عن الضمانات قبل استيفائها كاملة.', 'Fulfilment of these requirements is a condition for provisional or final acceptance according to the timing specified for each item; the final invoice shall not be paid and guarantees shall not be released before they are all fulfilled.')}</div>
+      <div class="hsig"><h3>${X('إقرار المقاول', 'Contractor’s Acknowledgement')}</h3><p>${EN ? `We, the undersigned, acknowledge that we have reviewed the project handover requirements set out in this document (${list.length} requirements), and undertake to carry out and deliver them in full by their specified dates.` : `نقرّ نحن الموقعين أدناه بأننا اطلعنا على اشتراطات تسليم المشروع الواردة في هذه الوثيقة (${list.length} اشتراطاً)، ونلتزم بتنفيذها وتسليمها كاملة في مواعيدها المحددة.`}</p>
+        <div class="hsg"><div><b>${X('المقاول', 'Contractor')}</b><span>${X('الاسم: ', 'Name: ')}${esc(t(prj?.contractor || ''))}</span><span>${X('المفوض بالتوقيع:', 'Authorized signatory:')}</span><span>${X('التوقيع:', 'Signature:')}</span><span>${X('الختم:', 'Stamp:')}</span><span>${X('التاريخ:', 'Date:')}</span></div><div><b>${X('عن تجمع الأحساء الصحي — قسم المشاريع', 'For Al Ahsa Health Cluster — Projects Section')}</b><span>${X('الاسم:', 'Name:')}</span><span>${X('الصفة:', 'Title:')}</span><span>${X('التوقيع:', 'Signature:')}</span><span>${X('التاريخ:', 'Date:')}</span></div></div></div>`;
     const css = `.hlg{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}.hst{color:#fff;border-radius:20px;padding:1px 10px;font-size:8.4pt;font-weight:700;white-space:nowrap;-webkit-print-color-adjust:exact;print-color-adjust:exact}
       .hitem{border:1px solid var(--l);border-radius:9px;padding:9px 12px;margin:0 0 9px;break-inside:avoid}.hh{display:flex;gap:8px;align-items:center}.hh b{flex:1;color:var(--n);font-size:11.5pt}.hitem p{margin:5px 0;font-size:9.8pt;line-height:1.7}
       .hdl{background:var(--s2);border-radius:6px;padding:5px 9px;font-size:9.4pt}.hdl span{display:inline-block;font-weight:700;color:var(--n);margin-inline-end:8px}.hck{margin-top:6px;font-size:8.6pt;color:var(--g)}
       .hsig{break-inside:avoid;margin-top:18px;border:2px solid var(--n);border-radius:10px;padding:14px 16px}.hsig h3{font-size:14pt}.hsg{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:10px}.hsg div{display:flex;flex-direction:column;gap:12px}.hsg b{color:var(--n)}.hsg span{border-bottom:1px dotted #9AA6B1;padding-bottom:4px;font-size:10pt}`;
     const { openDoc, coverHtml } = await import('./pdfdoc.js');
-    openDoc({ win, title: `اشتراطات تسليم المشروع${prj ? ' — ' + prj.name : ''}`, body, css,
-      cover: coverHtml({ kicker: 'وثيقة تعاقدية', tag: 'جزء من وثائق الطرح', title: 'اشتراطات تسليم المشروع', sub: 'ما يلتزم المقاول بتسليمه: المخططات كما نُفِّذ، الضمانات والشهادات، الترميز والتوسيم، التشغيل والصيانة والتدريب، وفترة الضمان.',
-        project: prj?.name, facility: prj ? [prj.facility, prj.contractor ? 'المقاول: ' + prj.contractor : ''].filter(Boolean).join(' · ') : '', pills: ['As‑Built', 'O&M', 'Warranties', 'Asset Tagging', 'Training'], edition: `${list.length} اشتراطاً`, date: new Date().toISOString().slice(0, 10) }) });
+    openDoc({ win, lang, title: `${X('اشتراطات تسليم المشروع', 'Project Handover Requirements')}${prj ? ' — ' + t(prj.name) : ''}`, body, css,
+      cover: coverHtml({ en: EN, kicker: X('وثيقة تعاقدية', 'Contract document'), tag: X('جزء من وثائق الطرح', 'Part of the tender documents'), title: X('اشتراطات تسليم المشروع', 'Project Handover Requirements'), sub: X('ما يلتزم المقاول بتسليمه: المخططات كما نُفِّذ، الضمانات والشهادات، الترميز والتوسيم، التشغيل والصيانة والتدريب، وفترة الضمان.', 'What the Contractor shall deliver: as‑built drawings, warranties and certificates, coding and labelling, operation, maintenance and training, and the warranty period.'),
+        project: prj ? t(prj.name) : '', facility: prj ? [t(prj.facility), prj.contractor ? X('المقاول: ', 'Contractor: ') + t(prj.contractor) : ''].filter(Boolean).join(' · ') : '', pills: ['As‑Built', 'O&M', 'Warranties', 'Asset Tagging', 'Training'], edition: X(`${list.length} اشتراطاً`, `${list.length} requirements`), date: new Date().toISOString().slice(0, 10) }) });
   } catch (e) { try { win?.close(); } catch (x) { } err(e); }
 }

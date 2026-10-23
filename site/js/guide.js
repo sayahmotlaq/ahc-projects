@@ -8,6 +8,18 @@ const BADGE = {
   ADA: ['Accessible', 'سهولة الوصول'], WAR: ['Long Warranty', 'ضمان ممتد'],
 };
 const RULE = { only: ['حصراً', 'r-only'], list: ['من القائمة المعتمدة', 'r-list'], eq: ['أو ما يعادله بعد الاعتماد', 'r-eq'] };
+const RULE_EN = { only: 'Exclusive', list: 'From approved list', eq: 'Or approved equivalent' };
+// تسميات المستند بالعربية والإنجليزية
+const LB = {
+  ar: { appr: 'المعتمد لدى التجمع:', prop: 'الخاصية', mk: 'الشائع في السوق', ap: 'المعتمد لدى التجمع', whyF: 'لماذا هذه الشركات؟', why: 'لماذا يهم في المنشأة الصحية؟', risk: 'لو رُكّب الشائع', sub: 'يُقدَّم للاعتماد:', other: 'بقية الأنظمة', code: 'الرمز', sys: 'النظام', apr2: 'المعتمد', reason: 'سبب الاعتماد', item: 'البند', cond: 'الشرط',
+    sum: 'ملخص البنود المعتمدة', sumP: ' في هذا المشروع', note1: (b) => `الرموز (LS) هي أرقام البنود في جدول الكميات${b}، ووصف البند في الجدول هو المرجع التعاقدي، وهذا الدليل يشرح أسبابه.`, approval: 'الاعتماد قبل التوريد', srcs: 'المراجع', stds: 'المواصفات القياسية المشار إليها',
+    fig: 'الأرقام الواردة مأخوذة من بيانات المصنّعين المنشورة والمواصفات القياسية وقت إعداد الدليل، وقد تختلف حسب الموديل. والمرجع النهائي عند التوريد هو Data Sheet الموديل المعتمد ووصف البند في جدول الكميات.', end: 'شكراً لكم على عطائكم وتعاونكم', endS: 'قسم المشاريع — إدارة الخدمات الفنية — تجمع الأحساء الصحي',
+    title: 'دليل المواصفات المعتمدة', kicker: 'دليل المتبرعين والمقاولين', h1: 'المواصفات المعتمدة للتشطيبات<br>والتجهيزات في المنشآت الصحية', subC: 'مقارنة بند بند بين الشائع في السوق والمعتمد لدى التجمع، ولماذا تحتاج المنشأة الصحية إلى مواد صُمّمت للاستخدام الشاق والحركة الكثيفة والتطهير اليومي.', contr: 'المقاول: ', ed: 'دليل استرشادي', none: 'لا توجد في هذا الجدول بنود مقطوعية مرتبطة ببطاقات الدليل' },
+  en: { appr: 'Approved by the Cluster:', prop: 'Property', mk: 'Common in the market', ap: 'Approved by the Cluster', whyF: 'Why these companies?', why: 'Why it matters in a healthcare facility', risk: 'If the common option is installed', sub: 'Submit for approval:', other: 'Other systems', code: 'Code', sys: 'System', apr2: 'Approved', reason: 'Reason for approval', item: 'Item', cond: 'Condition',
+    sum: 'Summary of approved items', sumP: ' in this project', note1: (b) => `The (LS) codes are the item numbers in the Bill of Quantities${b}; the item description in the BOQ is the contractual reference, and this guide explains the reasons behind it.`, approval: 'Approval Before Supply', srcs: 'Sources', stds: 'Referenced standards',
+    fig: 'Figures are taken from manufacturers’ published data and standards at the time of preparation and may vary by model. The final reference at supply is the data sheet of the approved model and the item description in the BOQ. This English edition is a translation for reference; the Arabic text governs.', end: 'Thank you for your generosity and cooperation', endS: 'Projects Section — Technical Services Department — Al Ahsa Health Cluster',
+    title: 'Approved Specifications Guide', kicker: 'A Guide for Donors and Contractors', h1: 'Approved Specifications for Finishes<br>and Fit‑Out in Healthcare Facilities', subC: 'An item‑by‑item comparison between what is common in the market and what the Cluster approves — and why healthcare facilities need materials designed for heavy duty, high traffic and daily disinfection.', contr: 'Contractor: ', ed: 'Guidance document', none: 'This BOQ has no lump‑sum items linked to guide cards' },
+};
 const FURN = 'الأثاث غير الطبي والمكتبي';
 
 const loadCards = async (all = false) => { let x = sb.from('guide_cards').select('*').order('sort'); if (!all) x = x.eq('active', true); return q(x); };
@@ -15,15 +27,16 @@ const loadMeta = async () => { try { const { data } = await sb.from('settings').
 
 const badges = ks => `<div class="bdg">${(ks || []).filter(k => BADGE[k]).map(k => `<span class="b b-${k}"><b>${esc(BADGE[k][0])}</b><i>${esc(BADGE[k][1])}</i></span>`).join('')}</div>`;
 const refs = (rs, map) => (rs || []).filter(r => map[r]).map(r => `<sup class="rf">[${map[r]}]</sup>`).join(' ');
-const rule = (r, sm = '') => { const [t, c] = RULE[r] || RULE.list; return `<span class="rule ${sm} ${c}">${t}</span>`; };
+let EN = false;
+const rule = (r, sm = '') => { const [t, c] = RULE[r] || RULE.list; return `<span class="rule ${sm} ${c}">${EN ? RULE_EN[r] || RULE_EN.list : t}</span>`; };
 
-function card(c, rm) {
-  const rows = (c.rows || []).map(([p, m, a]) => `<tr><th>${esc(p)}</th><td class="mk">${esc(m)}</td><td class="ap">${esc(a)}</td></tr>`).join('');
-  return `<section class="item${c.section === FURN ? ' big' : ''}"><header class="ih"><div class="ic">${esc(c.code_label)}</div><div class="it"><h3>${esc(c.title)} ${refs(c.refs, rm)}</h3><div class="en">${esc(c.en)}</div></div>${rule(c.rule)}</header>
-  <div class="apr"><span>المعتمد لدى التجمع:</span> <b>${esc(c.approved)}</b></div>${badges(c.badges)}
-  ${rows ? `<table class="cmp"><thead><tr><th>الخاصية</th><th class="mk">الشائع في السوق</th><th class="ap">المعتمد لدى التجمع</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
-  <div class="why"><div class="w1"><h4>${c.section === FURN ? 'لماذا هذه الشركات؟' : 'لماذا يهم في المنشأة الصحية؟'}</h4><p>${esc(c.why)}</p></div>${c.risk ? `<div class="w2"><h4>لو رُكّب الشائع</h4><p>${esc(c.risk)}</p></div>` : ''}</div>
-  ${(c.submit || []).length ? `<div class="sub"><b>يُقدَّم للاعتماد:</b><ul>${c.submit.map(s => `<li>${esc(s)}</li>`).join('')}</ul></div>` : ''}</section>`;
+function card(c, rm, t = x => x, L = LB.ar) {
+  const rows = (c.rows || []).map(([p, m, a]) => `<tr><th>${esc(t(p))}</th><td class="mk">${esc(t(m))}</td><td class="ap">${esc(t(a))}</td></tr>`).join('');
+  return `<section class="item${c.section === FURN ? ' big' : ''}"><header class="ih"><div class="ic">${esc(c.code_label)}</div><div class="it"><h3>${esc(t(c.title))} ${refs(c.refs, rm)}</h3><div class="en">${esc(c.en)}</div></div>${rule(c.rule)}</header>
+  <div class="apr"><span>${L.appr}</span> <b>${esc(t(c.approved))}</b></div>${badges(c.badges)}
+  ${rows ? `<table class="cmp"><thead><tr><th>${L.prop}</th><th class="mk">${L.mk}</th><th class="ap">${L.ap}</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
+  <div class="why"><div class="w1"><h4>${c.section === FURN ? L.whyF : L.why}</h4><p>${esc(t(c.why))}</p></div>${c.risk ? `<div class="w2"><h4>${L.risk}</h4><p>${esc(t(c.risk))}</p></div>` : ''}</div>
+  ${(c.submit || []).length ? `<div class="sub"><b>${L.sub}</b><ul>${c.submit.map(s => `<li>${esc(t(s))}</li>`).join('')}</ul></div>` : ''}</section>`;
 }
 
 const INTRO = `<div class="intro"><h2>مقدمة</h2><div class="rib"></div>
@@ -75,10 +88,58 @@ const STEPS = `<p class="si">حتى يسير المشروع بلا رفض في �
  <li><b>عند وصول المواد:</b> مطابقة الموديل ورقم الدفعة والملصقات مع ما اعتُمد، وأي اختلاف يعني رفض المادة.</li></ol>
 <div class="note">البنود المعلّمة <span class="rule sm r-only">حصراً</span> لا يُقدَّم لها بديل، لأنها ترتبط بمنظومة موحّدة في منشآت التجمع أو بعقود صيانة وقطع غيار قائمة.</div>`;
 
-// boqId = null → الدليل الكامل بلا مشروع
-export async function openGuide(boqId) {
+const INTRO_EN = `<div class="intro"><h2>Introduction</h2><div class="rib"></div>
+<p class="lead">We would first like to extend our sincere thanks and appreciation to every donor who has chosen to leave their mark in a place where people heal. Developing or equipping a health centre is a gift whose benefit lasts for many years, touching patients, families and healthcare professionals every day.</p>
+<p>Because such generosity deserves to endure, we have prepared this guide <b>for information and guidance</b>, as a shared reference between us, donors and the executing contractors. It explains why our bills of quantities specify particular products and specifications, and what distinguishes them from the common alternatives in the market — with figures and technical references published by manufacturers and standards bodies.</p>
+<p>The difference rarely shows on handover day; two doors may look alike, and two chairs may appear identical. But a healthcare facility operates around the clock, is cleaned daily with strong disinfectants, and sees beds and trolleys moving through its corridors constantly. This is where the difference appears within a few months: either a material designed for this use, which lasts, or a material designed for an office or home, which needs repair or replacement — leaving the building with the operating cost and diminishing the impact of the donation.</p>
+<p>These specifications do not reflect a preference for one brand over another. They are the outcome of operating and maintenance experience across Cluster facilities, the requirements of Civil Defense, healthcare accreditation and infection control, and our commitment to <b>standardizing systems</b> across facilities so that spare parts and maintenance remain available and fast.</p>
+<div class="sig">We hope this guide is of help to everyone. The Projects Section team at the Technical Services Department is always available to answer any enquiry and to review any proposed alternative before supply, so that every project is delivered in a manner worthy of the donor and of those it serves.</div>
+<h2 style="margin-top:22px">Why is a healthcare facility different?</h2><div class="rib"></div>
+<div class="why5">
+ <div><b>24/7 operation</b><span>No holidays or closing hours; doors, chairs and lighting work three shifts a day.</span></div>
+ <div><b>Heavy, wheeled traffic</b><span>Beds, medication and meal trolleys and wheelchairs strike doors, walls and corners.</span></div>
+ <div><b>Daily disinfection</b><span>Chlorine, alcohol and quaternary ammonium compounds damage materials not designed for them.</span></div>
+ <div><b>Infection control</b><span>Every open joint, porous surface or water‑absorbing material is a place for microbes to collect.</span></div>
+ <div><b>Safety & accreditation</b><span>Civil Defense requirements and healthcare accreditation standards (CBAHI) cover doors, floors and furniture.</span></div>
+ <div><b>Standardized maintenance</b><span>One system for locks, elevators and accessories means one set of spare parts and faster repairs.</span></div>
+</div>
+<h3 class="brk">How to read this guide</h3>
+<p style="margin:4px 0">Each item has its own card: the code as it appears in the BOQ, the product approved by the Cluster, performance badges, a comparison table between what is common in the market and what is approved, followed by the reason for approval and what must be submitted before supply. The small number beside a title refers to the sources at the end of the guide.</p>
+<div class="legend">
+ <div><span class="rule sm r-only">Exclusive</span> No alternative accepted, as the item is tied to a standardized system or existing approval</div>
+ <div><span class="rule sm r-list">From approved list</span> Any of the names listed</div>
+ <div><span class="rule sm r-eq">Or approved equivalent</span> A matching alternative is accepted after written approval</div>
+ <div>The coloured badges (Heavy Duty, High Traffic…) summarize the type of performance required of the item.</div>
+</div></div>`;
+const FURN_EXTRA_EN = rm => `<div class="brands">
+ <div><b>Herman Miller</b>12‑year warranty on many products, based on three‑shift use.${refs([10], rm)}</div>
+ <div><b>Global (Canada)</b>Heavy Duty category: 12‑year warranty on all components for 24/7 use, and fabrics above 100,000 double rubs.${refs([11], rm)}</div>
+ <div><b>OFS</b>12‑year warranty on standard products; 5 years on mechanisms and foam.${refs([12], rm)}</div>
+ <div><b>Steelcase</b>Limited lifetime warranty on many components, with defined periods for other parts.${refs([13], rm)}</div></div>`;
+const FURN_AFTER_EN = rm => `<div class="box"><h3>What is a “double rub”?</h3>
+<p style="margin:0 0 6px">The Wyzenbeek test moves a piece of cotton duck back and forth across the upholstery fabric under fixed tension and load; each back‑and‑forth movement counts as one double rub. Counting stops when noticeable wear appears. The higher the number, the longer the upholstery lasts.${refs([15, 14, 11], rm)}</p>
+<div class="dr">
+ <div class="r mk"><span>General contract threshold</span><div class="bar"><i style="width:15%"></i></div><span class="v">15,000</span></div>
+ <div class="r mk"><span>Heavy‑duty commercial use</span><div class="bar"><i style="width:30%"></i></div><span class="v">30,000</span></div>
+ <div class="r"><span>Healthcare minimum</span><div class="bar"><i style="width:75%"></i></div><span class="v">75,000</span></div>
+ <div class="r"><span>Heavy Duty category (Global)</span><div class="bar"><i style="width:100%"></i></div><span class="v">100,000+</span></div></div>
+<p style="margin:0;font-size:9pt;color:var(--g)">Fabrics in common local furniture usually fall in the grey range, or their rating is not stated at all.</p></div>
+<div class="note"><b>About local manufacturers:</b> We do not mean to diminish local industry; the aim is documented performance. The approved list consists of the four names above, and any other proposed product will be considered only if accompanied by BIFMA test reports from an accredited laboratory, fabric data (double rubs, disinfectant cleanability and fire), and a written manufacturer’s warranty comparable to the above. The final decision rests with the Department.</div>`;
+const STEPS_EN = `<p class="si">To keep the project free of site rejections and re‑supply, please follow these steps for every item:</p>
+<ol class="steps">
+ <li><b>Submit a material submittal</b> for each item before purchase, stating the BOQ item number and the proposed model.</li>
+ <li><b>Attach original manufacturer documents:</b> data sheet, test certificates, certificate of origin, authorized agent or distributor letter, and warranty letter.</li>
+ <li><b>Provide samples</b> for items that require them (flooring, tiles, colours, fabrics, accessories).</li>
+ <li><b>For “or approved equivalent” items only:</b> a point‑by‑point comparison of the proposed and approved product against every property in this guide; an equivalent equals or exceeds every property — not most of them.</li>
+ <li><b>Await written approval</b> from the Projects Section before supply.</li>
+ <li><b>On delivery:</b> the model, batch number and labels are checked against the approval; any difference means rejection of the material.</li></ol>
+<div class="note">Items marked <span class="rule sm r-only">Exclusive</span> are not open to alternatives, as they are tied to a standardized system across Cluster facilities or to existing maintenance and spare‑parts contracts.</div>`;
+
+// boqId = null → الدليل الكامل بلا مشروع؛ lang = 'en' للنسخة الإنجليزية
+export async function openGuide(boqId, lang = 'ar') {
   let win; try {
     const { prepDoc } = await import('./pdfdoc.js'); win = prepDoc(); if (!win) return;
+    EN = lang === 'en'; const L = LB[EN ? 'en' : 'ar'];
     const [all, meta] = await Promise.all([loadCards(), loadMeta()]);
     let cards = all, prj = null, boq = null;
     if (boqId) {
@@ -86,8 +147,11 @@ export async function openGuide(boqId) {
       prj = await q(sb.from('projects').select('name,facility,contractor').eq('id', boq.project_id).single());
       const codes = new Set((await q(sb.from('boq_lines').select('ls_code').eq('boq_id', boqId))).map(l => l.ls_code).filter(Boolean));
       cards = all.filter(c => (c.ls_codes || []).some(x => codes.has(x)));
-      if (!cards.length) { win.close(); return toast('لا توجد في هذا الجدول بنود مقطوعية مرتبطة ببطاقات الدليل', 'bad'); }
+      if (!cards.length) { win.close(); return toast(LB.ar.none, 'bad'); }
     }
+    let t = x => x;
+    if (EN) { const I = await import('./i18n.js');
+      t = await I.translator([prj?.name, prj?.facility, prj?.contractor, boq?.name, ...cards.flatMap(c => [c.title, c.approved, c.why, c.risk, c.section, ...(c.submit || []), ...(c.rows || []).flat()]), ...(meta.sections || []).flatMap(s => [s.name, s.intro]), ...(meta.sources || []).map(x => x[0]), ...(meta.standards || [])].filter(Boolean)); }
     // ترقيم المراجع المستخدمة فقط بالترتيب
     const SRC = meta.sources || []; const used = [];
     const mark = r => { if (SRC[r - 1] && !used.includes(r)) used.push(r); };
@@ -96,31 +160,31 @@ export async function openGuide(boqId) {
     const secs = (meta.sections || []).map(s => s.name).concat([...new Set(cards.map(c => c.section))]).filter((s, i, a) => a.indexOf(s) === i);
     const intro = Object.fromEntries((meta.sections || []).map(s => [s.name, s.intro]));
     let n = 0, body = '';
-    const summary = cards.map(c => `<tr><td class="ltr c">${esc(c.code_label)}</td><td>${esc(c.title)}</td><td>${esc(c.approved)}</td><td>${rule(c.rule, 'sm')}</td></tr>`).join('');
+    const summary = cards.map(c => `<tr><td class="ltr c">${esc(c.code_label)}</td><td>${esc(t(c.title))}</td><td>${esc(t(c.approved))}</td><td>${rule(c.rule, 'sm')}</td></tr>`).join('');
     for (const s of secs) {
       const cs = cards.filter(c => c.section === s); if (!cs.length) continue; n++;
       const big = cs.filter(c => c.kind !== 'row'), rows = cs.filter(c => c.kind === 'row');
-      body += `<div class="sec brk"><div class="sh"><span class="sn">${n}</span><h2>${esc(s)}</h2></div><p class="si">${esc(intro[s] || '')}</p>${s === FURN ? FURN_EXTRA(rm) : ''}
-        ${big.map(c => card(c, rm)).join('')}
-        ${rows.length ? `${big.length ? '<h3 style="margin:6px 0">بقية الأنظمة</h3>' : ''}<table class="tbl"><thead><tr><th style="width:13%">الرمز</th><th style="width:17%">النظام</th><th style="width:30%">المعتمد</th><th>سبب الاعتماد</th></tr></thead><tbody>${rows.map(c => `<tr><td class="ltr c">${esc(c.code_label)}</td><td>${esc(c.title)}</td><td class="ltr br">${esc(c.approved)}</td><td>${esc(c.why)}</td></tr>`).join('')}</tbody></table>` : ''}
-        ${s === FURN ? FURN_AFTER(rm) : ''}</div>`;
+      body += `<div class="sec brk"><div class="sh"><span class="sn">${n}</span><h2>${esc(t(s))}</h2></div><p class="si">${esc(t(intro[s] || ''))}</p>${s === FURN ? (EN ? FURN_EXTRA_EN(rm) : FURN_EXTRA(rm)) : ''}
+        ${big.map(c => card(c, rm, t, L)).join('')}
+        ${rows.length ? `${big.length ? `<h3 style="margin:6px 0">${L.other}</h3>` : ''}<table class="tbl"><thead><tr><th style="width:13%">${L.code}</th><th style="width:17%">${L.sys}</th><th style="width:30%">${L.apr2}</th><th>${L.reason}</th></tr></thead><tbody>${rows.map(c => `<tr><td class="ltr c">${esc(c.code_label)}</td><td>${esc(t(c.title))}</td><td class="ltr br">${esc(t(c.approved))}</td><td>${esc(t(c.why))}</td></tr>`).join('')}</tbody></table>` : ''}
+        ${s === FURN ? (EN ? FURN_AFTER_EN(rm) : FURN_AFTER(rm)) : ''}</div>`;
     }
-    const date = dateAr(new Date().toISOString());
-    const html = `${INTRO}
-      <div style="margin-top:16px"><h2 style="font-size:18pt;font-weight:800">ملخص البنود المعتمدة${prj ? ' في هذا المشروع' : ''}</h2><div class="intro"><div class="rib"></div></div>
-      <table class="tbl"><thead><tr><th style="width:15%">الرمز</th><th style="width:28%">البند</th><th>المعتمد لدى التجمع</th><th style="width:20%">الشرط</th></tr></thead><tbody>${summary}</tbody></table>
-      <p class="note">الرموز (LS) هي أرقام البنود في جدول الكميات${boq ? ` «${esc(boq.name)}»` : ''}، ووصف البند في الجدول هو المرجع التعاقدي، وهذا الدليل يشرح أسبابه.</p></div>
+    const date = EN ? new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : dateAr(new Date().toISOString());
+    const html = `${EN ? INTRO_EN : INTRO}
+      <div style="margin-top:16px"><h2 style="font-size:18pt;font-weight:800">${L.sum}${prj ? L.sumP : ''}</h2><div class="intro"><div class="rib"></div></div>
+      <table class="tbl"><thead><tr><th style="width:15%">${L.code}</th><th style="width:28%">${L.item}</th><th>${L.ap}</th><th style="width:20%">${L.cond}</th></tr></thead><tbody>${summary}</tbody></table>
+      <p class="note">${L.note1(boq ? (EN ? ` “${esc(t(boq.name))}”` : ` «${esc(boq.name)}»`) : '')}</p></div>
       ${body}
-      <div class="sec brk"><div class="sh"><span class="sn">${n + 1}</span><h2>الاعتماد قبل التوريد</h2></div>${STEPS}
-      <h2 style="margin-top:22px">المراجع</h2><div class="intro"><div class="rib"></div></div>
-      <ol class="src">${used.map(r => { const [t, u] = SRC[r - 1]; return `<li>${esc(t)}${u ? `<br><a href="${esc(u)}">${esc(u)}</a>` : ''}</li>`; }).join('')}</ol>
-      <h3 style="margin-top:10px">المواصفات القياسية المشار إليها</h3><ul class="std">${(meta.standards || []).map(s => `<li>${esc(s)}</li>`).join('')}</ul>
-      <p class="note">الأرقام الواردة مأخوذة من بيانات المصنّعين المنشورة والمواصفات القياسية وقت إعداد الدليل، وقد تختلف حسب الموديل. والمرجع النهائي عند التوريد هو Data Sheet الموديل المعتمد ووصف البند في جدول الكميات.</p>
-      <p class="end">شكراً لكم على عطائكم وتعاونكم<br><span style="font-weight:500;color:var(--g)">قسم المشاريع — إدارة الخدمات الفنية — تجمع الأحساء الصحي</span></p></div>`;
+      <div class="sec brk"><div class="sh"><span class="sn">${n + 1}</span><h2>${L.approval}</h2></div>${EN ? STEPS_EN : STEPS}
+      <h2 style="margin-top:22px">${L.srcs}</h2><div class="intro"><div class="rib"></div></div>
+      <ol class="src">${used.map(r => { const [st, u] = SRC[r - 1]; return `<li>${esc(t(st))}${u ? `<br><a href="${esc(u)}">${esc(u)}</a>` : ''}</li>`; }).join('')}</ol>
+      <h3 style="margin-top:10px">${L.stds}</h3><ul class="std">${(meta.standards || []).map(s => `<li>${esc(t(s))}</li>`).join('')}</ul>
+      <p class="note">${L.fig}</p>
+      <p class="end">${L.end}<br><span style="font-weight:500;color:var(--g)">${L.endS}</span></p></div>`;
     const { openDoc, coverHtml } = await import('./pdfdoc.js');
-    openDoc({ win, title: `دليل المواصفات المعتمدة${prj ? ' — ' + prj.name : ''}`, body: html,
-      cover: coverHtml({ kicker: 'دليل المتبرعين والمقاولين', title: 'المواصفات المعتمدة للتشطيبات<br>والتجهيزات في المنشآت الصحية', sub: 'مقارنة بند بند بين الشائع في السوق والمعتمد لدى التجمع، ولماذا تحتاج المنشأة الصحية إلى مواد صُمّمت للاستخدام الشاق والحركة الكثيفة والتطهير اليومي.',
-        project: prj?.name, facility: prj ? [prj.facility, prj.contractor ? 'المقاول: ' + prj.contractor : ''].filter(Boolean).join(' · ') : '', pills: ['Heavy Duty', 'High Traffic', 'Disinfectant‑Resistant', 'ANSI/BHMA Grade 1', 'BIFMA'], edition: 'دليل استرشادي', date }) });
+    openDoc({ win, lang, title: `${L.title}${prj ? ' — ' + t(prj.name) : ''}`, body: html,
+      cover: coverHtml({ en: EN, kicker: L.kicker, title: L.h1, sub: L.subC,
+        project: prj ? t(prj.name) : '', facility: prj ? [t(prj.facility), prj.contractor ? L.contr + t(prj.contractor) : ''].filter(Boolean).join(' · ') : '', pills: ['Heavy Duty', 'High Traffic', 'Disinfectant‑Resistant', 'ANSI/BHMA Grade 1', 'BIFMA'], edition: L.ed, date }) });
   } catch (e) { try { win?.close(); } catch (x) { } err(e); }
 }
 
