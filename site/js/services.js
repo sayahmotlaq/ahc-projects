@@ -90,7 +90,7 @@ async function viewSvc(root, code) {
   add('flow', 'المسار خطوة بخطوة', flow.length ? `${planned && !(s.flow || []).length ? `<p class="muted small">خطوات الإجراء الحاكم ${linkify(routeProcs[0])} كما في دليل الحوكمة، إلى أن تُستكمل خطوات هذه الخدمة.</p>` : ''}<ol class="svc-flow">${flow.map(f => `<li style="--c:${ucol(f.u)}"><div class="svc-fh">${uchip(f.u)}${f.opt ? '<span class="badge skel">عند الحاجة</span>' : ''}${f.sla && f.sla !== '—' ? `<span class="svc-sla">${ico('clock')} ${esc(f.sla)}</span>` : ''}</div><div class="svc-fa">${linkify(f.a)}</div><div class="svc-fo">${f.o ? `<span>الناتج: <b>${esc(f.o)}</b></span>` : ''}${f.ref ? `<span class="svc-fr">${linkify(f.ref)}</span>` : ''}</div></li>`).join('')}</ol>` : '');
   const rx = s.raci || {};
   add('raci', 'الأدوار: من ينفّذ ومن يعتمد', (rx.rows || []).length ? `<div class="tblwrap"><table class="mn-t svc-raci"><thead><tr><th>العمل</th>${rx.cols.map(c => `<th>${uchip(c)}</th>`).join('')}</tr></thead><tbody>${rx.rows.map(r => `<tr><td>${esc(r.task)}</td>${rx.cols.map(c => { const v = r.v?.[c] || ''; return `<td class="rcx">${v ? v.split('/').map(x => `<span class="raci r-${x}" title="${RACI_T[x] || ''}">${x}</span>`).join('') : ''}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div><p class="svc-leg">${Object.entries(RACI_T).map(([k, t]) => `<span><span class="raci r-${k}">${k}</span> ${t}</span>`).join('')}</p>` : '');
-  add('coord', 'مع من التنسيق ولماذا', (s.coord || []).length ? `<div class="svc-coord">${s.coord.map(c => `<div style="--c:${ucol(c.u)}">${uchip(c.u)}<p>${linkify(c.why)}</p></div>`).join('')}</div>` : '');
+  add('coord', 'مع من التنسيق ولماذا', (s.coord || []).length ? `<div class="svc-coord">${s.coord.map(c => `<div style="--c:${ucol(c.u)}">${c.u ? uchip(c.u) : `<span class="uchip" style="--c:#6B7A88">${esc(c.l || '')}</span>`}<p>${linkify(c.why)}</p></div>`).join('')}</div>` : '');
   add('reqs', sec.reqs?.title || 'الاشتراطات', sec.reqs ? md(sec.reqs.body) : '');
   const specs = [
     mats.length ? `<div class="svc-mats">${mats.map(m => `<button class="svc-mat" data-mat="${esc(m.code)}"><span class="ltr cd">${esc(m.code)}</span><b>${esc(m.name)}</b><span class="makers">${(m.makers || []).map(x => `<span class="maker">${esc(x)}</span>`).join('')}</span>${m.spec ? `<small>${esc(m.spec)}</small>` : ''}<small class="muted">${m.rule === 'only' ? 'حصراً — لا بديل' : m.rule === 'eq' ? 'أو ما يعادله بعد الاعتماد الكتابي' : 'أي اسم من القائمة المعتمدة'}</small></button>`).join('')}</div>` : '',
@@ -109,7 +109,7 @@ async function viewSvc(root, code) {
   if (planned) parts.splice(1, 0, ['todo', 'ما بقي لهذه الخدمة', `<div class="notice">هذه الخدمة <b>قيد الإعداد</b>: المسار والإجراء الحاكم جاهزان أعلاه ويمكن رفع الطلب الآن. تُستكمل الأدوار والاشتراطات والمواصفات وطريقة التنفيذ في الدفعات القادمة.</div>`]);
 
   const conf = (s.confirm || []).length ? `<div class="notice svc-conf"><b>${ico('alert')} بانتظار تأكيد</b><ul>${s.confirm.map(c => `<li>${linkify(c)}</li>`).join('')}</ul></div>` : '';
-  root.innerHTML = `<div class="toolbar noprint"><a class="btn sm ghost" href="#/services">→ دليل الخدمات</a><span class="sp"></span>${(s.routes || []).some(r => r.kind) ? `<button class="btn sm primary" id="svReq">${ico('plus')} اطلب هذه الخدمة</button>` : ''}<button class="btn sm" id="svDoc">${ico('print')} ملف الخدمة PDF</button>${isAdmin() ? `<button class="btn sm ghost" id="svEd">${ico('edit')} تحرير</button>` : ''}</div>
+  root.innerHTML = `<div class="toolbar noprint"><a class="btn sm ghost" href="#/services">→ دليل الخدمات</a><span class="sp"></span>${(s.routes || []).some(r => r.kind) ? `<button class="btn sm primary" id="svReq">${ico('plus')} اطلب هذه الخدمة</button>` : ''}<button class="btn sm" id="svBrief">${ico('print')} الخلاصة في صفحة PDF</button><button class="btn sm ghost" id="svDoc">${ico('print')} الملف الكامل PDF</button>${isAdmin() ? `<button class="btn sm ghost" id="svEd">${ico('edit')} تحرير</button>` : ''}</div>
     <div class="svc-hero" style="--c:${ucol(s.unit)}"><span class="svc-hi">${ico(s.icon || 'book')}</span><div><div class="svc-meta"><span class="ltr cd">${esc(s.code)}</span>${stb(s.status)}${uchip(s.unit)}<span class="muted small">${esc(s.cat)}</span></div><h1>${esc(s.title)}</h1><p>${linkify(s.summary)}</p></div></div>
     ${(s.facts || []).length ? `<div class="svc-facts">${s.facts.map(([k, v]) => `<div><small>${esc(k)}</small><b>${linkify(v)}</b></div>`).join('')}</div>` : ''}
     ${conf}
@@ -123,6 +123,7 @@ async function viewSvc(root, code) {
   $$('[data-req]', root).forEach(b => b.onclick = () => req(s.routes[+b.dataset.req]));
   const rb = $('#svReq', root); if (rb) rb.onclick = async () => { const rs = s.routes.filter(r => r.kind); if (rs.length === 1) return req(rs[0]); $('#sv-routes', root)?.scrollIntoView({ behavior: 'smooth' }); toast('اختر المسار الذي ينطبق على طلبك'); };
   $('#svDoc', root).onclick = () => openSvcDoc(s.code);
+  $('#svBrief', root).onclick = () => (s.brief?.steps?.length ? openSvcBrief(s.code) : openSvcDoc(s.code));
   const ed = $('#svEd', root); if (ed) ed.onclick = () => editSvc(s, () => viewSvc(root, code).catch(err));
 }
 
@@ -171,7 +172,7 @@ export async function openSvcDoc(code, item = null) {
     add('المسار خطوة بخطوة — نموذج متابعة', flow.length ? `<table class="t flow"><thead><tr><th>#</th><th>القسم</th><th>الخطوة</th><th>الناتج</th><th>المهلة</th><th style="width:22mm">التاريخ</th><th style="width:26mm">الاسم والتوقيع</th></tr></thead><tbody>${flow.map((f, i) => `<tr><td class="c">${i + 1}</td><td><b>${ox(us(f.u))}</b>${f.opt ? '<br><small>عند الحاجة</small>' : ''}</td><td>${ox(f.a)}${f.ref ? `<br><small class="ltr">${ox(f.ref)}</small>` : ''}</td><td>${ox(f.o || '')}</td><td>${ox(f.sla && f.sla !== '—' ? f.sla : '')}</td><td></td><td></td></tr>`).join('')}</tbody></table>` : '');
     const rx = s.raci || {};
     add('الأدوار', (rx.rows || []).length ? `<table class="t raci"><thead><tr><th>العمل</th>${rx.cols.map(c => `<th>${ox(us(c))}</th>`).join('')}</tr></thead><tbody>${rx.rows.map(r => `<tr><td>${ox(r.task)}</td>${rx.cols.map(c => `<td class="c"><b>${ox(r.v?.[c] || '')}</b></td>`).join('')}</tr>`).join('')}</tbody></table><p class="note">R ينفّذ · A يعتمد ويُسأل · C يُستشار · I يُبلَّغ</p>` : '');
-    add('التنسيق', (s.coord || []).length ? `<table class="t"><tbody>${s.coord.map(c => `<tr><th style="width:34mm">${ox(un(c.u))}</th><td>${ox(c.why)}</td></tr>`).join('')}</tbody></table>` : '');
+    add('التنسيق', (s.coord || []).length ? `<table class="t"><tbody>${s.coord.map(c => `<tr><th style="width:34mm">${ox(c.u ? un(c.u) : c.l)}</th><td>${ox(c.why)}</td></tr>`).join('')}</tbody></table>` : '');
     if (sec.reqs) add(sec.reqs.title, pmd(sec.reqs.body));
     add('المواصفات والمصنّعون المعتمدون', [G.mats.map(m => `<div class="box"><b>${ox(m.name)}</b> <span class="ltr small">${ox(m.code)}</span><div class="mk">${(m.makers || []).map(x => `<span>${ox(x)}</span>`).join('')}</div>${m.spec ? `<div class="small">${ox(m.spec)}</div>` : ''}<div class="small g">${m.rule === 'only' ? 'حصراً — لا بديل' : m.rule === 'eq' ? 'أو ما يعادله بعد الاعتماد الكتابي' : 'أي اسم من القائمة المعتمدة فقط'}</div></div>`).join(''),
       G.cards.map(c => `<div class="box"><b>دليل المواصفات — ${ox(c.title)}:</b> ${ox(c.approved)}${c.why ? `<div class="small g">لماذا: ${ox(c.why)}</div>` : ''}</div>`).join(''),
@@ -204,4 +205,49 @@ export async function openSvcDoc(code, item = null) {
         dept: 'إدارة الخدمات الفنية — ' + un(s.unit), edition: s.code, date: new Date().toISOString().slice(0, 10) }) });
   } catch (e) { try { win.close(); } catch (x) { } err(e); }
 }
-document.addEventListener('click', e => { const b = e.target.closest('[data-svcdoc]'); if (!b) return; e.preventDefault(); let it = null; try { it = JSON.parse(b.dataset.item || 'null'); } catch (x) { } openSvcDoc(b.dataset.svcdoc, it); });
+document.addEventListener('click', e => { const b = e.target.closest('[data-svcdoc],[data-svcfull]'); if (!b) return; e.preventDefault(); let it = null; try { it = JSON.parse(b.dataset.item || 'null'); } catch (x) { }
+  if (b.dataset.svcfull) return openSvcDoc(b.dataset.svcfull, it);
+  const s = S?.svc?.find(x => x.code === b.dataset.svcdoc); (s && !s.brief?.steps?.length ? openSvcDoc : openSvcBrief)(b.dataset.svcdoc, it); });
+
+// ---------- الخلاصة في صفحة واحدة: ما يحتاجه المنفّذ والمستلم فعلاً، والتفاصيل في الملف الكامل والمنصة
+export async function openSvcBrief(code, item = null) {
+  const { prepDoc, openDoc } = await import('./pdfdoc.js'); const win = prepDoc(); if (!win) return;
+  try {
+    await loadSvc(); const s = S.svc.find(x => x.code === code); if (!s) throw new Error('الخدمة غير موجودة'); const B = s.brief || {};
+    const us = c => S.U[c]?.short || c, col = c => S.U[c] ? '#' + (S.U[c].color || '6B7A88') : '#6B7A88';
+    const chosen = item?.route ? (s.routes || []).find(r => r.t === item.route) : (s.routes || []).find(r => r.main);
+    const list = (a, mark) => `<ul class="${mark}">${(a || []).map(x => `<li>${ox(x)}</li>`).join('')}</ul>`;
+    const L = s.links || {}, refs = [...(L.procs || []), ...(L.rules || []), ...(L.wis || [])].join(' · ');
+    const docCode = await (await import('./docctl.js')).issueDoc({ kind: 'svc', ref: item?.ref || s.code, title: 'خلاصة — ' + (item ? `${item.ref} — ` : '') + s.title, lang: 'ar' });
+    const meta = item ? [item.ref, item.fac, item.loc, item.date, item.prio ? 'الأولوية: ' + item.prio : ''].filter(Boolean) : [s.code, us(s.unit), s.cat];
+    const body = `<div class="bh"><div class="bh-k">${item ? 'ملف الطلب — خلاصة في صفحة' : 'دليل الخدمات — خلاصة في صفحة'}<span>تجمع الأحساء الصحي · إدارة الخدمات الفنية</span></div><h1>${ox(s.title)}</h1><div class="bh-m">${meta.map(x => `<span>${ox(x)}</span>`).join('')}</div></div>
+      ${chosen ? `<div class="route"><b>☑ المسار:</b> ${ox(chosen.t)} <span>← ${ox(chosen.out || '')}${chosen.proc ? ' · ' + ox(chosen.proc) : ''}</span></div>` : ''}
+      ${s.status !== 'issued' ? '<div class="draft">مسودة للمراجعة — قد تتغير المهل والأدوار بعد الاعتماد</div>' : ''}
+      <div class="g2"><div class="bx"><h3>الخطوات ومن ينفّذها</h3><table class="st">${(B.steps || []).map(([u, t, sla], i) => `<tr><td class="n">${i + 1}</td><td class="u"><span style="--c:${col(u)}">${ox(us(u))}</span></td><td>${ox(t)}</td><td class="sla">${ox(sla || '')}</td><td class="ok">☐</td></tr>`).join('')}</table></div>
+        <div class="col"><div class="bx"><h3>قبل البدء</h3>${list(B.before, 'chk')}</div><div class="bx"><h3>التنسيق مع</h3><ul class="co">${(B.coord || []).map(([u, t]) => `<li><b style="color:${col(u)}">${ox(us(u))}</b> ${ox(t)}</li>`).join('')}</ul></div></div></div>
+      <div class="bx spec"><h3>المواصفات المعتمدة</h3><div class="br">${(B.brands || []).map(x => `<span>${ox(x)}</span>`).join('')}</div>${list(B.musts, 'dot two')}</div>
+      <div class="g2 eq"><div class="bx"><h3>طريقة التنفيذ</h3>${list(B.how, 'chk num')}</div><div class="bx no"><h3>ممنوع</h3>${list(B.donts, 'x')}</div></div>
+      <div class="bx"><h3>القبول والاستلام</h3>${list(B.accept, 'chk three')}</div>
+      <div class="sg">${(B.sign || ['المنشأة', 'القسم المنفّذ']).map(x => `<div><b>${ox(x)}</b><span>الاسم</span><span>التوقيع</span><span>التاريخ</span></div>`).join('')}</div>
+      <p class="rf">المرجع الكامل: دليل الخدمات ${ox(s.code)} في المنصة${refs ? ' — ' + ox(refs) : ''}</p>`;
+    const css = `@page{margin:12mm 12mm 14mm}body{font-size:8.7pt;line-height:1.42}.doc{padding:0!important}.docstamp{margin-top:4px!important;padding-top:3px!important;font-size:7pt!important}
+      .bh{background:#153E5C;color:#fff;border-radius:8px;padding:9px 14px 10px;-webkit-print-color-adjust:exact;print-color-adjust:exact}.bh-k{display:flex;justify-content:space-between;font-size:8.4pt;color:#9FDBF5;font-weight:700}.bh-k span{color:#C9D6E1;font-weight:500}
+      .bh h1{color:#fff;font-size:15.5pt;margin:1px 0 3px}.bh-m{display:flex;flex-wrap:wrap;gap:5px}.bh-m span{background:rgba(255,255,255,.14);border-radius:12px;padding:0 9px;font-size:8.4pt}
+      .route{margin:6px 0 0;padding:5px 10px;border-right:4px solid #27A8DF;background:#E8F6FC;border-radius:5px;-webkit-print-color-adjust:exact;print-color-adjust:exact}.route span{color:#153E5C;font-weight:700}
+      .draft{margin-top:4px;font-size:7.8pt;color:#8a6200;background:#FFF4D6;border-radius:4px;padding:1px 8px;display:inline-block;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .g2{display:grid;grid-template-columns:1.65fr 1fr;gap:7px;margin-top:7px}.g2.eq{grid-template-columns:1.3fr 1fr}.col{display:flex;flex-direction:column;gap:7px}
+      .bx{border:1px solid #D9E2EA;border-radius:7px;padding:5px 9px;margin-top:6px;break-inside:avoid}.g2 .bx,.col .bx{margin-top:0}
+      .bx h3{font-size:9.6pt;margin:0 0 4px;color:#153E5C;border-bottom:2px solid #27A8DF;display:inline-block;padding-bottom:1px}
+      .st{width:100%;border-collapse:collapse}.st td{padding:2px 3px;border-bottom:1px solid #EEF2F6;vertical-align:top}.st .n{width:5mm;color:#5B6B7A;font-weight:700;text-align:center}.st .u{width:18mm}
+      .st .u span{display:inline-block;font-size:7.6pt;font-weight:700;color:var(--c);border:1px solid var(--c);border-radius:9px;padding:0 6px;white-space:nowrap}.st .sla{width:15mm;color:#5B6B7A;font-size:7.8pt;white-space:nowrap}.st .ok{width:5mm;font-size:11pt;color:#153E5C}
+      ul{margin:0;padding:0;list-style:none}li{position:relative;padding-right:15px;margin:1.5px 0}
+      ul.chk li::before{content:'☐';position:absolute;right:0;top:-1px;font-size:10pt;color:#153E5C}ul.x li::before{content:'✕';position:absolute;right:1px;color:#C8453A;font-weight:800}ul.dot li::before{content:'';position:absolute;right:3px;top:6px;width:5px;height:5px;border-radius:50%;background:#27A8DF}
+      ul.co li{padding-right:0}ul.two{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}ul.three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 10px}
+      .no{background:#FDF3F2;border-color:#F3C9C4;-webkit-print-color-adjust:exact;print-color-adjust:exact}.no h3{color:#C8453A;border-color:#C8453A}
+      .br{display:flex;flex-wrap:wrap;gap:4px;margin:2px 0 5px}.br span{background:#153E5C;color:#fff;border-radius:5px;padding:0 8px;font-weight:700;direction:ltr;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .sg{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:8px}.sg div{border:1.4px solid #153E5C;border-radius:7px;padding:5px 9px;display:grid;grid-template-columns:auto 1fr;gap:3px 8px;align-items:end;break-inside:avoid}
+      .sg b{grid-column:1/-1;color:#153E5C}.sg span{font-size:8pt;color:#5B6B7A;border-bottom:1px dotted #9AA6B1;padding-bottom:4px;grid-column:1/-1}
+      .rf{margin:6px 0 0;font-size:7.6pt;color:#5B6B7A}`;
+    openDoc({ win, docCode, title: (item ? `خلاصة الطلب ${item.ref} — ` : 'خلاصة الخدمة — ') + s.title, body, css });
+  } catch (e) { try { win.close(); } catch (x) { } err(e); }
+}
