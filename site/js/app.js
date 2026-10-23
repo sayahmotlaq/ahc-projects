@@ -82,19 +82,45 @@ function setNav(k) {
   $('#sheet')?.classList.remove('show');
 }
 export function setCounts(map) { Object.entries(map).forEach(([k, v]) => $$(`[data-cnt="${k}"]`).forEach(el => { el.textContent = v || ''; el.classList.toggle('show', !!v); })); }
+// فهرس المحتوى للبحث الموحد: المعايير والمواد والقواعد والإجراءات والأدلة وتعليمات العمل وبنود المقطوعية واشتراطات التسليم والمرجع الفني
+let contentIdx = null;
+async function buildContentIdx() {
+  const safe = p => Promise.resolve(p).then(r => r || []).catch(() => []), Q = x => safe(q(x));
+  const [stds, mats, rules, procs, mans, ls, ho] = await Promise.all([Q(sb.from('standards').select('code,title,en,tokens,kind').eq('active', true)), Q(sb.from('materials').select('code,name,makers,category,spec').eq('active', true)),
+    Q(sb.from('gov_rules').select('code,title,statement').eq('active', true)), Q(sb.from('gov_processes').select('code,title,goal')), Q(sb.from('manual_templates').select('code,title,scope,cat')),
+    Q(sb.from('ls_items').select('code,title,descr').eq('active', true)), Q(sb.from('handover_reqs').select('code,title,descr').eq('active', true))]);
+  const out = [
+    ...stds.map(s => ({ r: 1, code: s.code, name: s.title, kind: s.kind === 'internal' ? 'معيار التجمع' : 'كود / مواصفة', icon: s.kind === 'internal' ? 'shield' : 'book', link: 'std:' + s.code, s: [s.code, s.title, s.en, ...(s.tokens || [])].join(' ') })),
+    ...mats.map(m => ({ r: 2, code: m.code, name: `${m.name} — ${(m.makers || []).join('، ')}`, kind: 'مادة معتمدة', icon: 'stamp', link: 'mat:' + m.code, s: [m.code, m.name, m.category, m.spec, ...(m.makers || [])].join(' ') })),
+    ...rules.map(r => ({ r: 3, code: r.code, name: r.title, kind: 'قاعدة حوكمة', icon: 'shieldok', link: 'rule:' + r.code, s: [r.code, r.title, r.statement].join(' ') })),
+    ...procs.map(p => ({ r: 3, code: p.code, name: p.title, kind: 'إجراء', icon: 'book', link: '#/gov/sop/' + p.code, s: [p.code, p.title, p.goal].join(' ') })),
+    ...mans.map(m => ({ r: 4, code: m.scope === 'wi' ? m.code : '', name: m.title, kind: m.scope === 'wi' ? 'تعليمات عمل' : m.scope === 'facility' ? 'قالب دليل منشأة' : 'دليل عام', icon: 'file', link: m.scope === 'facility' ? '#/manuals' : '#/manuals/g/' + m.code, s: [m.code, m.title, m.cat].join(' ') })),
+    ...ls.map(i => ({ r: 5, code: i.code, name: i.title, kind: 'بند مقطوعية', icon: 'coins', link: isAdmin() ? '#/admin/lumpsum' : '#/library', s: [i.code, i.title, i.descr].join(' ') })),
+    ...ho.map(h => ({ r: 5, code: h.code, name: h.title, kind: 'اشتراط تسليم', icon: 'clipok', link: '#/handover', s: [h.code, h.title, h.descr].join(' ') })),
+  ];
+  try { if (REF.loaded) Object.values(REF.byItem || {}).forEach(it => out.push({ r: 6, code: it.code, name: it.ar, kind: 'المرجع الفني', icon: 'ruler', link: '#/ref/' + String(it.code).replace(/\s+/g, '-'), s: [it.code, it.ar, it.en].join(' ') })); } catch (e) { }
+  return out;
+}
 async function openPalette() {
   if ($('.pal')) return;
   if (!projIndex) { try { projIndex = canRead() ? await q(sb.from('projects').select('id,name,ref,stage,category').eq('archived', false).order('name')) : []; } catch (e) { projIndex = []; } }
   let opsIdx = []; try { if (canRead() || OPS_ROLES.includes(role())) { const { data } = await sb.from('ops_items').select('id,ref,title,unit,status').order('id', { ascending: false }).limit(400); opsIdx = data || []; } } catch (e) { }
+  if (!contentIdx) contentIdx = buildContentIdx();
   const pages = NAV.filter(n => n[0] !== 'sec' && allow(n[3])).map(n => ({ id: null, name: (n[0].startsWith('dept/') ? 'قسم ' : '') + n[1], link: '#/' + n[0], kind: n[0].startsWith('dept/') ? 'قسم' : 'صفحة' }));
-  const w = document.createElement('div'); w.className = 'pal'; w.innerHTML = `<div class="box"><input id="palq" placeholder="اكتب اسم مشروع أو صفحة أو قسم، أو رقم عمل مثل MNT-26-…" autocomplete="off"><div class="list" id="pall"></div></div>`;
+  const w = document.createElement('div'); w.className = 'pal'; w.innerHTML = `<div class="box"><input id="palq" placeholder="ابحث في المشاريع والصفحات والأعمال، والمعايير والمواد والقواعد والإجراءات والأدلة والبنود…" autocomplete="off"><div class="list" id="pall"></div></div>`;
   document.body.appendChild(w); const inp = $('#palq', w), list = $('#pall', w); let sel = 0, items = [];
   const norm = s => (s || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي');
-  const render = () => { const qs = norm(inp.value.trim()); items = qs ? [...projIndex.filter(p => norm(p.name + ' ' + (p.ref || '')).includes(qs)).slice(0, 8).map(p => ({ name: p.name, link: '#/project/' + p.id, kind: p.category || 'مشروع' })), ...opsIdx.filter(o => norm(o.ref + ' ' + o.title).includes(qs)).slice(0, 6).map(o => ({ name: o.title, link: '#/ops/list?id=' + o.id, kind: o.ref })), ...pages.filter(p => norm(p.name).includes(qs)).slice(0, 4)] : pages.slice(0, 8);
-    sel = 0; list.innerHTML = items.map((it, i) => `<a class="res ${i === sel ? 'sel' : ''}" href="${it.link}" data-i="${i}">${ico(it.id === null && it.kind === 'صفحة' ? 'dash' : 'folder')}<span>${esc(it.name)}</span><small>${esc(it.kind)}</small></a>`).join('') || '<p class="muted" style="padding:14px">لا نتائج</p>'; };
+  let CI = []; contentIdx.then(x => { CI = x; if (inp.value.trim()) render(); }).catch(() => { });
+  const render = () => { const qs = norm(inp.value.trim()); const words = qs.split(/\s+/).filter(Boolean); const hit = t => { const n = norm(t); return words.every(w => n.includes(w)); };
+    const wb = t => { const n = ' ' + norm(t).replace(/[^\p{L}\p{N}]+/gu, ' '); return words.every(w => n.includes(' ' + w) || n.includes(' ال' + w) || n.includes(' وال' + w)); };
+    const ci = qs ? CI.filter(c => hit(c.s)).map(c => ({ c, k: (wb(c.name) ? 0 : wb(c.s) ? 1 : 2) })).sort((a, b) => a.k - b.k || a.c.r - b.c.r).slice(0, 14).map(x => x.c) : [];
+    items = qs ? [...projIndex.filter(p => norm(p.name + ' ' + (p.ref || '')).includes(qs)).slice(0, 6).map(p => ({ name: p.name, link: '#/project/' + p.id, kind: p.category || 'مشروع' })), ...opsIdx.filter(o => norm(o.ref + ' ' + o.title).includes(qs)).slice(0, 5).map(o => ({ name: o.title, link: '#/ops/list?id=' + o.id, kind: o.ref })), ...pages.filter(p => norm(p.name).includes(qs)).slice(0, 4), ...ci] : pages.slice(0, 8);
+    sel = 0; list.innerHTML = items.map((it, i) => `<a class="res ${i === sel ? 'sel' : ''}" href="${it.link.includes(':') && !it.link.startsWith('#') ? '#' : it.link}" data-i="${i}">${ico(it.icon || (it.id === null && it.kind === 'صفحة' ? 'dash' : 'folder'))}<span>${it.code ? `<b class="ltr cd">${esc(it.code)}</b> ` : ''}${esc(it.name)}</span><small>${esc(it.kind)}</small></a>`).join('') || '<p class="muted" style="padding:14px">لا نتائج</p>'; };
   const close = () => w.remove();
   inp.oninput = render; render(); inp.focus();
-  inp.onkeydown = e => { if (e.key === 'ArrowDown') { sel = Math.min(sel + 1, items.length - 1); } else if (e.key === 'ArrowUp') { sel = Math.max(sel - 1, 0); } else if (e.key === 'Enter') { if (items[sel]) { location.hash = items[sel].link; close(); } return; } else if (e.key === 'Escape') { close(); return; } else return; $$('.res', list).forEach((a, i) => a.classList.toggle('sel', i === sel)); };
+  const go = it => { if (/^(std|mat):/.test(it.link)) import('./standards.js').then(m => it.link.startsWith('std:') ? m.openStd(it.link.slice(4)) : m.openMat(it.link.slice(4))); else if (it.link.startsWith('rule:')) import('./gov.js').then(m => m.openPeek(it.link.slice(5))); else location.hash = it.link; close(); };
+  list.addEventListener('click', e => { const a = e.target.closest('.res'); if (!a) return; const it = items[+a.dataset.i]; if (it && /^(std|mat|rule):/.test(it.link)) { e.preventDefault(); go(it); } });
+  inp.onkeydown = e => { if (e.key === 'ArrowDown') { sel = Math.min(sel + 1, items.length - 1); } else if (e.key === 'ArrowUp') { sel = Math.max(sel - 1, 0); } else if (e.key === 'Enter') { if (items[sel]) go(items[sel]); return; } else if (e.key === 'Escape') { close(); return; } else return; $$('.res', list).forEach((a, i) => a.classList.toggle('sel', i === sel)); };
   w.addEventListener('click', e => { if (e.target === w) close(); if (e.target.closest('.res')) close(); });
 }
 
@@ -147,6 +173,7 @@ async function route() {
   try {
     if (HUBR[parts[0]]) { const H = await import('./hub.js'); const hub = HUBR[parts[0]]; await H.mountHub(m, hub, parts[0] === hub ? (params.get('t') || '') : parts[0], params); }
     else if (parts[0] === 'library') { const { mountLibrary } = await import('./library.js'); mountLibrary(m); }
+    else if (parts[0] === 'standards') { const { mountStandards } = await import('./standards.js'); await mountStandards(m, params); }
     else if (parts[0] === 'today') { const { mountToday } = await import('./today.js'); await mountToday(m, params); }
     else if (parts[0] === 'dashboard') { const { mountDashboard } = await import('./projects.js'); await mountDashboard(m); }
     else if (parts[0] === 'projects') { const { mountProjects } = await import('./projects.js'); await mountProjects(m, params); }
@@ -185,6 +212,8 @@ async function route() {
   } catch (e) { err(e); m.innerHTML = `<div class="empty-boq">تعذّر التحميل: ${esc(e.message || e)}</div>`; }
 }
 window.addEventListener('hashchange', route);
+// شارات «المصدر»: كلما ظهرت خانة مصدر في الصفحة تُملأ بالمعايير والمواد المرتبطة بها
+let srcT = null; new MutationObserver(() => { clearTimeout(srcT); srcT = setTimeout(() => { if (document.querySelector('.srcslot[data-src]:not([data-done])')) import('./standards.js').then(m => m.decorate(document)).catch(() => { }); }, 120); }).observe(document.body, { childList: true, subtree: true });
 // مراقبة صدور نسخة جديدة من المنصة
 let verNotified = false;
 async function checkVersion() { if (verNotified || !window.AHC_CONFIG?.version) return; try { const t = await (await fetch('config.js?t=' + Date.now(), { cache: 'no-store' })).text(); const m = t.match(/version:\s*"([^"]+)"/); if (m && m[1] !== window.AHC_CONFIG.version) { verNotified = true; let tried = ''; try { tried = sessionStorage.getItem('ahc_ver_try') || ''; } catch (e) { } if (tried === m[1]) return; const b = document.createElement('div'); b.className = 'verbar'; b.innerHTML = '⬆ صدرت نسخة جديدة من المنصة — <b>اضغط هنا للتحديث</b>'; b.onclick = () => { try { sessionStorage.setItem('ahc_ver_try', m[1]); } catch (e) { } location.replace(location.pathname + '?r=' + Date.now() + location.hash); }; document.body.appendChild(b); } } catch (e) { } }

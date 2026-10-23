@@ -90,7 +90,7 @@ async function render(n) {
       h += `<div class="sec-card health"><h2><span class="ic"></span>متطلبات المنشآت الصحية ومكافحة العدوى</h2>${list(d.health, false)}</div>`;
       h += `<div class="sec-card accept"><h2><span class="ic"></span>معايير القبول والاختبار</h2>${list(d.accept)}</div>`;
       if (d.method?.length) h += `<div class="sec-card"><h2><span class="ic"></span>طريقة التنفيذ (Method Statement)</h2>${list(d.method)}</div>`;
-      h += `<div class="sec-card"><h2><span class="ic"></span>المراجع والمعايير</h2><div class="refs">${(d.refs || []).map(r => `<span class="ref">${esc(r)}</span>`).join('')}</div></div>`;
+      h += `<div class="sec-card"><h2><span class="ic"></span>المراجع والمعايير</h2><div class="refs">${(d.refs || []).map(r => `<span class="ref">${esc(r)}</span>`).join('')}</div><div class="srcslot" data-src="ref" data-key="${esc(d.code)}" data-src-text="${esc((d.refs || []).join(' '))}"></div></div>`;
     } else {
       h += `<div class="skel-note">المواصفة التفصيلية لهذا البند قيد الاستكمال. النطاق والخيارات والأسعار الاسترشادية معتمدة للاستخدام في جداول الكميات.</div>`;
     }
