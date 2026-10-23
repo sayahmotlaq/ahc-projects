@@ -1,0 +1,10 @@
+import { chromium } from 'playwright';
+const D = process.argv[2];
+const b = await chromium.launch(); const p = await b.newPage();
+const ft = `<div style="font-family:Tajawal;font-size:8pt;color:#5B6B7A;width:100%;padding:0 16mm;display:flex;justify-content:space-between"><span>© 2026 All rights reserved — Al Ahsa Health Cluster, Technical Services Department</span><span><span class="pageNumber"></span> / <span class="totalPages"></span></span></div>`;
+const hd = `<div style="width:100%;padding:0 16mm;"><div style="height:3px;background:linear-gradient(90deg,#153E5C 0 70%,#27A8DF 70%)"></div></div>`;
+await p.goto('file://' + D + '/body_en.html'); await p.evaluate(() => document.fonts.ready);
+await p.pdf({ path: D + '/body_en.pdf', format: 'A4', printBackground: true, preferCSSPageSize: true, displayHeaderFooter: true, headerTemplate: hd, footerTemplate: ft });
+await p.goto('file://' + D + '/cover_en.html'); await p.evaluate(() => document.fonts.ready);
+await p.pdf({ path: D + '/cover_en.pdf', format: 'A4', printBackground: true, preferCSSPageSize: true });
+await b.close();

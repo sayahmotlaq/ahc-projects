@@ -2,7 +2,15 @@
 import { esc, fmt, toast, download } from './ui.js';
 const today = () => new Date().toISOString().slice(0,10);
 // ---------- تصدير Excel (ExcelJS)
-export function loadExcelJS(){ return new Promise((res, rej) => { if(window.ExcelJS) return res(); const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js'; s.onload = res; s.onerror = () => rej(new Error('cdn')); document.head.appendChild(s); }); }
+export function loadExcelJS(){ return new Promise((res, rej) => { if(window.ExcelJS) { stampExcel(); return res(); } const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js'; s.onload = () => { stampExcel(); res(); }; s.onerror = () => rej(new Error('cdn')); document.head.appendChild(s); }); }
+// فوتر حقوق النشر في كل ورقة Excel تصدر من المنصة (يُطبَّق تلقائياً عند الحفظ)
+export const COPY_XL = '© 2026 حقوق النشر محفوظة لتجمع الأحساء الصحي — إدارة الخدمات الفنية';
+export function copyFooter(f = '') { const t = '&L&8' + COPY_XL; if (!f) return t + '&R&8&P / &N'; if (f.includes(COPY_XL)) return f; return /&L/.test(f) ? f.replace(/&L(.*?)(?=&C|&R|$)/, t) : t + f; }
+function stampExcel() {
+  const P = window.ExcelJS?.Workbook?.prototype; if (!P || P.__ahcCopy) return; const d = Object.getOwnPropertyDescriptor(P, 'xlsx'); if (!d?.get) return;
+  Object.defineProperty(P, 'xlsx', { configurable: true, get() { const x = d.get.call(this); if (!x.__ahc) { const wb = this, w = x.writeBuffer.bind(x); x.writeBuffer = (...a) => { wb.worksheets.forEach(ws => { ws.headerFooter = Object.assign({}, ws.headerFooter, { oddFooter: copyFooter(ws.headerFooter?.oddFooter) }); }); return w(...a); }; x.__ahc = 1; } return x; } });
+  P.__ahcCopy = 1;
+}
 const NAVY='FF153E5C', BLUE='FF1B6CA8', LB='FFEAF3F9', CARD='FFF5F1EE', GOLDBG='FFFFF4D6', WHITE='FFFFFFFF', GREY='FF5E5E5E';
 const FONT = 'Arial';
 const thin = {style:'thin', color:{argb:'FFC9C2B8'}};

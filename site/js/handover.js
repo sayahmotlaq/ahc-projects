@@ -12,10 +12,10 @@ export async function mountHandover(root) {
   const render = () => {
     const list = rows.filter(r => (isAdmin() || r.active) && (!fq || (r.code + r.title + r.descr + r.deliver).includes(fq)));
     root.innerHTML = `<div class="fmhead"><div class="fmhead-t"><h1 class="pagetitle">اشتراطات تسليم المشروع</h1><p class="muted m0">ما يلتزم المقاول بتسليمه: المخططات كما نُفِّذ، الضمانات والشهادات، الترميز والتوسيم، التشغيل والصيانة والتدريب. تُرفق تلقائياً بملف Excel لجدول الكميات، وتُولَّد منها بنود «الإغلاق والضمان» في المشروع.</p></div>
-      <div class="fmhead-a"><button class="btn" id="hoPrint">${ico('print')} ${print ? 'عرض القائمة' : 'عرض للطباعة / PDF'}</button><button class="btn primary" id="hoXl">${ico('download')} Excel</button>${isAdmin() ? '<button class="btn" id="hoNew">＋ اشتراط</button>' : ''}</div></div>
+      <div class="fmhead-a"><button class="btn" id="hoPrint">${ico('print')} PDF للطباعة</button><button class="btn primary" id="hoXl">${ico('download')} Excel</button>${isAdmin() ? '<button class="btn" id="hoNew">＋ اشتراط</button>' : ''}</div></div>
       ${print ? printView(list) : `<div class="toolbar"><input id="hoQ" class="stq" placeholder="بحث في الاشتراطات…" value="${esc(fq)}"><span class="muted small">${list.filter(r => r.active).length} اشتراطاً فعالاً</span></div>
       ${grps().map(g => { const ls = list.filter(r => r.grp === g); return ls.length ? `<section class="pcard hogrp"><h2>${esc(g)}</h2>${ls.map(r => `<div class="hoq ${r.active ? '' : 'off'}"><div class="hoq-h"><span class="ltr cd">${r.code}</span><b>${esc(r.title)}</b><span class="badge skel">${esc(r.stage || '')}</span><span class="sp"></span>${isAdmin() ? `<button class="btn sm ghost" data-e="${r.code}">تعديل</button>` : ''}</div><p>${esc(r.descr)}</p>${r.deliver ? `<div class="small"><b>المطلوب تسليمه:</b> ${esc(r.deliver)}</div>` : ''}</div>`).join('')}</section>` : ''; }).join('')}`}`;
-    $('#hoPrint', root).onclick = () => { print = !print; render(); if (print) setTimeout(() => window.print(), 300); };
+    $('#hoPrint', root).onclick = () => openHandoverDoc();
     $('#hoXl', root).onclick = () => exportHO(rows.filter(r => r.active));
     $('#hoNew', root) && ($('#hoNew', root).onclick = () => form(null));
     if (print) return;
@@ -56,4 +56,33 @@ export async function closeoutFromHO(projectId, items) {
   const rows = list.map(h => `[${h.code}] ${h.title}`).filter(l => !have.has(l)).map((label, k) => ({ project_id: projectId, sort: items.length + k + 1, label, note: '' }));
   if (!rows.length) { toast('كل الاشتراطات موجودة في القائمة'); return 0; }
   await q(sb.from('closeout_items').insert(rows)); toast(`أُضيف ${rows.length} بنداً`); return rows.length;
+}
+
+// ===== مستند PDF بهوية التجمع (عام أو باسم المشروع) =====
+const STC = { 'قبل الاستلام الابتدائي': '#27A8DF', 'عند الاستلام الابتدائي': '#153E5C', 'خلال فترة الضمان': '#0F7B5F', 'قبل الاستلام النهائي': '#6B5BA8' };
+export async function openHandoverDoc({ projectId = null, boqName = '' } = {}) {
+  let win; try {
+    const { prepDoc } = await import('./pdfdoc.js'); win = prepDoc(); if (!win) return;
+    const list = await loadHO(); if (!list.length) { win.close(); return toast('لا اشتراطات فعالة'); }
+    const prj = projectId ? await q(sb.from('projects').select('name,facility,contractor').eq('id', projectId).single()) : null;
+    const grps = [...new Set(list.map(r => r.grp))]; let k = 0;
+    const st = s => `<span class="hst" style="background:${STC[s] || '#5B6B7A'}">${esc(s || '')}</span>`;
+    const body = `<div class="intro"><h2>عن هذه الاشتراطات</h2><div class="rib"></div>
+      <p>تحدد هذه الوثيقة ما يلتزم المقاول بتسليمه حتى تُستلم المنشأة جاهزة للتشغيل والصيانة: المخططات كما نُفِّذ، والضمانات والشهادات، وترميز الأصول وتوسيمها، وكتيبات التشغيل والتدريب، ومتطلبات فترة الضمان والاستلام النهائي. وهي <b>جزء لا يتجزأ من العقد ووثائق الطرح</b>${boqName ? ` المرفقة بجدول الكميات «${esc(boqName)}»` : ''}.</p>
+      <div class="hlg">${Object.keys(STC).map(s => `<div>${st(s)}</div>`).join('')}</div>
+      <table class="tbl" style="margin-top:10px"><thead><tr><th style="width:8%">م</th><th>المجموعة</th><th style="width:18%">عدد الاشتراطات</th></tr></thead><tbody>${grps.map((g, i) => `<tr><td class="c">${i + 1}</td><td>${esc(g)}</td><td class="c">${list.filter(r => r.grp === g).length}</td></tr>`).join('')}</tbody></table></div>
+      ${grps.map((g, i) => `<div class="sec ${i ? '' : 'brk'}" style="margin-top:14px"><div class="sh"><span class="sn">${i + 1}</span><h2>${esc(g)}</h2></div>
+        ${list.filter(r => r.grp === g).map(r => `<div class="hitem"><div class="hh"><span class="ic">${esc(r.code)}</span><b>${esc(r.title)}</b>${st(r.stage)}</div><p>${esc(r.descr)}</p>${r.deliver ? `<div class="hdl"><span>المطلوب تسليمه</span>${esc(r.deliver)}</div>` : ''}<div class="hck">☐ استُلم &nbsp;&nbsp; التاريخ: ............ &nbsp;&nbsp; ملاحظات: ..............................</div></div>`).join('')}</div>`).join('')}
+      <div class="note" style="margin-top:14px">يُعدّ استيفاء هذه الاشتراطات شرطاً للاستلام الابتدائي أو النهائي حسب التوقيت المحدد لكل بند، ولا يُصرف المستخلص الختامي ولا يُفرج عن الضمانات قبل استيفائها كاملة.</div>
+      <div class="hsig"><h3>إقرار المقاول</h3><p>نقرّ نحن الموقعين أدناه بأننا اطلعنا على اشتراطات تسليم المشروع الواردة في هذه الوثيقة (${list.length} اشتراطاً)، ونلتزم بتنفيذها وتسليمها كاملة في مواعيدها المحددة.</p>
+        <div class="hsg"><div><b>المقاول</b><span>الاسم: ${esc(prj?.contractor || '')}</span><span>المفوض بالتوقيع:</span><span>التوقيع:</span><span>الختم:</span><span>التاريخ:</span></div><div><b>عن تجمع الأحساء الصحي — قسم المشاريع</b><span>الاسم:</span><span>الصفة:</span><span>التوقيع:</span><span>التاريخ:</span></div></div></div>`;
+    const css = `.hlg{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}.hst{color:#fff;border-radius:20px;padding:1px 10px;font-size:8.4pt;font-weight:700;white-space:nowrap;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .hitem{border:1px solid var(--l);border-radius:9px;padding:9px 12px;margin:0 0 9px;break-inside:avoid}.hh{display:flex;gap:8px;align-items:center}.hh b{flex:1;color:var(--n);font-size:11.5pt}.hitem p{margin:5px 0;font-size:9.8pt;line-height:1.7}
+      .hdl{background:var(--s2);border-radius:6px;padding:5px 9px;font-size:9.4pt}.hdl span{display:inline-block;font-weight:700;color:var(--n);margin-inline-end:8px}.hck{margin-top:6px;font-size:8.6pt;color:var(--g)}
+      .hsig{break-inside:avoid;margin-top:18px;border:2px solid var(--n);border-radius:10px;padding:14px 16px}.hsig h3{font-size:14pt}.hsg{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:10px}.hsg div{display:flex;flex-direction:column;gap:12px}.hsg b{color:var(--n)}.hsg span{border-bottom:1px dotted #9AA6B1;padding-bottom:4px;font-size:10pt}`;
+    const { openDoc, coverHtml } = await import('./pdfdoc.js');
+    openDoc({ win, title: `اشتراطات تسليم المشروع${prj ? ' — ' + prj.name : ''}`, body, css,
+      cover: coverHtml({ kicker: 'وثيقة تعاقدية', tag: 'جزء من وثائق الطرح', title: 'اشتراطات تسليم المشروع', sub: 'ما يلتزم المقاول بتسليمه: المخططات كما نُفِّذ، الضمانات والشهادات، الترميز والتوسيم، التشغيل والصيانة والتدريب، وفترة الضمان.',
+        project: prj?.name, facility: prj ? [prj.facility, prj.contractor ? 'المقاول: ' + prj.contractor : ''].filter(Boolean).join(' · ') : '', pills: ['As‑Built', 'O&M', 'Warranties', 'Asset Tagging', 'Training'], edition: `${list.length} اشتراطاً`, date: new Date().toISOString().slice(0, 10) }) });
+  } catch (e) { try { win?.close(); } catch (x) { } err(e); }
 }

@@ -1605,3 +1605,6 @@ td.kic{color:var(--k)} td.kic svg.i{width:20px;height:20px}
 .tqk a svg{width:15px;height:15px;color:#1B6CA8} .tqk a:hover{border-color:#27A8DF;background:#F3FAFE}
 .tqk .tqk-new{background:#123B5C;color:#fff;border-color:#123B5C}
 @media (max-width:600px){.tqk{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none} .tqk a,.tqk button{flex:0 0 auto}}
+
+/* فوتر حقوق النشر في كل ما يُطبع من المنصة */
+@media print{body::after{content:"© 2026 حقوق النشر محفوظة لتجمع الأحساء الصحي — إدارة الخدمات الفنية";position:fixed;bottom:0;left:0;right:0;text-align:center;font:500 8px Tajawal,sans-serif;color:#5B6B7A;padding:2px 0;background:#fff}}

@@ -1,0 +1,10 @@
+import { chromium } from 'playwright';
+const D = process.argv[2];
+const b = await chromium.launch(); const p = await b.newPage();
+const ft = `<div style="font-family:Tajawal;font-size:8pt;color:#5B6B7A;width:100%;padding:0 16mm;display:flex;justify-content:space-between;direction:rtl"><span>© 2026 حقوق النشر محفوظة لتجمع الأحساء الصحي — إدارة الخدمات الفنية</span><span style="direction:ltr"><span class="pageNumber"></span> / <span class="totalPages"></span></span></div>`;
+const hd = `<div style="width:100%;padding:0 16mm;"><div style="height:3px;background:linear-gradient(90deg,#27A8DF 0 30%,#153E5C 30%)"></div></div>`;
+await p.goto('file://' + D + '/body.html'); await p.evaluate(() => document.fonts.ready);
+await p.pdf({ path: D + '/body.pdf', format: 'A4', printBackground: true, preferCSSPageSize: true, displayHeaderFooter: true, headerTemplate: hd, footerTemplate: ft });
+await p.goto('file://' + D + '/cover.html'); await p.evaluate(() => document.fonts.ready);
+await p.pdf({ path: D + '/cover.pdf', format: 'A4', printBackground: true, preferCSSPageSize: true });
+await b.close();

@@ -10,16 +10,22 @@ export function mountLibrary(root) {
     ['للمشاريع والطرح', [
       ['#/ref', 'book', 'المرجع الفني الموحد', 'بنود MasterFormat بمواصفاتها التفصيلية وخياراتها وأسعارها الاسترشادية.', canRead()],
       ['#/admin/lumpsum', 'coins', 'بنود المقطوعية ونطاقات العمل', 'صياغات بنود الطرح الجاهزة، ونطاقات العمل، والملاحظات العامة الافتراضية، وربطها بالمرجع.', isAdmin()],
+      ['#guide', 'doc', 'دليل المواصفات المعتمدة (PDF)', 'دليل للمتبرعين والمقاولين: الشائع في السوق مقابل المعتمد لدى التجمع ولماذا. يُصدر أيضاً من جدول كميات أي مشروع باسمه.', canRead()],
       ['#/handover', 'clipok', 'اشتراطات تسليم المشروع', 'ما يلتزم المقاول بتسليمه: المخططات كما نُفِّذ، الضمانات، الترميز، التشغيل والتدريب.', canRead()],
       ['#/studies', 'ruler', 'قوالب جداول المواد والمواصفات', 'تطوير داخلي للمداخل والردهات، ودورات المياه — تُختار عند إنشاء جدول المواد في أي دراسة أو مشروع.', canRead()],
+    ]],
+    ['معايير التجمع', [
+      ['assets/standards/AAHC-FM-STD-DIGITAL-SIGNAGE-001.pdf', 'file', 'معيار الشاشات الرقمية والتلفزيونات', 'AAHC-FM-STD-DIGITAL-SIGNAGE-001 — اختيار الشاشات وتركيبها: Samsung QMC، منصة Navori، الكهرباء والشبكة، الارتفاعات والمقاسات. (الإصدار 0 — مسودة، إدارة المرافق)', true],
     ]],
     ['الحوكمة والتشغيل', [
       ['#/gov', 'book', 'دليل الحوكمة والإجراءات', 'الإجراءات وخطواتها، حدود الاعتماد، اللجان، التقويم السنوي، سجل المخاطر، والخطط.', ops()],
       ['#/manuals', 'file', 'أدلة المنشآت وتعليمات العمل', 'أدلة التشغيل والصيانة ومستخدمي المنشأة، الأدلة العامة، وبطاقات العمال بعدة لغات.', true],
     ]],
   ];
-  const card = ([h, i, t, d]) => `<a class="libc" href="${h}">${ico(i)}<b>${esc(t)}</b><span>${esc(d)}</span></a>`;
+  const card = ([h, i, t, d]) => `<a class="libc" href="${h}"${h.startsWith('assets/') ? ' target="_blank" rel="noopener"' : ''}>${ico(i)}<b>${esc(t)}</b><span>${esc(d)}</span></a>`;
   root.innerHTML = `<div class="hubh"><div><h1 class="pagetitle">المكتبة الفنية</h1><p class="muted m0">المراجع والقوالب والأدلة التي يُبنى عليها العمل — مكان واحد بدل البحث في القوائم.</p></div></div>
     ${sections.map(([s, cs]) => { const v = cs.filter(c => c[4]); return v.length ? `<h2 class="libh">${esc(s)}</h2><div class="libg">${v.map(card).join('')}</div>` : ''; }).join('')}
+    ${isAdmin() ? '<p class="muted small" style="margin-top:6px">إدارة بطاقات دليل المواصفات من <a href="#/admin/guide">الإدارة ← دليل المواصفات</a>.</p>' : ''}
     ${ops() ? `<h2 class="libh">أدلة الأقسام</h2><div class="libd">${DEPTS.map(([c, n]) => `<a href="#/dept/${c}/manual">${ico('book')} ${esc(n)}</a>`).join('')}</div>` : ''}`;
+  const g = root.querySelector('a[href="#guide"]'); if (g) g.onclick = async e => { e.preventDefault(); (await import('./guide.js')).openGuide(null); };
 }

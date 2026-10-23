@@ -64,6 +64,7 @@ export async function mountBoq(root, boqId, project, onBack) {
 
       <span class="sp"></span>
       <button class="btn primary" id="bExcel">⬇ تصدير Excel</button>
+      ${lines.some(l => l.ls_code) ? '<button class="btn" id="bGuide" title="دليل للمتبرع والمقاول يشرح المواصفات المعتمدة لبنود هذا الجدول — باسم المشروع">دليل المواصفات PDF</button>' : ''}<button class="btn" id="bHO" title="اشتراطات تسليم المشروع باسم المشروع مع إقرار المقاول">اشتراطات التسليم PDF</button>
       ${edit ? `<button class="btn" id="bSettings">إعدادات الجدول</button><button class="btn" id="bRefresh" title="تحديث أسعار البنود من المرجع الحالي">تحديث الأسعار</button>` : ''}
       <button class="btn" onclick="window.print()">طباعة</button>
     </div>${govBar(GOV.boq(boq), 'حالة الجدول: ' + (STATUS[boq.status] || boq.status))}
@@ -83,6 +84,8 @@ export async function mountBoq(root, boqId, project, onBack) {
     <div class="pcard" id="bqNotes" ${boq.notes ? '' : 'hidden'}><h2><span class="ic"></span>ملاحظات عامة</h2><div class="pre" id="bqNotesTxt" style="white-space:pre-wrap;line-height:1.8">${esc(boq.notes || '')}</div></div>
     <div class="pcard"><h2><span class="ic"></span>البنود <span class="muted" id="lineCount"></span>${boq.hide_prices ? ' <span class="badge ovr">نسخة طرح — بلا أسعار</span>' : ''}</h2><div class="tblwrap-bq" id="bqTable"></div><div class="totals" id="bqTotals"></div></div>`;
   $('#bBack').onclick = onBack;
+  $('#bGuide') && ($('#bGuide').onclick = async () => (await import('./guide.js')).openGuide(boq.id));
+  $('#bHO').onclick = async () => (await import('./handover.js')).openHandoverDoc({ projectId: project.id, boqName: boq.name });
   $('#bExcel').onclick = async () => { const { prj, c } = await boqExportData(boq, lines, project); exportExcel(prj, c, await logo()); };
   if (edit) {
     $('#bSettings').onclick = () => settings();
