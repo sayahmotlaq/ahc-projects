@@ -27,7 +27,7 @@ export async function openVerify() {
       if (!data) { out.innerHTML = '<div class="notice bad">لا توجد وثيقة صادرة بهذا الرقم من المنصة.</div>'; return; }
       let cmp = ''; const f = $('#vFile', w).files[0];
       if (f) { const h = await sha256(await f.arrayBuffer()); cmp = !data.sha256 ? '<p class="muted">لا توجد بصمة محفوظة لهذه الوثيقة (ملفات PDF لا تُحفظ بصمتها).</p>' : h === data.sha256 ? '<div class="notice ok"><b>مطابق للنسخة الأصلية</b> — لم يُعدَّل الملف.</div>' : '<div class="notice bad"><b>غير مطابق</b> — الملف عُدِّل أو أعيد حفظه بعد إصداره. اطلب النسخة الأصلية أو قارن البنود يدوياً.</div>'; }
-      out.innerHTML = `<div class="gpk-goal"><b>${esc(data.title || '')}</b><br>الرقم: <span class="ltr">${esc(data.code)}</span><br>النوع: ${esc({ boq: 'جدول كميات', guide: 'دليل المواصفات', ho: 'اشتراطات التسليم' }[data.kind] || data.kind)} · ${data.lang === 'en' ? 'إنجليزي' : 'عربي'}<br>صدرت: ${esc(dateAr(data.issued_at))} ${new Date(data.issued_at).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}${data.issued_name ? ' — ' + esc(data.issued_name) : ''}</div>${cmp}`;
+      out.innerHTML = `<div class="gpk-goal"><b>${esc(data.title || '')}</b><br>الرقم: <span class="ltr">${esc(data.code)}</span><br>النوع: ${esc({ boq: 'جدول كميات', guide: 'دليل المواصفات', ho: 'اشتراطات التسليم', svc: 'ملف خدمة أو طلب' }[data.kind] || data.kind)} · ${data.lang === 'en' ? 'إنجليزي' : 'عربي'}<br>صدرت: ${esc(dateAr(data.issued_at))} ${new Date(data.issued_at).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}${data.issued_name ? ' — ' + esc(data.issued_name) : ''}</div>${cmp}`;
     };
   } });
 }

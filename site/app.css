@@ -1689,3 +1689,4 @@ td.kic{color:var(--k)} td.kic svg.i{width:20px;height:20px}
 @media (max-width:900px){.svc-wrap{grid-template-columns:1fr} .svc-wrap .mn-toc{display:none} .svc-hero{padding:16px} .svc-hero h1{font-size:20px}}
 @media print{.svc-wrap{display:block} .svc-hero{-webkit-print-color-adjust:exact;print-color-adjust:exact} .svc-sec{break-inside:auto;border:0;padding:6px 0} .svc-flow li{break-inside:avoid} .svc-wi details{display:block} .svc-wi details>*{display:block}}
 .svc-doc .gref{white-space:nowrap} .svc-raci td:first-child{min-width:200px}
+.svc-hrow{display:flex;gap:8px;align-items:stretch;flex-wrap:wrap;margin:6px 0} .svc-hrow .svc-hint{flex:1;margin:0} .svc-hrow .btn{align-self:center}

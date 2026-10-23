@@ -58,9 +58,8 @@ function catalog(root, q0) {
   inp.oninput = run; run(); if (!q0) inp.focus();
 }
 
-// ---------- صفحة الخدمة
-async function viewSvc(root, code) {
-  const s = S.svc.find(x => x.code === code); if (!s) { root.innerHTML = '<p class="muted">الخدمة غير موجودة. <a href="#/services">دليل الخدمات</a></p>'; return; }
+// ---------- جمع مصادر الخدمة حياً
+async function gather(s) {
   const L = s.links || {}, flowRefs = (s.flow || []).flatMap(f => String(f.ref || '').split(/\s*·\s*/)), routeProcs = (s.routes || []).map(r => r.proc).filter(Boolean);
   const pc = [...new Set([...(L.procs || []), ...flowRefs.filter(c => /^[A-Z]-\d{2}$/.test(c) && !c.startsWith('R-') && !c.startsWith('A-')), ...routeProcs])];
   const rc = [...new Set([...(L.rules || []), ...flowRefs.filter(c => c.startsWith('R-'))])], ac = [...new Set([...(L.auth || []), ...flowRefs.filter(c => /^A-\d/.test(c))])];
@@ -73,6 +72,13 @@ async function viewSvc(root, code) {
     (L.cards || []).length ? safe(q(sb.from('guide_cards').select('key,title,approved,why').in('key', L.cards))) : [], (L.ho || []).length ? safe(q(sb.from('handover_reqs').select('code,title,descr').in('code', L.ho))) : [],
     (L.stds || []).length ? safe(q(sb.from('standards').select('code,title,kind').in('code', L.stds))) : []]);
   S.procCodes = new Set(procs.map(p => p.code)); S.matCodes = new Set(mats.map(m => m.code)); S.cardCodes = new Set(cards.map(c => c.key));
+  return { pc, wc, procs, rules, auth, wis, ls, mats, cards, ho, stds, routeProcs };
+}
+
+// ---------- صفحة الخدمة
+async function viewSvc(root, code) {
+  const s = S.svc.find(x => x.code === code); if (!s) { root.innerHTML = '<p class="muted">الخدمة غير موجودة. <a href="#/services">دليل الخدمات</a></p>'; return; }
+  const { pc, wc, procs, rules, auth, wis, ls, mats, cards, ho, stds, routeProcs } = await gather(s);
   const P = Object.fromEntries(procs.map(p => [p.code, p])), sec = Object.fromEntries((s.sections || []).map(x => [x.key, x]));
   const planned = s.status === 'planned';
   // الأقسام بالترتيب؛ كل قسم يظهر فقط إن كان له محتوى
@@ -103,7 +109,7 @@ async function viewSvc(root, code) {
   if (planned) parts.splice(1, 0, ['todo', 'ما بقي لهذه الخدمة', `<div class="notice">هذه الخدمة <b>قيد الإعداد</b>: المسار والإجراء الحاكم جاهزان أعلاه ويمكن رفع الطلب الآن. تُستكمل الأدوار والاشتراطات والمواصفات وطريقة التنفيذ في الدفعات القادمة.</div>`]);
 
   const conf = (s.confirm || []).length ? `<div class="notice svc-conf"><b>${ico('alert')} بانتظار تأكيد</b><ul>${s.confirm.map(c => `<li>${linkify(c)}</li>`).join('')}</ul></div>` : '';
-  root.innerHTML = `<div class="toolbar noprint"><a class="btn sm ghost" href="#/services">→ دليل الخدمات</a><span class="sp"></span>${(s.routes || []).some(r => r.kind) ? `<button class="btn sm primary" id="svReq">${ico('plus')} اطلب هذه الخدمة</button>` : ''}<button class="btn sm" onclick="print()">${ico('print')} طباعة / PDF</button>${isAdmin() ? `<button class="btn sm ghost" id="svEd">${ico('edit')} تحرير</button>` : ''}</div>
+  root.innerHTML = `<div class="toolbar noprint"><a class="btn sm ghost" href="#/services">→ دليل الخدمات</a><span class="sp"></span>${(s.routes || []).some(r => r.kind) ? `<button class="btn sm primary" id="svReq">${ico('plus')} اطلب هذه الخدمة</button>` : ''}<button class="btn sm" id="svDoc">${ico('print')} ملف الخدمة PDF</button>${isAdmin() ? `<button class="btn sm ghost" id="svEd">${ico('edit')} تحرير</button>` : ''}</div>
     <div class="svc-hero" style="--c:${ucol(s.unit)}"><span class="svc-hi">${ico(s.icon || 'book')}</span><div><div class="svc-meta"><span class="ltr cd">${esc(s.code)}</span>${stb(s.status)}${uchip(s.unit)}<span class="muted small">${esc(s.cat)}</span></div><h1>${esc(s.title)}</h1><p>${linkify(s.summary)}</p></div></div>
     ${(s.facts || []).length ? `<div class="svc-facts">${s.facts.map(([k, v]) => `<div><small>${esc(k)}</small><b>${linkify(v)}</b></div>`).join('')}</div>` : ''}
     ${conf}
@@ -116,6 +122,7 @@ async function viewSvc(root, code) {
   const req = r => fileReq(s, r);
   $$('[data-req]', root).forEach(b => b.onclick = () => req(s.routes[+b.dataset.req]));
   const rb = $('#svReq', root); if (rb) rb.onclick = async () => { const rs = s.routes.filter(r => r.kind); if (rs.length === 1) return req(rs[0]); $('#sv-routes', root)?.scrollIntoView({ behavior: 'smooth' }); toast('اختر المسار الذي ينطبق على طلبك'); };
+  $('#svDoc', root).onclick = () => openSvcDoc(s.code);
   const ed = $('#svEd', root); if (ed) ed.onclick = () => editSvc(s, () => viewSvc(root, code).catch(err));
 }
 
@@ -142,3 +149,59 @@ function editSvc(s, done) {
       try { await q(sb.from('services').update(out).eq('code', s.code)); toast('حُفظ'); close(); await loadSvc(true); done(); } catch (er) { err(er); } };
   } });
 }
+
+// ---------- ملف الخدمة / ملف الطلب PDF: كل ما يحتاجه المنفّذ والمستلم في مستند واحد بهوية التجمع ورقم مرجعي
+// item (اختياري): { ref, fac, loc, title, unit, prio, date, by, route } — من صفحة الطلب
+const ox = s => String(s || '').replace(/</g, '&lt;');
+const pmd = txt => { let h = '', ul = false; for (const raw of String(txt || '').split('\n')) { const l = raw.trim(); if (!l) continue; if (l.startsWith('- ')) { if (!ul) { h += '<ul>'; ul = true; } h += `<li>${ox(l.slice(2))}</li>`; } else { if (ul) { h += '</ul>'; ul = false; } h += `<p>${ox(l)}</p>`; } } return h + (ul ? '</ul>' : ''); };
+const pchk = txt => `<table class="chk">${String(txt || '').split('\n').map(l => l.trim()).filter(l => l.startsWith('- ')).map(l => `<tr><td class="bx">☐</td><td>${ox(l.slice(2))}</td></tr>`).join('')}</table>`;
+const prow = body => String(body || '').split('\n').filter(l => l.trim().startsWith('|')).slice(1).map(l => l.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|').map(x => x.trim()));
+export async function openSvcDoc(code, item = null) {
+  const { prepDoc, openDoc, coverHtml } = await import('./pdfdoc.js'); const win = prepDoc(); if (!win) return;
+  try {
+    await loadSvc(); const s = S.svc.find(x => x.code === code); if (!s) throw new Error('الخدمة غير موجودة');
+    const G = await gather(s), P = Object.fromEntries(G.procs.map(p => [p.code, p])), sec = Object.fromEntries((s.sections || []).map(x => [x.key, x]));
+    const un = c => S.U[c]?.name || c, us = c => S.U[c]?.short || c;
+    const parts = []; const add = (t, h) => h && parts.push([t, h]);
+    const chosen = item?.route ? (s.routes || []).findIndex(r => r.t === item.route) : -1;
+    if (item) add('بيانات الطلب', `<table class="kv">${[['رقم الطلب', item.ref], ['العنوان', item.title], ['المنشأة', item.fac], ['الموقع', item.loc], ['القسم المختص', item.unit], ['الأولوية', item.prio], ['تاريخ الطلب', item.date], ['مقدم الطلب', item.by]].filter(x => x[1]).map(([k, v]) => `<tr><th>${k}</th><td>${ox(v)}</td></tr>`).join('')}</table>`);
+    add('المسار', `<p>${ox(s.summary)}</p><table class="t"><thead><tr><th style="width:8mm"></th><th>الحالة</th><th>المسار</th><th>القسم</th><th>الإجراء</th></tr></thead><tbody>${(s.routes || []).map((r, i) => `<tr class="${i === chosen ? 'on' : ''}"><td class="bx">${i === chosen ? '☑' : '☐'}</td><td>${ox(r.t)}</td><td><b>${ox(r.out || '')}</b></td><td>${ox(us(r.unit))}</td><td class="ltr">${ox(r.proc || '')}</td></tr>`).join('')}</tbody></table>${item && chosen < 0 ? '<p class="note">حدِّد المسار المنطبق بعلامة ☑.</p>' : ''}`);
+    if (sec.need) add(sec.need.title, pchk(sec.need.body));
+    const flow = (s.flow || []).length ? s.flow : (P[G.routeProcs[0]]?.steps || []).map(x => ({ u: x.unit, a: x.action, o: x.where, sla: x.sla }));
+    add('المسار خطوة بخطوة — نموذج متابعة', flow.length ? `<table class="t flow"><thead><tr><th>#</th><th>القسم</th><th>الخطوة</th><th>الناتج</th><th>المهلة</th><th style="width:22mm">التاريخ</th><th style="width:26mm">الاسم والتوقيع</th></tr></thead><tbody>${flow.map((f, i) => `<tr><td class="c">${i + 1}</td><td><b>${ox(us(f.u))}</b>${f.opt ? '<br><small>عند الحاجة</small>' : ''}</td><td>${ox(f.a)}${f.ref ? `<br><small class="ltr">${ox(f.ref)}</small>` : ''}</td><td>${ox(f.o || '')}</td><td>${ox(f.sla && f.sla !== '—' ? f.sla : '')}</td><td></td><td></td></tr>`).join('')}</tbody></table>` : '');
+    const rx = s.raci || {};
+    add('الأدوار', (rx.rows || []).length ? `<table class="t raci"><thead><tr><th>العمل</th>${rx.cols.map(c => `<th>${ox(us(c))}</th>`).join('')}</tr></thead><tbody>${rx.rows.map(r => `<tr><td>${ox(r.task)}</td>${rx.cols.map(c => `<td class="c"><b>${ox(r.v?.[c] || '')}</b></td>`).join('')}</tr>`).join('')}</tbody></table><p class="note">R ينفّذ · A يعتمد ويُسأل · C يُستشار · I يُبلَّغ</p>` : '');
+    add('التنسيق', (s.coord || []).length ? `<table class="t"><tbody>${s.coord.map(c => `<tr><th style="width:34mm">${ox(un(c.u))}</th><td>${ox(c.why)}</td></tr>`).join('')}</tbody></table>` : '');
+    if (sec.reqs) add(sec.reqs.title, pmd(sec.reqs.body));
+    add('المواصفات والمصنّعون المعتمدون', [G.mats.map(m => `<div class="box"><b>${ox(m.name)}</b> <span class="ltr small">${ox(m.code)}</span><div class="mk">${(m.makers || []).map(x => `<span>${ox(x)}</span>`).join('')}</div>${m.spec ? `<div class="small">${ox(m.spec)}</div>` : ''}<div class="small g">${m.rule === 'only' ? 'حصراً — لا بديل' : m.rule === 'eq' ? 'أو ما يعادله بعد الاعتماد الكتابي' : 'أي اسم من القائمة المعتمدة فقط'}</div></div>`).join(''),
+      G.cards.map(c => `<div class="box"><b>دليل المواصفات — ${ox(c.title)}:</b> ${ox(c.approved)}${c.why ? `<div class="small g">لماذا: ${ox(c.why)}</div>` : ''}</div>`).join(''),
+      G.ls.map(i => `<div class="box"><b>نص المواصفة: ${ox(i.title)}</b> <span class="ltr small">${ox(i.code)}</span><p class="small">${ox(i.descr)}</p></div>`).join(''),
+      G.stds.length ? `<p class="small">المعايير: ${G.stds.map(x => ox(x.code + ' — ' + x.title)).join('، ')}</p>` : ''].join(''));
+    const wis = G.wc.map(c => G.wis.find(w => w.code === c)).filter(Boolean);
+    if (wis.length) { const w = wis[0], ws = Object.fromEntries((w.sections || []).map(x => [x.key, x]));
+      add(`طريقة التنفيذ — ${w.title}`, `<p class="small g ltr" style="text-align:right">${ox(w.code)}</p>${ws.safety ? `<h4>السلامة ومعدات الوقاية</h4>${pmd(ws.safety.body)}` : ''}${ws.tools ? `<h4>الأدوات والمواد</h4>${pmd(ws.tools.body)}` : ''}
+        <h4>الخطوات — يؤشّر الفني على كل خطوة</h4><table class="t"><thead><tr><th>#</th><th>الخطوة</th><th>التحقق</th><th style="width:10mm">✓</th></tr></thead><tbody>${prow(ws.steps?.body).map(r => `<tr><td class="c">${ox(r[0])}</td><td>${ox(r[1])}</td><td>${ox(r[2])}</td><td class="bx">☐</td></tr>`).join('')}</tbody></table>
+        ${wis.slice(1).length ? `<p class="note">بعد التشغيل: ${wis.slice(1).map(x => ox(x.code + ' ' + x.title)).join('، ')}</p>` : ''}`); }
+    add(sec.accept?.title || 'القبول والاستلام', (sec.accept ? pchk(sec.accept.body) : '') + (G.ho.length ? `<h4>ما يُسلَّم مع العمل</h4>${G.ho.map(h => `<div class="ho"><span class="bx">☐</span><b>${ox(h.title)}</b> <span class="ltr small g">${ox(h.code)}</span></div>`).join('')}` : ''));
+    if (sec.donts) add(sec.donts.title, pmd(sec.donts.body));
+    add('المراجع', [G.procs.length ? `<h4>الإجراءات</h4><ul>${G.pc.filter(c => P[c]).map(c => `<li><span class="ltr">${c}</span> ${ox(P[c].title)}</li>`).join('')}</ul>` : '', G.rules.length ? `<h4>القواعد</h4><ul>${G.rules.map(r => `<li><span class="ltr">${r.code}</span> <b>${ox(r.title)}</b> — ${ox(r.statement)}</li>`).join('')}</ul>` : '', G.auth.length ? `<h4>حدود الاعتماد</h4><ul>${G.auth.map(a => `<li><span class="ltr">${a.code}</span> ${ox(a.title)}${a.data?.limit ? ` — ${ox(a.data.limit)}` : ''}</li>`).join('')}</ul>` : ''].join(''));
+    const signs = item ? ['المنشأة المستفيدة', 'قسم الصيانة', 'المقاول المنفّذ (إن وجد)'] : [];
+    const body = `${s.status !== 'issued' && (s.confirm || []).length ? `<div class="warn"><b>نسخة مسودة — بنود بانتظار التأكيد:</b><ul>${s.confirm.map(c => `<li>${ox(c)}</li>`).join('')}</ul></div>` : ''}
+      ${parts.map(([t, h], i) => `<section class="ps"><div class="sh"><span class="sn">${i + 1}</span><h2>${ox(t)}</h2></div>${h}</section>`).join('')}
+      ${signs.length ? `<section class="ps sigp"><div class="sh"><span class="sn">✓</span><h2>محضر الاستلام</h2></div><p>نقرّ بأن العمل نُفّذ وفق الاشتراطات والمواصفات وتعليمات العمل المذكورة في هذا الملف، وتم اختباره واستلامه.</p><div class="sgs">${signs.map(x => `<div><b>${x}</b><span>الاسم:</span><span>التوقيع:</span><span>التاريخ:</span></div>`).join('')}</div></section>` : ''}`;
+    const css = `.ps{margin-bottom:16px}.ps h2{font-size:15pt}.ps h4{margin:10px 0 4px;font-size:11pt}.ps ul{margin:4px 0;padding-right:18px}.ps li{margin:2px 0}
+      .t{margin:6px 0;font-size:9.4pt}.t th,.t td{border:1px solid #D5DEE6;padding:5px 6px;vertical-align:top;text-align:right}.t thead th{background:#153E5C;color:#fff;font-weight:700;-webkit-print-color-adjust:exact;print-color-adjust:exact}.t tr{break-inside:avoid}.t tr.on td{background:#E8F6FC;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .t.flow td{height:13mm}.c{text-align:center!important}.bx{text-align:center;font-size:13pt;width:8mm;color:#153E5C}.raci td,.raci th{text-align:center}.raci td:first-child{text-align:right}
+      .kv{font-size:10.4pt;margin:4px 0}.kv th{width:34mm;text-align:right;color:#5B6B7A;font-weight:500;padding:5px 6px;border-bottom:1px solid #E3EAF0}.kv td{padding:5px 6px;border-bottom:1px solid #E3EAF0;font-weight:700}
+      .chk{font-size:10pt}.chk td{padding:3px 4px;vertical-align:top}.note{font-size:9pt;color:#5B6B7A}.small{font-size:9pt}.g{color:#5B6B7A}
+      .box{border:1px solid #E3EAF0;border-radius:8px;padding:8px 10px;margin:6px 0;break-inside:avoid}.box p{margin:4px 0 0;line-height:1.7}.mk{display:flex;flex-wrap:wrap;gap:4px;margin:5px 0}.mk span{background:#153E5C;color:#fff;border-radius:5px;padding:1px 8px;font-size:9pt;direction:ltr;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .ho{display:flex;gap:6px;align-items:baseline;margin:3px 0}.warn{border:1px solid #E7D9B0;background:#FFF6E0;border-radius:8px;padding:8px 12px;margin-bottom:14px;font-size:9.4pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .sigp{break-before:page}.sgs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:14px}.sgs div{border:1.5px solid #153E5C;border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:16px}.sgs b{color:#153E5C}.sgs span{border-bottom:1px dotted #9AA6B1;padding-bottom:4px;font-size:9.5pt}`;
+    const docCode = await (await import('./docctl.js')).issueDoc({ kind: 'svc', ref: item?.ref || s.code, title: (item ? `${item.ref} — ` : '') + s.title, lang: 'ar' });
+    openDoc({ win, docCode, title: (item ? `ملف الطلب ${item.ref} — ` : 'ملف الخدمة — ') + s.title, body, css,
+      cover: coverHtml({ kicker: item ? 'ملف الطلب' : 'دليل الخدمات — ملف الخدمة', tag: s.status === 'issued' ? 'معتمد' : 'مسودة للمراجعة', title: ox(s.title), sub: item ? 'المسار، الأدوار، الاشتراطات والمواصفات، طريقة التنفيذ، والاستلام — نسخة لهذا الطلب.' : s.summary,
+        project: item ? `${item.ref || ''} — ${item.title || ''}` : '', facility: item ? [item.fac, item.loc].filter(Boolean).join(' · ') : '', pills: [us(s.unit), s.cat, s.code].filter(Boolean),
+        dept: 'إدارة الخدمات الفنية — ' + un(s.unit), edition: s.code, date: new Date().toISOString().slice(0, 10) }) });
+  } catch (e) { try { win.close(); } catch (x) { } err(e); }
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-svcdoc]'); if (!b) return; e.preventDefault(); let it = null; try { it = JSON.parse(b.dataset.item || 'null'); } catch (x) { } openSvcDoc(b.dataset.svcdoc, it); });

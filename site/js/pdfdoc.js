@@ -90,7 +90,7 @@ export function coverHtml(c) {
   <div class="cv-tx"><div class="cv-k">${esc(c.kicker || '')}</div><h1>${c.title}</h1>${c.sub ? `<div class="cv-sub">${esc(c.sub)}</div>` : ''}
   ${c.project ? `<div class="cv-prj"><b>${esc(c.project)}</b>${esc(c.facility || '')}</div>` : ''}
   ${(c.pills || []).length ? `<div class="cv-pills">${c.pills.map(p => `<span>${esc(p)}</span>`).join('')}</div>` : ''}</div>
-  <div class="cv-ft"><div><b>${c.en ? 'Technical Services Department — Projects Section' : 'إدارة الخدمات الفنية — قسم المشاريع'}</b><span>${c.en ? 'Al Ahsa Health Cluster' : 'تجمع الأحساء الصحي'}</span></div><div style="text-align:${c.en ? 'right' : 'left'}"><b>${esc(c.edition || '')}</b><span>${esc(c.date || '')}</span></div></div></div>`;
+  <div class="cv-ft"><div><b>${c.dept || (c.en ? 'Technical Services Department — Projects Section' : 'إدارة الخدمات الفنية — قسم المشاريع')}</b><span>${c.en ? 'Al Ahsa Health Cluster' : 'تجمع الأحساء الصحي'}</span></div><div style="text-align:${c.en ? 'right' : 'left'}"><b>${esc(c.edition || '')}</b><span>${esc(c.date || '')}</span></div></div></div>`;
 }
 
 // يفتح المستند في نافذة جديدة ويطلق الطباعة بعد تحميل الخط
