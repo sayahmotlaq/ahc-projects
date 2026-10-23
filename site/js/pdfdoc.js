@@ -94,7 +94,7 @@ export function coverHtml(c) {
 }
 
 // يفتح المستند في نافذة جديدة ويطلق الطباعة بعد تحميل الخط
-export async function openDoc({ title, cover = '', body, css = '', win = null, lang = 'ar' }) {
+export async function openDoc({ title, cover = '', body, css = '', win = null, lang = 'ar', docCode = '' }) {
   const en = lang === 'en', A = en ? 'left' : 'right', B = en ? 'right' : 'left';
   const w = win || prepDoc(); if (!w || w.closed) return;
   cover = cover.replace('%%LOGO%%', await logoData());
@@ -103,17 +103,18 @@ export async function openDoc({ title, cover = '', body, css = '', win = null, l
   w.document.write(`<!doctype html><html lang="${en ? 'en' : 'ar'}" dir="${en ? 'ltr' : 'rtl'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
-@page{size:A4;margin:20mm 16mm 18mm;@bottom-${A}{content:"${foot}";font-family:Tajawal,sans-serif;font-size:7.5pt;color:#5B6B7A}@bottom-${B}{content:counter(page) " / " counter(pages);font-family:Tajawal,sans-serif;font-size:8pt;color:#5B6B7A}@top-center{content:"";border-bottom:3px solid #27A8DF;width:100%;vertical-align:bottom;margin-bottom:6mm}}
-${cover ? '@page :first{margin:0;@bottom-left{content:none}@bottom-right{content:none}@top-center{content:none;border:0}}' : ''}
+@page{size:A4;margin:20mm 16mm 18mm;@bottom-${A}{content:"${foot}";font-family:Tajawal,sans-serif;font-size:7.5pt;color:#5B6B7A}${docCode ? `@bottom-center{content:"${docCode}";font-family:Tajawal,sans-serif;font-size:7pt;color:#9AA6B1;direction:ltr}` : ''}@bottom-${B}{content:counter(page) " / " counter(pages);font-family:Tajawal,sans-serif;font-size:8pt;color:#5B6B7A}@top-center{content:"";border-bottom:3px solid #27A8DF;width:100%;vertical-align:bottom;margin-bottom:6mm}}
+${cover ? '@page :first{margin:0;@bottom-left{content:none}@bottom-right{content:none}@bottom-center{content:none}@top-center{content:none;border:0}}' : ''}
 ${DOC_CSS}
 ${COVER_CSS}
+.docstamp{margin-top:18px;border-top:1px solid #E3EAF0;padding-top:8px;font-size:8.5pt;color:#5B6B7A;text-align:center}
 .docbar{position:sticky;top:0;z-index:5;display:flex;gap:10px;align-items:center;justify-content:center;background:#153E5C;color:#fff;padding:10px;font-size:13px}
 .docbar button{font:inherit;font-weight:700;border:0;border-radius:8px;padding:8px 16px;cursor:pointer;background:#27A8DF;color:#fff}.docbar button.g{background:transparent;border:1px solid rgba(255,255,255,.5)}
 @media screen{html{background:#E9EEF2}body{max-width:210mm;margin:0 auto 30px;background:#fff;box-shadow:0 2px 18px rgba(0,0,0,.12)}.doc{padding:20mm 16mm}.cv{margin-bottom:0;border-bottom:1px dashed #cdd6de}}
 @media print{.docbar{display:none}body{max-width:none}.doc{padding:0}}
 ${en ? LTR_CSS : ''}
 ${css}
-</style></head><body><div class="docbar" dir="rtl"><span>لحفظ الملف PDF: اضغط «طباعة» ثم اختر «حفظ بتنسيق PDF»</span><button onclick="print()">طباعة / حفظ PDF</button><button class="g" onclick="close()">إغلاق</button></div>${cover}<div class="doc">${body}</div></body></html>`);
+</style></head><body><div class="docbar" dir="rtl"><span>لحفظ الملف PDF: اضغط «طباعة» ثم اختر «حفظ بتنسيق PDF»</span><button onclick="print()">طباعة / حفظ PDF</button><button class="g" onclick="close()">إغلاق</button></div>${cover}<div class="doc">${body}${docCode ? `<p class="docstamp">${en ? 'Ref.' : 'الرقم المرجعي'} <span dir="ltr">${docCode}</span> — ${en ? 'Issued from the AHC Technical Services platform; any alteration voids this copy. Verify at ahc-tsd.com › Technical Library › Verify a document.' : 'نسخة صادرة من منصة إدارة الخدمات الفنية، وأي تعديل عليها يبطلها. يُتحقق منها في المنصة: المكتبة الفنية ← التحقق من وثيقة.'}</p>` : ''}</div></body></html>`);
   w.document.close();
   const go = () => (w.document.fonts?.ready || Promise.resolve()).then(() => setTimeout(() => w.print(), 350));
   if (w.document.readyState === 'complete') go(); else w.addEventListener('load', go);

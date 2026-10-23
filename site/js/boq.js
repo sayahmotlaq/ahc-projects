@@ -49,7 +49,7 @@ export async function boqExportData(boq, lines, project) {
     c.lsSpecs = rc.sort().map(x => ({ ...REF.byItem[x], ...(full[x] || {}), _used: used[x] }));
   }
   if (boq.handover !== false) { const { data } = await sb.from('handover_reqs').select('*').eq('active', true).order('sort'); c.handover = data || []; }
-  const prj = { name: project.name, ref: project.ref, facility: project.facility, type: project.type, dept: project.dept, engineer: project.engineer_name || '', date: boq.created_at?.slice(0, 10), contingency: boq.contingency, vat: boq.vat, factor: boq.factor, notes: boq.notes, hide_prices: boq.hide_prices, pricing: boq.pricing, boqName: boq.name };
+  const prj = { name: project.name, ref: project.ref, facility: project.facility, type: project.type, dept: project.dept, engineer: project.engineer_name || '', date: boq.created_at?.slice(0, 10), contingency: boq.contingency, vat: boq.vat, factor: boq.factor, notes: boq.notes, hide_prices: boq.hide_prices, pricing: boq.pricing, boqName: boq.name, boqId: boq.id };
   return { prj, c };
 }
 export async function mountBoq(root, boqId, project, onBack) {
@@ -63,7 +63,7 @@ export async function mountBoq(root, boqId, project, onBack) {
       <div class="titleblock"><b>${esc(project.name)}</b><span class="muted">جدول الكميات: ${esc(boq.name)} · <span class="badge skel">${STATUS[boq.status] || boq.status}</span></span></div>
 
       <span class="sp"></span>
-      <select id="bLang" class="langsel" title="لغة الملفات المصدَّرة (Excel وPDF)"><option value="ar">العربية</option><option value="en">English</option></select>
+      <span class="langseg" data-for="bLang" title="لغة الملفات المصدَّرة (Excel وPDF)"><button type="button" data-l="ar">عربي</button><button type="button" data-l="en">English</button></span><select id="bLang" hidden><option value="ar">العربية</option><option value="en">English</option></select>
       <button class="btn primary" id="bExcel">⬇ تصدير Excel</button>
       ${lines.some(l => l.ls_code) ? '<button class="btn" id="bGuide" title="دليل للمتبرع والمقاول يشرح المواصفات المعتمدة لبنود هذا الجدول — باسم المشروع">دليل المواصفات PDF</button>' : ''}<button class="btn" id="bHO" title="اشتراطات تسليم المشروع باسم المشروع مع إقرار المقاول">اشتراطات التسليم PDF</button>
       ${edit ? `<button class="btn" id="bSettings">إعدادات الجدول</button><button class="btn" id="bRefresh" title="تحديث أسعار البنود من المرجع الحالي">تحديث الأسعار</button>` : ''}
@@ -88,6 +88,7 @@ export async function mountBoq(root, boqId, project, onBack) {
   const lang = () => $('#bLang').value;
   try { $('#bLang').value = localStorage.getItem('ahc_xlang') || 'ar'; } catch (e) { }
   $('#bLang').onchange = () => { try { localStorage.setItem('ahc_xlang', lang()); } catch (e) { } };
+  import('./ui.js').then(u => u.bindLangSeg && u.bindLangSeg(document));
   $('#bGuide') && ($('#bGuide').onclick = async () => (await import('./guide.js')).openGuide(boq.id, lang()));
   $('#bHO').onclick = async () => (await import('./handover.js')).openHandoverDoc({ projectId: project.id, boqName: boq.name, lang: lang() });
   $('#bExcel').onclick = async () => { const { prj, c } = await boqExportData(boq, lines, project); exportExcelLang(prj, c, await logo(), lang()); };

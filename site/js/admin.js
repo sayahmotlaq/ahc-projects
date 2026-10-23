@@ -91,9 +91,12 @@ async function settings(t) {
     ${field('تنبيه انتهاء فترة ضمان المشروع قبل (أيام)', inp('warr', get('warranty_alert_days') ?? 60, 'type="number" min="7" max="365"'))}
     ${field('لوحة الشرف للمهندسين', sel('lb', [['false', 'غير مفعّلة (كل مهندس يرى نفسه ومتوسط الفريق)'], ['true', 'مفعّلة (يظهر ترتيب المهندس بين زملائه)']], String(get('perf_leaderboard') === true)), 'wide')}
     <div class="btnrow end wide"><button class="btn primary">حفظ</button></div></form>
-    <h3 class="sub">المرجع الفني</h3><p class="muted">إصدار البيانات: ${esc(JSON.stringify(rv))}</p><div class="btnrow"><button class="btn" id="clearCache">إعادة تحميل المرجع من الخادم</button></div></div>`;
+    <h3 class="sub">حماية ملفات Excel المصدّرة</h3><p class="muted small">كلمة مرور تُقفل بها كل أوراق ملفات Excel الصادرة من المنصة (يبقى المقاول قادراً على تعبئة خانات المبالغ فقط). اتركها فارغة لإلغاء الحماية بكلمة مرور. لا تُكتب في الكود، وتحفظ هنا فقط.</p>
+    <div class="btnrow"><input id="xlpw" type="password" dir="ltr" autocomplete="new-password" placeholder="${get('xl_protect')?.password ? '•••••• (محفوظة)' : 'لم تُحدد'}" style="max-width:260px"><button class="btn" id="xlpwSave">حفظ كلمة المرور</button></div>
+        <h3 class="sub">المرجع الفني</h3><p class="muted">إصدار البيانات: ${esc(JSON.stringify(rv))}</p><div class="btnrow"><button class="btn" id="clearCache">إعادة تحميل المرجع من الخادم</button></div></div>`;
   $('#f', t).onsubmit = async e => { e.preventDefault(); const f = formData(e.target); try { await q(sb.from('settings').upsert([{ key: 'org', value: { name: f.name, dept: f.dept } }, { key: 'admin_emails', value: f.admins.split(/[,،]/).map(x => x.trim().toLowerCase()).filter(Boolean) }, { key: 'submittal_sla_days', value: Number(f.sla) || 7 }, { key: 'stale_days', value: Number(f.stale) || 14 }, { key: 'doc_expiry_alert_days', value: Number(f.docexp) || 30 }, { key: 'warranty_alert_days', value: Number(f.warr) || 60 }, { key: 'perf_leaderboard', value: f.lb === 'true' }])); toast('تم الحفظ — تُطبّق الإعدادات عند إعادة تحميل الصفحة'); } catch (er) { err(er); } };
   $('#clearCache').onclick = () => { invalidateRef(); location.reload(); };
+  $('#xlpwSave', t).onclick = async () => { const v = $('#xlpw', t).value; try { await q(sb.from('settings').upsert({ key: 'xl_protect', value: { password: v }, updated_at: new Date().toISOString() }, { onConflict: 'key' })); toast(v ? 'حُفظت كلمة مرور الحماية' : 'أُلغيت كلمة مرور الحماية'); $('#xlpw', t).value = ''; } catch (er) { err(er); } };
 }
 
 // ---------- جودة البيانات: نواقص تشوّه المؤشرات

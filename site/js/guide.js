@@ -182,7 +182,8 @@ export async function openGuide(boqId, lang = 'ar') {
       <p class="note">${L.fig}</p>
       <p class="end">${L.end}<br><span style="font-weight:500;color:var(--g)">${L.endS}</span></p></div>`;
     const { openDoc, coverHtml } = await import('./pdfdoc.js');
-    openDoc({ win, lang, title: `${L.title}${prj ? ' — ' + t(prj.name) : ''}`, body: html,
+    const docCode = await (await import('./docctl.js')).issueDoc({ kind: 'guide', ref: boqId || 'all', title: prj ? prj.name : 'الدليل الكامل', lang });
+    openDoc({ win, lang, docCode, title: `${L.title}${prj ? ' — ' + t(prj.name) : ''}`, body: html,
       cover: coverHtml({ en: EN, kicker: L.kicker, title: L.h1, sub: L.subC,
         project: prj ? t(prj.name) : '', facility: prj ? [t(prj.facility), prj.contractor ? L.contr + t(prj.contractor) : ''].filter(Boolean).join(' · ') : '', pills: ['Heavy Duty', 'High Traffic', 'Disinfectant‑Resistant', 'ANSI/BHMA Grade 1', 'BIFMA'], edition: L.ed, date }) });
   } catch (e) { try { win?.close(); } catch (x) { } err(e); }

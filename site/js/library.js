@@ -18,6 +18,7 @@ export function mountLibrary(root) {
       ['#/standards', 'shield', 'معايير التجمع', 'معايير التجمع الداخلية بمالكها وإصدارها وحالتها، وأين يُطبَّق كل معيار في البنود والاشتراطات والقواعد والأدلة.', true],
       ['#/standards?t=ext', 'book', 'الكودات والمواصفات المرجعية', 'كود البناء السعودي، NFPA، ASHRAE، ANSI/BHMA، BIFMA، الوصول الشامل وغيرها — مع البنود التي تستند إليها.', true],
       ['#/standards?t=mat', 'stamp', 'المواد والمصنّعون المعتمدون', 'السجل الواحد للعلامات المعتمدة لكل مادة ونظام، وشرط قبول البديل، وبنودها.', true],
+      ['#verify', 'stamp', 'التحقق من وثيقة صادرة', 'أدخل الرقم المرجعي المطبوع على جدول كميات أو دليل أو اشتراطات، وقارن ملف المقاول بالنسخة الأصلية.', true],
       ['#/standards?t=chk', 'okc', 'فحص التطابق', 'يكشف أي اختلاف بين السجل المعتمد ونص البنود في القائمة أو في جدول مشروع.', isAdmin()],
     ]],
     ['الحوكمة والتشغيل', [
@@ -30,5 +31,6 @@ export function mountLibrary(root) {
     ${sections.map(([s, cs]) => { const v = cs.filter(c => c[4]); return v.length ? `<h2 class="libh">${esc(s)}</h2><div class="libg">${v.map(card).join('')}</div>` : ''; }).join('')}
     ${isAdmin() ? '<p class="muted small" style="margin-top:6px">إدارة بطاقات دليل المواصفات من <a href="#/admin/guide">الإدارة ← دليل المواصفات</a>.</p>' : ''}
     ${ops() ? `<h2 class="libh">أدلة الأقسام</h2><div class="libd">${DEPTS.map(([c, n]) => `<a href="#/dept/${c}/manual">${ico('book')} ${esc(n)}</a>`).join('')}</div>` : ''}`;
+  const vf = root.querySelector('a[href="#verify"]'); if (vf) vf.onclick = async e => { e.preventDefault(); (await import('./docctl.js')).openVerify(); };
   const g = root.querySelector('a[href="#guide"]'); if (g) g.onclick = async e => { e.preventDefault(); (await import('./guide.js')).openGuide(null); };
 }
