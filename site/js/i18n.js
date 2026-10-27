@@ -35,7 +35,7 @@ export async function translator(texts) {
 // النصوص المطلوبة لتصدير جدول كميات بالإنجليزية (لصفحة «الترجمة» وللتحقق قبل التصدير)
 export function boqTexts(prj, c) {
   const out = [prj.name, prj.facility, prj.type, prj.dept, prj.engineer, prj.boqName];
-  if (prj.notes) out.push(...prj.notes.split('\n').filter(x => x.trim()));
+  if (prj.notes) out.push(prj.notes, ...prj.notes.split('\n').filter(x => x.trim())); // النص كاملاً لترجمة الكتلة سطراً سطراً، والأسطر لصفحة الترجمة
   c.groups.forEach(g => g.lines.forEach(L => { if (L.free) out.push(L.ln.title, L.ln.descr, L.ln.loc); else out.push(L.r.v.spec, L.ln.loc); }));
   (c.handover || []).forEach(h => out.push(h.grp, h.title, h.descr, h.deliver, h.stage));
   return out.filter(Boolean);
