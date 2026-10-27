@@ -65,7 +65,7 @@ export async function mountBoq(root, boqId, project, onBack) {
       <span class="sp"></span>
       <span class="langseg" data-for="bLang" title="لغة الملفات المصدَّرة (Excel وPDF)"><button type="button" data-l="ar">عربي</button><button type="button" data-l="en">English</button></span><select id="bLang" hidden><option value="ar">العربية</option><option value="en">English</option></select>
       <button class="btn primary" id="bExcel">⬇ تصدير Excel</button>
-      ${lines.some(l => l.ls_code) ? '<button class="btn" id="bGuide" title="دليل للمتبرع والمقاول يشرح المواصفات المعتمدة لبنود هذا الجدول — باسم المشروع">دليل المواصفات PDF</button>' : ''}<button class="btn" id="bHO" title="اشتراطات تسليم المشروع باسم المشروع مع إقرار المقاول">اشتراطات التسليم PDF</button>
+      ${lines.length ? '<button class="btn" id="bSum" title="ملخص مرتب لبنود الجدول ونطاقها بلا أسعار — للعرض على المتبرع وأصحاب القرار">ملخص الجدول PDF</button>' : ''}${lines.some(l => l.ls_code) ? '<button class="btn" id="bGuide" title="دليل للمتبرع والمقاول يشرح المواصفات المعتمدة لبنود هذا الجدول — باسم المشروع">دليل المواصفات PDF</button>' : ''}<button class="btn" id="bHO" title="اشتراطات تسليم المشروع باسم المشروع مع إقرار المقاول">اشتراطات التسليم PDF</button>
       ${edit ? `<button class="btn" id="bSettings">إعدادات الجدول</button><button class="btn" id="bRefresh" title="تحديث أسعار البنود من المرجع الحالي">تحديث الأسعار</button>` : ''}
       <button class="btn" onclick="window.print()">طباعة</button>
     </div>${govBar(GOV.boq(boq), 'حالة الجدول: ' + (STATUS[boq.status] || boq.status))}
@@ -89,6 +89,7 @@ export async function mountBoq(root, boqId, project, onBack) {
   try { $('#bLang').value = localStorage.getItem('ahc_xlang') || 'ar'; } catch (e) { }
   $('#bLang').onchange = () => { try { localStorage.setItem('ahc_xlang', lang()); } catch (e) { } };
   import('./ui.js').then(u => u.bindLangSeg && u.bindLangSeg(document));
+  $('#bSum') && ($('#bSum').onclick = async () => (await import('./boqdoc.js')).openBoqSummary(boq.id, lang()));
   $('#bGuide') && ($('#bGuide').onclick = async () => (await import('./guide.js')).openGuide(boq.id, lang()));
   $('#bHO').onclick = async () => (await import('./handover.js')).openHandoverDoc({ projectId: project.id, boqName: boq.name, lang: lang() });
   $('#bExcel').onclick = async () => { const { prj, c } = await boqExportData(boq, lines, project); exportExcelLang(prj, c, await logo(), lang()); };
