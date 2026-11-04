@@ -157,7 +157,7 @@ export function toHtml(blocks, V, tpl) {
       case 'parties': return `<div class="ag-pt">${computed(b, V, tpl).map(([k, v]) => `<div><b>${k}</b>${esc(v)}</div>`).join('')}</div>`;
       case 'services': return `<ul class="d">${computed(b, V, tpl).map(x => `<li>${esc(x)}</li>`).join('')}</ul>`;
       case 'costbox': { const c = computed(b, V, tpl); return `<div class="cbox"><h4>الصورة المالية لمشروعكم</h4>${tblHtml({ rows: c.rows, w: [45, 55], kv: true })}<p class="sm" style="margin:4px 0 0">${esc(c.note)}</p></div>`; }
-      case 'sig': return `<div class="ag-sig">${computed(b, V, tpl).map(([h, o, nm]) => `<div><h4>${esc(h)}</h4><div class="o">${esc(o)}</div><div class="nm">${esc(nm)}</div><div class="ln">التوقيع<i></i></div>${b.annex ? '' : '<div class="ln">الختم<i></i></div>'}<div class="ln">التاريخ<i></i></div></div>`).join('')}</div>`;
+      case 'sig': return `<div class="ag-sig">${computed(b, V, tpl).map(([h, o, nm]) => `<div><h4>${esc(h)}</h4><div class="o">${esc(o)}</div><div class="nm">${esc(nm)}</div><div class="ln">التوقيع<i></i></div><div class="ln">التاريخ<i></i></div></div>`).join('')}</div>`;
       case 'budget': case 'pdata': case 'notices': case 'phases': case 'cash': return tblHtml(computed(b, V, tpl));
       case 'pb': return '<div class="brk"></div>';
     }
@@ -223,7 +223,7 @@ function docxBody(blocks, V, tpl, kind) {
       case 'costbox': { const c = computed(b, V, tpl); return P('الصورة المالية لمشروعكم', { b: true, color: C.n, keep: true, before: 120 }) + table({ rows: c.rows, w: [45, 55], kv: true }) + P(c.note, { sz: 9, color: C.g }); }
       case 'sig': { const s = computed(b, V, tpl), w = Math.round(TW / 2);
         const col = ([h, o, nm]) => cell([P(h, { b: true, color: C.n, jc: 'center', shd: C.s2, after: 60 }), P(o, { b: true, jc: 'center', after: 20 }), P(nm, { jc: 'center', after: 200 }),
-          P('التوقيع: ........................................', { color: C.g, sz: 10, after: 160 }), ...(b.annex ? [] : [P('الختم: ..........................................', { color: C.g, sz: 10, after: 160 })]), P('التاريخ: ........................................', { color: C.g, sz: 10, after: 60 })], w);
+          P('التوقيع: ........................................', { color: C.g, sz: 10, after: 160 }), P('التاريخ: ........................................', { color: C.g, sz: 10, after: 60 })], w);
         return `<w:tbl><w:tblPr><w:bidiVisual/><w:tblW w:w="${TW}" w:type="dxa"/><w:tblBorders>${['top', 'left', 'bottom', 'right', 'insideV'].map(x => `<w:${x} w:val="single" w:sz="4" w:space="0" w:color="${C.l}"/>`).join('')}</w:tblBorders><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="80" w:type="dxa"/><w:left w:w="140" w:type="dxa"/><w:bottom w:w="80" w:type="dxa"/><w:right w:w="140" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="${w}"/><w:gridCol w:w="${w}"/></w:tblGrid><w:tr><w:trPr><w:cantSplit/></w:trPr>${s.map(col).join('')}</w:tr></w:tbl>` + P(''); }
       case 'budget': case 'pdata': case 'notices': case 'phases': case 'cash': return table(computed(b, V, tpl));
       case 'pb': return para('', { pb: true });
