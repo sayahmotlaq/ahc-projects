@@ -1,7 +1,7 @@
 // ===== الاتفاقيات: يعبّي الموظف بيانات المتبرع والمشروع، وتُبنى الاتفاقية وملحقها تلقائياً من القالب المعتمد — تصدير PDF وWord بهوية التجمع
 import { sb, q, isAdmin, canEdit, session } from './api.js';
 import { $, $$, esc, ico, toast, err, confirm, download, dateAr, parseMoney, fmtMoney } from './ui.js';
-import { vars, resolve, toHtml, titleHtml, buildDocx, AGR_CSS, num, tafqeet } from './agrcore.js';
+import { vars, resolve, toHtml, buildDocx, AGR_CSS, num, tafqeet } from './agrcore.js';
 
 export const AST = { draft: ['مسودة', 'st-draft'], review: ['قيد المراجعة', 'st-plan'], sent: ['مرسلة للمتبرع', 'st-plan'], signed: ['موقعة', 'st-ok'], archived: ['أرشيف', 'st-draft'] };
 const stb = s => { const [t, c] = AST[s] || AST.draft; return `<span class="stb ${c}">${t}</span>`; };
@@ -136,7 +136,8 @@ async function output(a, t, kind, fmt, win) {
     download(blob, `${name} - ${(V.center_or || '').replace(/[\\/:*?"<>|]/g, '')}.docx`); toast('تم تصدير ملف Word'); return;
   }
   const { openDoc, coverHtml } = await import('./pdfdoc.js');
-  const body = kind === 'agreement' ? titleHtml(V, ref, '%%LOGO%%') + `<div class="ag">${toHtml(blocks, V, t)}</div>` : `<div class="ag">${toHtml(blocks, V, t)}</div>`;
-  const cover = kind === 'annex' ? coverHtml({ kicker: 'الشراكة المجتمعية', title: 'ملحق إجراءات وآليات العمل', sub: `دليل المتبرع لرحلة إنشاء ${V.center_or}: الأطراف، والتواصل، وآلية الصرف، والتكلفة، والجودة، والاستلام.`, project: V.center_or, facility: V.loc_or, pills: [`${V.amount_n} ر.س`, `${V.months} شهراً`], tag: 'ملحق الاتفاقية', edition: ref, date: `${V.yg}م / ${V.yh}هـ` }) : '';
+  const body = `<div class="ag">${toHtml(blocks, V, t)}</div>`;
+  const cover = kind === 'agreement' ? coverHtml({ kicker: 'الشراكة المجتمعية', title: 'اتفاقية شراكة مجتمعية', sub: `بين تجمع الأحساء الصحي التابع لـ${V.affil} و${V.p2title}، لإنشاء وتجهيز مركز رعاية صحية أولية${V.loc} بمحافظة الأحساء.`, project: V.center_or, facility: V.loc_or, pills: [`${V.yg}م / ${V.yh}هـ`, `مدة التنفيذ ${V.months} شهراً`], tag: 'اتفاقية', edition: ref, date: `${V.yg}م / ${V.yh}هـ` })
+    : coverHtml({ kicker: 'الشراكة المجتمعية', title: 'ملحق إجراءات وآليات العمل', sub: `دليل المتبرع لرحلة إنشاء ${V.center_or}: الأطراف، والتواصل، وآلية الصرف، والتكلفة، والجودة، والاستلام.`, project: V.center_or, facility: V.loc_or, pills: [`${V.amount_n} ر.س`, `${V.months} شهراً`], tag: 'ملحق الاتفاقية', edition: ref, date: `${V.yg}م / ${V.yh}هـ` });
   await openDoc({ title, cover, body, css: AGR_CSS, win, docCode: ref, footC: kind === 'agreement' ? 'الأحرف الأولى:  الطرف الأول ........  الطرف الثاني ........' : '' });
 }
