@@ -97,13 +97,14 @@ export function computed(b, V, tpl) {
     case 'costbox': return { rows: [['مبلغ التبرع قبل الضريبة', `${V.amount_n} ر.س`], ['ضريبة القيمة المضافة (15%) على الفواتير', `${V.vat_n} ر.س تقريباً`], ['الإجمالي المتوقع شاملاً الضريبة', `${V.amount_vat} ر.س تقريباً`],
       ...(V.per_m2 ? [['تكلفة التنفيذ الاسترشادية للمتر المربع', `${num(V.per_m2)} ر.س / م² (قبل الضريبة، دون الأثاث وإيصال الخدمات)`]] : [])],
       note: 'للمقارنة: تراوحت تكلفة التنفيذ الاسترشادية في اتفاقيات التجمع للمراكز المماثلة (2025–2026) بين 5,000 و6,000 ريال للمتر المربع من مسطح البناء قبل الضريبة. السعر الملزم هو نتيجة الطرح.' };
-    case 'sig': return b.annex ? [['ممثل الطرف الأول', 'إدارة الخدمات الفنية — قسم المشاريع', V.p1_coord || ''], ['ممثل الطرف الثاني', V.p2title, V.p2_coord || '']]
+    case 'sig': return b.annex ? [['ممثل الطرف الأول', 'تجمع الأحساء الصحي', V.p1_coord || ''], ['ممثل الطرف الثاني', V.p2title, V.p2_coord || '']]
       : [['الطرف الأول', 'تجمع الأحساء الصحي', V.p1_rep + (V.p1_rep_title ? '\n' + V.p1_rep_title : '')], ['الطرف الثاني', V.company ? V.p2title : 'المتبرع', V.company ? (V.p2full.split('ويمثلها في هذه الاتفاقية ')[1] || '').split(' بصفته ')[0] : V.p2title]];
   }
 }
 
 // ---------- HTML (نافذة الطباعة PDF)
 export const AGR_CSS = `
+.cv-top{justify-content:center}.cv-top .cv-tag{display:none}.cv-top img{height:30mm}.cv-tx{text-align:center}.cv-sub{margin:0 auto;white-space:pre-line;font-weight:700}.cv-pills{justify-content:center}.cv-prj{margin-left:auto;margin-right:auto}.cv-ft{justify-content:center;text-align:center}.cv-ft>div:first-child{display:none}.cv-ft>div:last-child{text-align:center!important}
 *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .ag-hd{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid var(--n);padding-bottom:10px;margin-bottom:18px}
 .ag-hd img{height:17mm}.ag-ref{text-align:left;font-size:8.6pt;color:var(--g);line-height:1.6}.ag-ref b{color:var(--n);direction:ltr;display:inline-block}
@@ -165,7 +166,7 @@ export function toHtml(blocks, V, tpl) {
   return blocks.map(B).join('');
 }
 export function titleHtml(V, ref, logo) {
-  return `<div class="ag-hd"><img src="${logo}" alt=""><div class="ag-ref">الرقم المرجعي: <b>${esc(ref)}</b><br>إدارة الخدمات الفنية — قسم المشاريع</div></div>
+  return `<div class="ag-hd"><img src="${logo}" alt=""><div class="ag-ref">الرقم المرجعي: <b>${esc(ref)}</b></div></div>
   <div class="ag-tt"><span class="k">الشراكة المجتمعية</span><h1>اتفاقية شراكة مجتمعية</h1><div class="l">بين تجمع الأحساء الصحي التابع لـ${esc(V.affil)}<br>و${esc(V.p2title)}<br>لإنشاء وتجهيز مركز رعاية صحية أولية${esc(V.loc)} بمحافظة الأحساء</div><span class="y">${V.yg}م / ${V.yh}هـ</span></div>`;
 }
 
@@ -246,11 +247,10 @@ function coverDocx(V, ref, kind, picD) {
     + P(V.loc_or, { sz: 11.5, color: C.g, jc: 'center', after: 1400 })
     + P(`${V.yg}م / ${V.yh}هـ`, { b: true, sz: 11, color: C.n, jc: 'center', after: 40 })
     + P(`الرقم المرجعي: ${ref}`, { sz: 9.5, color: C.g, jc: 'center', after: 400 })
-    + P('إدارة الخدمات الفنية — قسم المشاريع', { b: true, sz: 11, color: C.n, jc: 'center', after: 0 })
-    + P('تجمع الأحساء الصحي', { sz: 10, color: C.g, jc: 'center', after: 0 })
+    + P('تجمع الأحساء الصحي', { b: true, sz: 11.5, color: C.n, jc: 'center', after: 0 })
     + para('', { pb: true, after: 0 });
 }
-const COPY = '© 2026 حقوق النشر محفوظة لتجمع الأحساء الصحي — إدارة الخدمات الفنية';
+export const AGR_COPY = '© 2026 حقوق النشر محفوظة لتجمع الأحساء الصحي'; const COPY = AGR_COPY;
 export async function buildDocx(JSZip, { blocks, V, tpl, kind, ref, logo, logoW = 1332, logoH = 467, title, outType }) {
   const z = new JSZip();
   const cx = Math.round(1.55 * 914400), cy = Math.round(cx * logoH / logoW);
@@ -260,7 +260,7 @@ export async function buildDocx(JSZip, { blocks, V, tpl, kind, ref, logo, logoW 
   const body = coverDocx(V, ref, kind, picD) + docxBody(blocks, V, tpl, kind);
   const hw = Math.round(TW / 2);
   const header = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr ${ns}><w:tbl><w:tblPr><w:bidiVisual/><w:tblW w:w="${TW}" w:type="dxa"/><w:tblBorders><w:bottom w:val="single" w:sz="12" w:space="0" w:color="${C.s}"/></w:tblBorders><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="${hw}"/><w:gridCol w:w="${hw}"/></w:tblGrid><w:tr>
-    ${cell([para(run(title, { b: true, sz: 9, color: C.n }), { after: 0 }), para(run('إدارة الخدمات الفنية — قسم المشاريع', { sz: 8, color: C.g }), { after: 60 })], hw)}
+    ${cell([para(run(title, { b: true, sz: 9, color: C.n }), { after: 0 }), para(run('تجمع الأحساء الصحي', { sz: 8, color: C.g }), { after: 60 })], hw)}
     ${cell([`<w:p><w:pPr><w:bidi/><w:jc w:val="left"/><w:spacing w:after="60"/></w:pPr>${pic}</w:p>`], hw)}</w:tr></w:tbl>${P('', { after: 0, sz: 4 })}</w:hdr>`;
   const fld = c => `<w:fldSimple w:instr=" ${c} "><w:r><w:rPr><w:rFonts w:ascii="${FONT}" w:hAnsi="${FONT}" w:cs="${FONT}"/><w:sz w:val="16"/></w:rPr><w:t>1</w:t></w:r></w:fldSimple>`;
   const fw = [Math.round(TW * .44), Math.round(TW * .38), Math.round(TW * .18)];
@@ -272,7 +272,7 @@ export async function buildDocx(JSZip, { blocks, V, tpl, kind, ref, logo, logoW 
   const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="${FONT}" w:hAnsi="${FONT}" w:cs="${FONT}" w:eastAsia="${FONT}"/><w:sz w:val="22"/><w:szCs w:val="22"/><w:lang w:val="ar-SA" w:bidi="ar-SA"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:bidi/><w:spacing w:after="100" w:line="300" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:pPr><w:bidi/></w:pPr><w:rPr><w:rtl/></w:rPr></w:style><w:style w:type="table" w:default="1" w:styleId="TableNormal"><w:name w:val="Normal Table"/><w:tblPr><w:tblInd w:w="0" w:type="dxa"/><w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:left w:w="108" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="108" w:type="dxa"/></w:tblCellMar></w:tblPr></w:style></w:styles>`;
   z.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/><Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/><Override PartName="/word/header2.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/><Override PartName="/word/footer2.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>`);
   z.file('_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/></Relationships>`);
-  z.file('docProps/core.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${X(title)}</dc:title><dc:creator>تجمع الأحساء الصحي — إدارة الخدمات الفنية</dc:creator><dc:identifier>${X(ref)}</dc:identifier><dcterms:created xsi:type="dcterms:W3CDTF">${new Date().toISOString().slice(0, 19)}Z</dcterms:created></cp:coreProperties>`);
+  z.file('docProps/core.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${X(title)}</dc:title><dc:creator>تجمع الأحساء الصحي</dc:creator><dc:identifier>${X(ref)}</dc:identifier><dcterms:created xsi:type="dcterms:W3CDTF">${new Date().toISOString().slice(0, 19)}Z</dcterms:created></cp:coreProperties>`);
   z.file('word/_rels/document.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rSty" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rSet" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/><Relationship Id="rHdr" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/><Relationship Id="rFtr" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/><Relationship Id="rHdr0" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header2.xml"/><Relationship Id="rFtr0" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer2.xml"/><Relationship Id="rLogoD" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/logo.png"/></Relationships>`);
   z.file('word/_rels/header1.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rLogo" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/logo.png"/></Relationships>`);
   z.file('word/settings.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:updateFields w:val="true"/><w:defaultTabStop w:val="454"/><w:themeFontLang w:val="en-US" w:bidi="ar-SA"/><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>`);

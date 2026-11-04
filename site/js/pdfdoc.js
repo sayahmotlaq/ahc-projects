@@ -94,11 +94,11 @@ export function coverHtml(c) {
 }
 
 // يفتح المستند في نافذة جديدة ويطلق الطباعة بعد تحميل الخط
-export async function openDoc({ title, cover = '', body, css = '', win = null, lang = 'ar', docCode = '', footC = '' }) {
+export async function openDoc({ title, cover = '', body, css = '', win = null, lang = 'ar', docCode = '', footC = '', copy = '', stamp = true }) {
   const en = lang === 'en', A = en ? 'left' : 'right', B = en ? 'right' : 'left';
   const w = win || prepDoc(); if (!w || w.closed) return;
   const lg = await logoData(); cover = cover.replace('%%LOGO%%', lg); body = body.replace('%%LOGO%%', lg);
-  const foot = (en ? COPYRIGHT_EN : COPYRIGHT).replace(/"/g, '\"');
+  const foot = (copy || (en ? COPYRIGHT_EN : COPYRIGHT)).replace(/"/g, '\"');
   w.document.open();
   w.document.write(`<!doctype html><html lang="${en ? 'en' : 'ar'}" dir="${en ? 'ltr' : 'rtl'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
@@ -114,7 +114,7 @@ ${COVER_CSS}
 @media print{.docbar{display:none}body{max-width:none}.doc{padding:0}}
 ${en ? LTR_CSS : ''}
 ${css}
-</style></head><body><div class="docbar" dir="rtl"><span>لحفظ الملف PDF: اضغط «طباعة» ثم اختر «حفظ بتنسيق PDF»</span><button onclick="print()">طباعة / حفظ PDF</button><button class="g" onclick="close()">إغلاق</button></div>${cover}<div class="doc">${body}${docCode ? `<p class="docstamp">${en ? 'Ref.' : 'الرقم المرجعي'} <span dir="ltr">${docCode}</span> — ${en ? 'Issued from the AHC Technical Services platform; any alteration voids this copy. Verify at ahc-tsd.com › Technical Library › Verify a document.' : 'نسخة صادرة من منصة إدارة الخدمات الفنية، وأي تعديل عليها يبطلها. يُتحقق منها في المنصة: المكتبة الفنية ← التحقق من وثيقة.'}</p>` : ''}</div></body></html>`);
+</style></head><body><div class="docbar" dir="rtl"><span>لحفظ الملف PDF: اضغط «طباعة» ثم اختر «حفظ بتنسيق PDF»</span><button onclick="print()">طباعة / حفظ PDF</button><button class="g" onclick="close()">إغلاق</button></div>${cover}<div class="doc">${body}${docCode && stamp ? `<p class="docstamp">${en ? 'Ref.' : 'الرقم المرجعي'} <span dir="ltr">${docCode}</span> — ${en ? 'Issued from the AHC Technical Services platform; any alteration voids this copy. Verify at ahc-tsd.com › Technical Library › Verify a document.' : 'نسخة صادرة من منصة إدارة الخدمات الفنية، وأي تعديل عليها يبطلها. يُتحقق منها في المنصة: المكتبة الفنية ← التحقق من وثيقة.'}</p>` : ''}</div></body></html>`);
   w.document.close();
   const go = () => (w.document.fonts?.ready || Promise.resolve()).then(() => setTimeout(() => w.print(), 350));
   if (w.document.readyState === 'complete') go(); else w.addEventListener('load', go);
