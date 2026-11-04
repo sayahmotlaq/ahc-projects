@@ -1690,3 +1690,14 @@ td.kic{color:var(--k)} td.kic svg.i{width:20px;height:20px}
 @media print{.svc-wrap{display:block} .svc-hero{-webkit-print-color-adjust:exact;print-color-adjust:exact} .svc-sec{break-inside:auto;border:0;padding:6px 0} .svc-flow li{break-inside:avoid} .svc-wi details{display:block} .svc-wi details>*{display:block}}
 .svc-doc .gref{white-space:nowrap} .svc-raci td:first-child{min-width:200px}
 .svc-hrow{display:flex;gap:8px;align-items:stretch;flex-wrap:wrap;margin:6px 0} .svc-hrow .svc-hint{flex:1;margin:0} .svc-hrow .btn{align-self:center}
+/* ===== الاتفاقيات (update125) ===== */
+.agr-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:4px 0 14px}.agr-kpis div{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+.agr-kpis b{display:block;font-size:20px;color:var(--navy);font-variant-numeric:tabular-nums}.agr-kpis span{font-size:12px;color:var(--grey)}
+.agr-out{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:12px}
+.agr-out>div{display:flex;gap:6px;align-items:center;padding-left:12px;border-left:1px solid var(--line)}.agr-out>div b{display:flex;gap:6px;align-items:center;color:var(--navy);font-size:13px;margin-left:4px}
+.agr-form section{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:12px}
+.agr-form h3{font-size:15px;color:var(--navy);margin:0 0 10px;padding-bottom:6px;border-bottom:2px solid #E8F6FC}
+.agr-form .fld.wide{grid-column:1/-1}.agr-cbs{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;margin-top:10px}
+.agr-cb{display:inline-flex;gap:6px;align-items:center;font-size:13px;cursor:pointer}.agr-w{color:var(--navy);font-size:14px;padding-top:6px}
+.agr-bud{margin-top:10px}.agr-bud input.money{width:100%}.agr-log{margin:8px 0 30px;font-size:12.5px}.agr-log div{padding:3px 0;border-bottom:1px dashed var(--line)}
+@media (max-width:720px){.agr-kpis{grid-template-columns:1fr 1fr}.agr-out>div{border:0;padding:0}}

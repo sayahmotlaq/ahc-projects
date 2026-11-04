@@ -62,7 +62,7 @@ table{width:100%;border-collapse:collapse}
 .note{background:var(--s2);border-radius:8px;padding:9px 12px;font-size:9.6pt;margin:10px 0}
 .end{text-align:center;margin-top:24px;color:var(--n);font-weight:700}`;
 
-const COVER_CSS = `.cv{width:210mm;height:297mm;position:relative;overflow:hidden;background:#fff;break-after:page;page-break-after:always}
+export const COVER_CSS = `.cv{width:210mm;height:297mm;position:relative;overflow:hidden;background:#fff;break-after:page;page-break-after:always}
 .cv-top{padding:22mm 18mm 0;display:flex;justify-content:space-between;align-items:center}.cv-top img{height:24mm}
 .cv-tag{color:#27A8DF;font-weight:700;font-size:11pt;border:1.5px solid #27A8DF;border-radius:30px;padding:4px 16px}
 .cv-band{position:absolute;left:0;right:0;top:78mm;height:150mm;background:#153E5C}
@@ -94,16 +94,16 @@ export function coverHtml(c) {
 }
 
 // يفتح المستند في نافذة جديدة ويطلق الطباعة بعد تحميل الخط
-export async function openDoc({ title, cover = '', body, css = '', win = null, lang = 'ar', docCode = '' }) {
+export async function openDoc({ title, cover = '', body, css = '', win = null, lang = 'ar', docCode = '', footC = '' }) {
   const en = lang === 'en', A = en ? 'left' : 'right', B = en ? 'right' : 'left';
   const w = win || prepDoc(); if (!w || w.closed) return;
-  cover = cover.replace('%%LOGO%%', await logoData());
+  const lg = await logoData(); cover = cover.replace('%%LOGO%%', lg); body = body.replace('%%LOGO%%', lg);
   const foot = (en ? COPYRIGHT_EN : COPYRIGHT).replace(/"/g, '\"');
   w.document.open();
   w.document.write(`<!doctype html><html lang="${en ? 'en' : 'ar'}" dir="${en ? 'ltr' : 'rtl'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
-@page{size:A4;margin:20mm 16mm 18mm;@bottom-${A}{content:"${foot}";font-family:Tajawal,sans-serif;font-size:7.5pt;color:#5B6B7A}${docCode ? `@bottom-center{content:"${docCode}";font-family:Tajawal,sans-serif;font-size:7pt;color:#9AA6B1;direction:ltr}` : ''}@bottom-${B}{content:counter(page) " / " counter(pages);font-family:Tajawal,sans-serif;font-size:8pt;color:#5B6B7A}@top-center{content:"";border-bottom:3px solid #27A8DF;width:100%;vertical-align:bottom;margin-bottom:6mm}}
+@page{size:A4;margin:20mm 16mm 18mm;@bottom-${A}{content:"${foot}";font-family:Tajawal,sans-serif;font-size:7.5pt;color:#5B6B7A}${footC ? `@bottom-center{content:"${footC}";font-family:Tajawal,sans-serif;font-size:7.5pt;color:#153E5C}` : docCode ? `@bottom-center{content:"${docCode}";font-family:Tajawal,sans-serif;font-size:7pt;color:#9AA6B1;direction:ltr}` : ''}@bottom-${B}{content:counter(page) " / " counter(pages);font-family:Tajawal,sans-serif;font-size:8pt;color:#5B6B7A}@top-center{content:"";border-bottom:3px solid #27A8DF;width:100%;vertical-align:bottom;margin-bottom:6mm}}
 ${cover ? '@page :first{margin:0;@bottom-left{content:none}@bottom-right{content:none}@bottom-center{content:none}@top-center{content:none;border:0}}' : ''}
 ${DOC_CSS}
 ${COVER_CSS}
